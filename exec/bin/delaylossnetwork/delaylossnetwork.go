@@ -1,0 +1,263 @@
+/*
+ * Copyright 1999-2019 Alibaba Group Holding Ltd.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+
+	"strings"
+	"strconv"
+	"github.com/sirupsen/logrus"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+)
+
+var dlNetInterface, dlLocalPort, dlRemotePort, dlExcludePort string
+var dlDestinationIp string
+var lossNetPercent, delayNetTime, delayNetOffset string
+var dlNetStart, dlNetStop bool
+
+const delimiter = ","
+
+func main() {
+	flag.StringVar(&dlNetInterface, "interface", "", "network interface")
+	flag.StringVar(&delayNetTime, "time", "", "delay time")
+	flag.StringVar(&delayNetOffset, "offset", "", "delay offset")
+	flag.StringVar(&lossNetPercent, "percent", "", "loss percent")
+	flag.StringVar(&dlLocalPort, "local-port", "", "local ports, for example: 80,8080,8081")
+	flag.StringVar(&dlRemotePort, "remote-port", "", "remote ports, for example: 80,8080,8081")
+	flag.StringVar(&dlExcludePort, "exclude-port", "", "exclude ports, for example: 22,23")
+	flag.StringVar(&dlDestinationIp, "destination-ip", "", "destination ip")
+	flag.BoolVar(&dlNetStart, "start", false, "start delay")
+	flag.BoolVar(&dlNetStop, "stop", false, "stop delay")
+	util.AddDebugFlag()
+	flag.Parse()
+	util.InitLog(util.Bin)
+	if dlNetInterface == "" {
+		bin.PrintErrAndExit("less --interface flag")
+	}
+
+	if dlNetStart {
+		var classRule string
+		if lossNetPercent != "" {
+			classRule = fmt.Sprintf("netem loss %s%%", lossNetPercent)
+		} else if delayNetTime != "" {
+			classRule = fmt.Sprintf("netem delay %sms %sms", delayNetTime, delayNetOffset)
+		}
+		startNet(dlNetInterface, classRule, dlLocalPort, dlRemotePort, dlExcludePort, dlDestinationIp)
+	} else if dlNetStop {
+		stopNet(dlNetInterface)
+	} else {
+		bin.PrintErrAndExit("less --start or --stop flag")
+	}
+}
+
+var channel = channel2.NewLocalChannel()
+
+func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp string) {
+	// check device txqueuelen size, if the size is zero, then set the value to 1000
+	response := preHandleTxqueue(netInterface)
+	if !response.Success {
+		bin.PrintErrAndExit(response.Err)
+	}
+	ctx := context.Background()
+	// assert localPort and remotePort
+	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" {
+		response := channel.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
+		if !response.Success {
+			bin.PrintErrAndExit(response.Err)
+		}
+		bin.PrintOutputAndExit(response.Result.(string))
+		return
+	}
+	response = addQdiscForDL(channel, ctx, netInterface)
+	// only ip
+	if localPort == "" && remotePort == "" && excludePort == "" {
+		response = addIpFilterForDL(ctx, channel, netInterface, classRule, destIp)
+		bin.PrintOutputAndExit(response.Result.(string))
+		return
+	}
+	ipRule := getIpRule(destIp)
+	// exclude
+	if localPort == "" && remotePort == "" && excludePort != "" {
+		response = addExcludePortFilterForDL(ctx, channel, netInterface, classRule, excludePort, ipRule)
+		bin.PrintOutputAndExit(response.Result.(string))
+		return
+	}
+	// local port or remote port
+	response = addLocalOrRemotePortForDL(ctx, channel, netInterface, classRule, localPort, remotePort, ipRule)
+	bin.PrintOutputAndExit(response.Result.(string))
+}
+
+func preHandleTxqueue(netInterface string) *spec.Response {
+	txFile := fmt.Sprintf("/sys/class/net/%s/tx_queue_len", netInterface)
+	isExist := util.IsExist(txFile)
+	if isExist {
+		// check the value
+		response := channel.Run(context.TODO(), "head", fmt.Sprintf("-1 %s", txFile))
+		if response.Success {
+			txlen := strings.TrimSpace(response.Result.(string))
+			len, err := strconv.Atoi(txlen)
+			if err != nil {
+				logrus.Warningf("parse %s file err, %v", txFile, err)
+			} else {
+				if len > 0 {
+					return response
+				} else {
+					logrus.Infof("the tx_queue_len value for %s is %s", netInterface, txlen)
+				}
+			}
+		}
+	}
+	// set to 1000 directly
+	response := channel.Run(context.TODO(), "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
+	if !response.Success {
+		logrus.Warningf("set txqueuelen for %s err, %s", netInterface, response.Err)
+	}
+	return response
+}
+
+func getIpRule(destIp string) string {
+	if destIp == "" {
+		return ""
+	}
+	return fmt.Sprintf("match ip dst %s", destIp)
+}
+
+// addIpFilterForDL
+func addIpFilterForDL(ctx context.Context, channel spec.Channel, netInterface string, classRule, destIp string) *spec.Response {
+	response := channel.Run(ctx, "tc",
+		fmt.Sprintf(`qdisc add dev %s parent 1:4 handle 40: %s`, netInterface, classRule))
+	if !response.Success {
+		stopNet(netInterface)
+		bin.PrintErrAndExit(response.Err)
+		return response
+	}
+	args := fmt.Sprintf(
+		`filter add dev %s parent 1: prio 4 protocol ip u32 match ip dst %s flowid 1:4`,
+		netInterface, destIp)
+	response = channel.Run(ctx, "tc", args)
+	if !response.Success {
+		stopDLNetFunc(netInterface)
+		bin.PrintErrAndExit(response.Err)
+	}
+	return response
+}
+
+var stopDLNetFunc = stopNet
+// addLocalOrRemotePortForDL creates class rule in 1:4 queue and add filter to the queue
+func addLocalOrRemotePortForDL(ctx context.Context, channel spec.Channel,
+	netInterface, classRule, localPort, remotePort, ipRule string) *spec.Response {
+	response := channel.Run(ctx, "tc",
+		fmt.Sprintf(`qdisc add dev %s parent 1:4 handle 40: %s`, netInterface, classRule))
+	if !response.Success {
+		stopNet(netInterface)
+		bin.PrintErrAndExit(response.Err)
+		return response
+	}
+	// local port 0
+	if localPort != "" {
+		ports := strings.Split(localPort, delimiter)
+		args := fmt.Sprintf(
+			`filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip sport %s 0xffff flowid 1:4`,
+			netInterface, ipRule, ports[0])
+		if len(ports) > 1 {
+			for i := 1; i < len(ports); i++ {
+				args = fmt.Sprintf(
+					`%s && \
+					tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip sport %s 0xffff flowid 1:4`,
+					args, netInterface, ipRule, ports[i])
+			}
+		}
+		response = channel.Run(ctx, "tc", args)
+		if !response.Success {
+			stopDLNetFunc(netInterface)
+			bin.PrintErrAndExit(response.Err)
+		}
+	}
+	// remote port 2
+	if remotePort != "" {
+		ports := strings.Split(remotePort, delimiter)
+		args := fmt.Sprintf(
+			`filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip dport %s 0xffff flowid 1:4`,
+			netInterface, ipRule, ports[0])
+		if len(ports) > 1 {
+			for i := 1; i < len(ports); i++ {
+				args = fmt.Sprintf(
+					`%s && \
+					tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip dport %s 0xffff flowid 1:4`,
+					args, netInterface, ipRule, ports[i])
+			}
+		}
+		response = channel.Run(ctx, "tc", args)
+		if !response.Success {
+			stopDLNetFunc(netInterface)
+			bin.PrintErrAndExit(response.Err)
+		}
+	}
+	return response
+}
+
+// addExcludePortFilterForDL create class rule for each band and add filter to 1:4
+func addExcludePortFilterForDL(ctx context.Context, channel spec.Channel,
+	netInterface, classRule, excludePort, ipRule string) *spec.Response {
+	args := fmt.Sprintf(
+		`qdisc add dev %s parent 1:1 %s && \
+			tc qdisc add dev %s parent 1:2 %s && \
+			tc qdisc add dev %s parent 1:3 %s && \
+			tc qdisc add dev %s parent 1:4 handle 40: pfifo_fast`,
+		netInterface, classRule, netInterface, classRule, netInterface, classRule, netInterface)
+	ports := strings.Split(excludePort, delimiter)
+
+	for idx := range ports {
+		args = fmt.Sprintf(
+			`%s && \
+			tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip sport %s 0xffff flowid 1:4 && \
+			tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip dport %s 0xffff flowid 1:4`,
+			args, netInterface, ipRule, ports[idx], netInterface, ipRule, ports[idx])
+	}
+
+	response := channel.Run(ctx, "tc", args)
+	if !response.Success {
+		stopDLNetFunc(netInterface)
+		bin.PrintErrAndExit(response.Err)
+		return response
+	}
+	return response
+}
+
+// addQdiscForDL creates bands for filter
+func addQdiscForDL(channel spec.Channel, ctx context.Context, netInterface string) *spec.Response {
+	// add tc filter for delay specify port
+	response := channel.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root handle 1: prio bands 4`, netInterface))
+	if !response.Success {
+		bin.PrintErrAndExit(response.Err)
+		return response
+	}
+	return response
+}
+
+// stopNet, no need to add os.Exit
+func stopNet(netInterface string) {
+	ctx := context.Background()
+	channel.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+	channel.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
+}

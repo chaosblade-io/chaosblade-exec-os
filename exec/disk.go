@@ -49,7 +49,5 @@ func (*DiskCommandSpec) LongDesc() string {
 }
 
 func (*DiskCommandSpec) Example() string {
-	return `disk fill --path /home --size 1000
-
-# You can execute "blade query disk mount-point" command to query the mount points`
+	return "blade create disk fill --path /home --size 1000"
 }

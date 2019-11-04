@@ -79,7 +79,7 @@ func (*CpuCommandModelSpec) LongDesc() string {
 }
 
 func (*CpuCommandModelSpec) Example() string {
-	return "cpu fullload"
+	return "blade create cpu load --cpu-percent 80"
 }
 
 type fullLoadActionCommand struct {

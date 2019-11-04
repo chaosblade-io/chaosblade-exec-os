@@ -47,5 +47,5 @@ func (*ProcessCommandModelSpec) LongDesc() string {
 }
 
 func (*ProcessCommandModelSpec) Example() string {
-	return "process kill --process tomcat"
+	return "blade create process kill --process tomcat"
 }

@@ -22,10 +22,10 @@ import (
 	"path"
 	"testing"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 func Test_startBurnCpu(t *testing.T) {
@@ -113,11 +113,11 @@ func Test_bindBurnCpu(t *testing.T) {
 
 	channel = &cl.MockLocalChannel{
 		Response:         spec.ReturnFail(spec.Code[spec.CommandNotFound], "taskset command not found"),
-		ExpectedCommands: []string{fmt.Sprintf(`taskset -cp 0 25233`)},
+		ExpectedCommands: []string{fmt.Sprintf(`taskset -a -cp 0 25233`)},
 		T:                t,
 	}
 
-	bindBurnCpu(context.Background(), as.core, as.pid)
+	bindBurnCpuByTaskset(context.Background(), as.core, as.pid)
 	if exitCode != 1 {
 		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
 	}

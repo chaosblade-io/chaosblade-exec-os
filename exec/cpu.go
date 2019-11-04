@@ -123,6 +123,10 @@ func (ce *cpuExecutor) SetChannel(channel spec.Channel) {
 }
 
 func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+	err := checkCpuExpEnv()
+	if err != nil {
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	}
 	if ce.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}
@@ -193,4 +197,14 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, 
 // stop burn cpu
 func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnCpuBin), "--stop")
+}
+
+func checkCpuExpEnv() error {
+	commands := []string{"ps", "awk", "grep", "kill", "nohup", "tr"}
+	for _, command := range commands {
+		if !channel.IsCommandAvailable(command) {
+			return fmt.Errorf("%s command not found", command)
+		}
+	}
+	return nil
 }

@@ -18,6 +18,8 @@ package exec
 
 import (
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"fmt"
 )
 
 type DiskCommandSpec struct {
@@ -50,4 +52,14 @@ func (*DiskCommandSpec) LongDesc() string {
 
 func (*DiskCommandSpec) Example() string {
 	return "blade create disk fill --path /home --size 1000"
+}
+
+func checkDiskExpEnv() error {
+	commands := []string{"ps", "awk", "grep", "kill", "nohup", "rm", "dd"}
+	for _, command := range commands {
+		if !channel.IsCommandAvailable(command) {
+			return fmt.Errorf("%s command not found", command)
+		}
+	}
+	return nil
 }

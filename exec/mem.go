@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 )
 
 type MemCommandModelSpec struct {
@@ -109,6 +110,10 @@ func (ce *memExecutor) SetChannel(channel spec.Channel) {
 }
 
 func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+	err := checkMemoryExpEnv()
+	if err != nil {
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	}
 	if ce.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}
@@ -147,4 +152,14 @@ func (ce *memExecutor) start(ctx context.Context, memPercent int) *spec.Response
 // stop burn mem
 func (ce *memExecutor) stop(ctx context.Context) *spec.Response {
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), "--stop")
+}
+
+func checkMemoryExpEnv() error {
+	commands := []string{"ps", "awk", "grep", "kill", "nohup", "dd", "mount", "umount"}
+	for _, command := range commands {
+		if !channel.IsCommandAvailable(command) {
+			return fmt.Errorf("%s command not found", command)
+		}
+	}
+	return nil
 }

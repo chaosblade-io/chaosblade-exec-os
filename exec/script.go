@@ -23,6 +23,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 )
 
 type ScriptCommandModelSpec struct {
@@ -120,4 +121,14 @@ func insertContentToScriptBy(channel spec.Channel, functionName string, newConte
 	lineNum := lineNums[0]
 	// insert content to the line below
 	return channel.Run(context.TODO(), "sed", fmt.Sprintf(`-i '%s a %s' %s`, lineNum, newContent, scriptFile))
+}
+
+func checkScriptExpEnv() error {
+	commands := []string{"cat", "rm", "sed", "awk", "rm"}
+	for _, command := range commands {
+		if !channel.IsCommandAvailable(command) {
+			return fmt.Errorf("%s command not found", command)
+		}
+	}
+	return nil
 }

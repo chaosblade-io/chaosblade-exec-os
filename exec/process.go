@@ -16,7 +16,11 @@
 
 package exec
 
-import "github.com/chaosblade-io/chaosblade-spec-go/spec"
+import (
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"fmt"
+)
 
 type ProcessCommandModelSpec struct {
 	spec.BaseExpModelCommandSpec
@@ -48,4 +52,14 @@ func (*ProcessCommandModelSpec) LongDesc() string {
 
 func (*ProcessCommandModelSpec) Example() string {
 	return "blade create process kill --process tomcat"
+}
+
+func checkProcessExpEnv() error {
+	commands := []string{"ps", "kill", "grep", "tr", "awk"}
+	for _, command := range commands {
+		if !channel.IsCommandAvailable(command) {
+			return fmt.Errorf("%s command not found", command)
+		}
+	}
+	return nil
 }

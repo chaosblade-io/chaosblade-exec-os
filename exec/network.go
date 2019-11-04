@@ -22,6 +22,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 )
 
 type NetworkCommandSpec struct {
@@ -113,4 +114,14 @@ func getCommArgs(localPort, remotePort, excludePort, destinationIp string, args 
 		args = fmt.Sprintf("%s --destination-ip %s", args, destinationIp)
 	}
 	return args, nil
+}
+
+func checkNetworkExpEnv() error {
+	commands := []string{"tc", "head", "ifconfig"}
+	for _, command := range commands {
+		if !channel.IsCommandAvailable(command) {
+			return fmt.Errorf("%s command not found", command)
+		}
+	}
+	return nil
 }

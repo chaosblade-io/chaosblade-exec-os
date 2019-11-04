@@ -74,6 +74,10 @@ func (spe *StopProcessExecutor) Name() string {
 var stopProcessBin = "chaos_stopprocess"
 
 func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+	err := checkProcessExpEnv()
+	if err != nil {
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	}
 	if spe.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}

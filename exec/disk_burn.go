@@ -85,6 +85,10 @@ func (*BurnIOExecutor) Name() string {
 var burnIOBin = "chaos_burnio"
 
 func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+	err := checkDiskExpEnv()
+	if err != nil {
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	}
 	if be.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}

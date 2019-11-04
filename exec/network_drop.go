@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 )
 
 type DropActionSpec struct {
@@ -74,6 +75,10 @@ func (*NetworkDropExecutor) Name() string {
 var dropNetworkBin = "chaos_dropnetwork"
 
 func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+	err := checkNetworkDropExpEnv()
+	if err != nil {
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	}
 	if ne.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}
@@ -110,4 +115,14 @@ func (ne *NetworkDropExecutor) stop(localPort, remotePort string, ctx context.Co
 
 func (ne *NetworkDropExecutor) SetChannel(channel spec.Channel) {
 	ne.channel = channel
+}
+
+func checkNetworkDropExpEnv() error {
+	commands := []string{"iptables"}
+	for _, command := range commands {
+		if !channel.IsCommandAvailable(command) {
+			return fmt.Errorf("%s command not found", command)
+		}
+	}
+	return nil
 }

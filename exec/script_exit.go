@@ -74,6 +74,10 @@ func (*ScriptExitExecutor) Name() string {
 }
 
 func (see *ScriptExitExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+	err := checkScriptExpEnv()
+	if err != nil {
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	}
 	if see.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}

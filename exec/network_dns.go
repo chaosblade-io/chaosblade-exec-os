@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 )
 
 type DnsActionSpec struct {
@@ -76,6 +77,10 @@ func (*NetworkDnsExecutor) Name() string {
 var changeDnsBin = "chaos_changedns"
 
 func (ns *NetworkDnsExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+	err := checkNetworkDnsExpEnv()
+	if err != nil {
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	}
 	if ns.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}
@@ -104,4 +109,14 @@ func (ns *NetworkDnsExecutor) stop(ctx context.Context, domain, ip string) *spec
 
 func (ns *NetworkDnsExecutor) SetChannel(channel spec.Channel) {
 	ns.channel = channel
+}
+
+func checkNetworkDnsExpEnv() error {
+	commands := []string{"grep", "cat", "rm", "echo"}
+	for _, command := range commands {
+		if !channel.IsCommandAvailable(command) {
+			return fmt.Errorf("%s command not found", command)
+		}
+	}
+	return nil
 }

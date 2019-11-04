@@ -28,11 +28,11 @@ import (
 
 	"strconv"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
+	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/process"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
 )
 
 var (
@@ -152,7 +152,7 @@ var stopBurnCpuFunc = stopBurnCpu
 
 var runBurnCpuFunc = runBurnCpu
 
-var bindBurnCpuFunc = bindBurnCpu
+var bindBurnCpuFunc = bindBurnCpuByTaskset
 
 var checkBurnCpuFunc = checkBurnCpu
 
@@ -208,8 +208,8 @@ func runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded boo
 }
 
 // bindBurnCpu by taskset command
-func bindBurnCpu(ctx context.Context, core string, pid int) {
-	response := channel.Run(ctx, "taskset", fmt.Sprintf("-cp %s %d", core, pid))
+func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
+	response := channel.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
 	if !response.Success {
 		stopBurnCpuFunc()
 		bin.PrintErrAndExit(response.Err)

@@ -30,8 +30,8 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 var (
@@ -98,7 +98,7 @@ var stopBurnCpuFunc = stopBurnCpu
 
 var runBurnCpuFunc = runBurnCpu
 
-var bindBurnCpuFunc = bindBurnCpu
+var bindBurnCpuFunc = bindBurnCpuByCpuset
 
 var checkBurnCpuFunc = checkBurnCpu
 
@@ -120,12 +120,12 @@ func startBurnCpu() {
 		control := cgroupNewFunc(realCores, cpuPercent)
 		for _, core := range cores {
 			pid := runBurnCpuFunc(ctx, cpuCount, true, core)
-			bindBurnCpuFunc(ctx, core, pid)
 			if err := control.Add(cgroups.Process{Pid: pid}); err != nil {
 				stopBurnCpuFunc()
 				bin.PrintErrAndExit(fmt.Sprintf("Add pid to cgroup error, %v", err))
 			}
 		}
+		bindBurnCpuFunc(control, cpuList)
 	} else {
 		pid := runBurnCpuFunc(ctx, cpuCount, true, "0")
 		control := cgroupNewFunc(cpuCount, cpuPercent)
@@ -173,11 +173,19 @@ func runBurnCpu(ctx context.Context, cpuCount int, pidNeeded bool, processor str
 }
 
 // bindBurnCpu by taskset command
-func bindBurnCpu(ctx context.Context, core string, pid int) {
-	response := channel.Run(ctx, "taskset", fmt.Sprintf("-cp %s %d", core, pid))
+func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
+	response := channel.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
 	if !response.Success {
 		stopBurnCpuFunc()
 		bin.PrintErrAndExit(response.Err)
+	}
+}
+
+// bindBurnCpu by cpuset
+func bindBurnCpuByCpuset(cgctrl cgroups.Cgroup, cpuList string) {
+	if err := cgctrl.Update(&specs.LinuxResources{CPU: &specs.LinuxCPU{Cpus: cpuList}}); err != nil {
+		stopBurnCpuFunc()
+		bin.PrintErrAndExit(fmt.Sprintf("Bind core-list to cgroup error, %v", err))
 	}
 }
 

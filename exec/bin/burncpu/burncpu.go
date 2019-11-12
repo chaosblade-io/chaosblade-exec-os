@@ -23,16 +23,16 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
-	"strconv"
-
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/process"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var (

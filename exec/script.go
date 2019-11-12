@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 )
 
 type ScriptCommandModelSpec struct {

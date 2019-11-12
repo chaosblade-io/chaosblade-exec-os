@@ -17,9 +17,10 @@
 package exec
 
 import (
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"fmt"
+
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 type ProcessCommandModelSpec struct {

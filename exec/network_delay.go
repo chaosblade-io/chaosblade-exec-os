@@ -18,8 +18,8 @@ package exec
 
 import (
 	"context"
-	"path"
 	"fmt"
+	"path"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"

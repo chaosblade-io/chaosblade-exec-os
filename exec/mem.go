@@ -22,8 +22,8 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 type MemCommandModelSpec struct {

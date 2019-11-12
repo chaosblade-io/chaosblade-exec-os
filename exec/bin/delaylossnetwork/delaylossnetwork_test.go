@@ -17,13 +17,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"testing"
-	"context"
+
+	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
 )
 
 func Test_startDelayNet(t *testing.T) {

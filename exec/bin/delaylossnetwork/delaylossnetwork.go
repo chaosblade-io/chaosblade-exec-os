@@ -20,14 +20,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-
-	"strings"
 	"strconv"
-	"github.com/sirupsen/logrus"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"strings"
+
 	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/sirupsen/logrus"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var dlNetInterface, dlLocalPort, dlRemotePort, dlExcludePort string
@@ -163,6 +164,7 @@ func addIpFilterForDL(ctx context.Context, channel spec.Channel, netInterface st
 }
 
 var stopDLNetFunc = stopNet
+
 // addLocalOrRemotePortForDL creates class rule in 1:4 queue and add filter to the queue
 func addLocalOrRemotePortForDL(ctx context.Context, channel spec.Channel,
 	netInterface, classRule, localPort, remotePort, ipRule string) *spec.Response {

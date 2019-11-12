@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var stopProcessName string

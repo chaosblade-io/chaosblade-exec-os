@@ -28,10 +28,11 @@ import (
 
 	"github.com/shirou/gopsutil/mem"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var (

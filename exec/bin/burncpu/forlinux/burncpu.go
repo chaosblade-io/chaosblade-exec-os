@@ -29,9 +29,10 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var (

@@ -20,9 +20,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 )
 
 // main creates the yaml file of the experiments in the project

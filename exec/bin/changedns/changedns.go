@@ -21,8 +21,9 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var dnsDomain, dnsIp string

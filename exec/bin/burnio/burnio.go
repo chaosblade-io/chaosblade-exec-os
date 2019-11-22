@@ -134,7 +134,7 @@ func burnWrite(directory, size string) {
 	tmpFileForWrite := path.Join(directory, writeFile)
 	for {
 		args := fmt.Sprintf(`if=/dev/zero of=%s bs=%sM count=%d oflag=dsync`, tmpFileForWrite, size, count)
-		response := channel.Run(context.Background(), "dd", args)
+		response := channel.Run(context.TODO(), "dd", args)
 		if !response.Success {
 			bin.PrintAndExitWithErrPrefix(response.Err)
 			return
@@ -147,7 +147,7 @@ func burnRead(directory, size string) {
 	// create a 1g file under the directory
 	tmpFileForRead := path.Join(directory, readFile)
 	createArgs := fmt.Sprintf("if=/dev/zero of=%s bs=%dM count=%d oflag=dsync", tmpFileForRead, 6, count)
-	response := channel.Run(context.Background(), "dd", createArgs)
+	response := channel.Run(context.TODO(), "dd", createArgs)
 	if !response.Success {
 		bin.PrintAndExitWithErrPrefix(
 			fmt.Sprintf("using dd command to create a temp file under %s directory for reading error, %s",
@@ -155,7 +155,7 @@ func burnRead(directory, size string) {
 	}
 	for {
 		args := fmt.Sprintf(`if=%s of=/dev/null bs=%sM count=%d iflag=dsync,direct,fullblock`, tmpFileForRead, size, count)
-		response = channel.Run(context.Background(), "dd", args)
+		response = channel.Run(context.TODO(), "dd", args)
 		if !response.Success {
 			bin.PrintAndExitWithErrPrefix(fmt.Sprintf("using dd command to burn read io error, %s", response.Err))
 			return

@@ -58,7 +58,7 @@ func main() {
 var channel = cl.NewLocalChannel()
 
 func startFill(directory, size string) {
-	ctx := context.Background()
+	ctx := context.TODO()
 	if directory == "" {
 		bin.PrintErrAndExit("--directory flag value is empty")
 	}

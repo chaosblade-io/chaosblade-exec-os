@@ -35,9 +35,10 @@ func NewScriptCommandModelSpec() spec.ExpModelCommandSpec {
 		spec.BaseExpModelCommandSpec{
 			ExpFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
-					Name:     "file",
-					Desc:     "Script file full path",
-					Required: true,
+					Name:                  "file",
+					Desc:                  "Script file full path",
+					Required:              true,
+					RequiredWhenDestroyed: true,
 				},
 				&spec.ExpFlag{
 					Name:     "function-name",

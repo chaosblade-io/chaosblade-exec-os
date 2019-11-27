@@ -85,21 +85,21 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 	if netInterface == "" {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less interface parameter")
 	}
-	time := model.ActionFlags["time"]
-	if time == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less time flag")
-	}
-	offset := model.ActionFlags["offset"]
-	if offset == "" {
-		offset = "10"
-	}
-	localPort := model.ActionFlags["local-port"]
-	remotePort := model.ActionFlags["remote-port"]
-	excludePort := model.ActionFlags["exclude-port"]
-	destIp := model.ActionFlags["destination-ip"]
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return de.stop(netInterface, ctx)
 	} else {
+		time := model.ActionFlags["time"]
+		if time == "" {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less time flag")
+		}
+		offset := model.ActionFlags["offset"]
+		if offset == "" {
+			offset = "10"
+		}
+		localPort := model.ActionFlags["local-port"]
+		remotePort := model.ActionFlags["remote-port"]
+		excludePort := model.ActionFlags["exclude-port"]
+		destIp := model.ActionFlags["destination-ip"]
 		return de.start(localPort, remotePort, excludePort, destIp, time, offset, netInterface, ctx)
 	}
 }

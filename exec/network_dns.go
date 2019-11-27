@@ -35,14 +35,16 @@ func NewDnsActionSpec() spec.ExpActionCommandSpec {
 			ActionMatchers: []spec.ExpFlagSpec{},
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
-					Name:     "domain",
-					Desc:     "Domain name",
-					Required: true,
+					Name:                  "domain",
+					Desc:                  "Domain name",
+					Required:              true,
+					RequiredWhenDestroyed: true,
 				},
 				&spec.ExpFlag{
-					Name:     "ip",
-					Desc:     "Domain ip",
-					Required: true,
+					Name:                  "ip",
+					Desc:                  "Domain ip",
+					Required:              true,
+					RequiredWhenDestroyed: true,
 				},
 			},
 			ActionExecutor: &NetworkDnsExecutor{},

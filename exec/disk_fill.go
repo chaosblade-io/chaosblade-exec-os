@@ -35,8 +35,9 @@ func NewFillActionSpec() spec.ExpActionCommandSpec {
 		spec.BaseExpActionCommandSpec{
 			ActionMatchers: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
-					Name: "path",
-					Desc: "The path of directory where the disk is populated, default value is /",
+					Name:                  "path",
+					Desc:                  "The path of directory where the disk is populated, default value is /",
+					RequiredWhenDestroyed: true,
 				},
 			},
 			ActionFlags: []spec.ExpFlagSpec{
@@ -90,18 +91,17 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
 			fmt.Sprintf("the %s directory does not exist or is not directory", directory))
 	}
-
-	size := model.ActionFlags["size"]
-	if size == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less size arg")
-	}
-	_, err := strconv.Atoi(size)
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "size must be positive integer")
-	}
 	if _, ok := spec.IsDestroy(ctx); ok {
-		return fae.stop(directory, size, ctx)
+		return fae.stop(directory, ctx)
 	} else {
+		size := model.ActionFlags["size"]
+		if size == "" {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less size arg")
+		}
+		_, err := strconv.Atoi(size)
+		if err != nil {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "size must be positive integer")
+		}
 		return fae.start(directory, size, ctx)
 	}
 }
@@ -111,7 +111,7 @@ func (fae *FillActionExecutor) start(directory, size string, ctx context.Context
 		fmt.Sprintf("--directory %s --size %s --start", directory, size))
 }
 
-func (fae *FillActionExecutor) stop(directory, size string, ctx context.Context) *spec.Response {
+func (fae *FillActionExecutor) stop(directory string, ctx context.Context) *spec.Response {
 	return fae.channel.Run(ctx, path.Join(fae.channel.GetScriptPath(), fillDiskBin),
 		fmt.Sprintf("--directory %s --stop", directory))
 }

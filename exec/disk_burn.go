@@ -50,8 +50,9 @@ func NewBurnActionSpec() spec.ExpActionCommandSpec {
 					Desc: "Block size, MB, default is 10",
 				},
 				&spec.ExpFlag{
-					Name: "path",
-					Desc: "The path of directory where the disk is burning, default value is /",
+					Name:                  "path",
+					Desc:                  "The path of directory where the disk is burning, default value is /",
+					RequiredWhenDestroyed: true,
 				},
 			},
 			ActionExecutor: &BurnIOExecutor{},
@@ -100,6 +101,11 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 	if _, ok := spec.IsDestroy(ctx); ok {
 		readExists := model.ActionFlags["read"] == "true"
 		writeExists := model.ActionFlags["write"] == "true"
+		// set readExists and writeExists to true if does not specify read and write flags
+		if !(readExists || writeExists) {
+			readExists = true
+			writeExists = true
+		}
 		return be.stop(ctx, readExists, writeExists, directory)
 	}
 	if !util.IsDir(directory) {

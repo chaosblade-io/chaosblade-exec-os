@@ -82,9 +82,10 @@ var commFlags = []spec.ExpFlagSpec{
 		Desc: "destination ip. Support for using mask to specify the ip range, for example, 192.168.1.0/24. You can also use 192.168.1.1 or 192.168.1.1/32 to specify it.",
 	},
 	&spec.ExpFlag{
-		Name:     "interface",
-		Desc:     "Network interface, for example, eth0",
-		Required: true,
+		Name:                  "interface",
+		Desc:                  "Network interface, for example, eth0",
+		Required:              true,
+		RequiredWhenDestroyed: true,
 	},
 }
 

@@ -3,7 +3,8 @@
 BLADE_SRC_ROOT=`pwd`
 
 GO_ENV=CGO_ENABLED=1
-GO=env $(GO_ENV) go
+GO_MODULE=GO111MODULE=on
+GO=env $(GO_ENV) $(GO_MODULE) go
 
 UNAME := $(shell uname)
 
@@ -25,7 +26,6 @@ OS_YAML_FILE_PATH=$(BUILD_TARGET_BIN)/$(OS_YAML_FILE_NAME)
 ifeq ($(GOOS), linux)
 	GO_FLAGS=-ldflags="-linkmode external -extldflags -static"
 endif
-
 
 
 # build os

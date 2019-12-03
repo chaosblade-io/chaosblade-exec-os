@@ -35,7 +35,7 @@ func main() {
 	flag.StringVar(&dropRemotePort, "remote-port", "", "remote port")
 	flag.BoolVar(&dropNetStart, "start", false, "start drop")
 	flag.BoolVar(&dropNetStop, "stop", false, "stop drop")
-	flag.Parse()
+	bin.ParseFlagAndInitLog()
 
 	if dropNetStart == dropNetStop {
 		bin.PrintErrAndExit("must add --start or --stop flag")

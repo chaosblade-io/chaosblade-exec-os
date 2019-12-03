@@ -20,17 +20,21 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
 	"path"
+	"strconv"
 	"strings"
+	"syscall"
 
 	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/sirupsen/logrus"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var fillDataFile = "chaos_filldisk.log.dat"
-var fillDiskSize, fillDiskDirectory string
+var fillDiskSize, fillDiskDirectory, fillDiskPercent string
 var fillDiskStart, fillDiskStop bool
 
 const diskFillErrorMessage = "No space left on device"
@@ -38,16 +42,16 @@ const diskFillErrorMessage = "No space left on device"
 func main() {
 	flag.StringVar(&fillDiskDirectory, "directory", "", "the directory where the disk is populated")
 	flag.StringVar(&fillDiskSize, "size", "", "fill size, unit is M")
+	flag.StringVar(&fillDiskPercent, "percent", "", "percentage of disk, positive integer without %")
 	flag.BoolVar(&fillDiskStart, "start", false, "start fill or not")
 	flag.BoolVar(&fillDiskStop, "stop", false, "stop fill or not")
-
-	flag.Parse()
+	bin.ParseFlagAndInitLog()
 
 	if fillDiskStart == fillDiskStop {
 		bin.PrintErrAndExit("must specify start or stop operation")
 	}
 	if fillDiskStart {
-		startFill(fillDiskDirectory, fillDiskSize)
+		startFill(fillDiskDirectory, fillDiskSize, fillDiskPercent)
 	} else if fillDiskStop {
 		stopFill(fillDiskDirectory)
 	} else {
@@ -57,19 +61,54 @@ func main() {
 
 var channel = cl.NewLocalChannel()
 
-func startFill(directory, size string) {
+func startFill(directory, size, percent string) {
 	ctx := context.TODO()
 	if directory == "" {
 		bin.PrintErrAndExit("--directory flag value is empty")
 	}
+	if size == "" && percent == "" {
+		bin.PrintErrAndExit("less --size or --percent flag")
+	}
 	dataFile := path.Join(directory, fillDataFile)
-
+	// calculate the fill size
+	size, err := calculateFileSize(directory, size, percent)
+	if err != nil {
+		bin.PrintErrAndExit(fmt.Sprintf("calculate size err, %v", err))
+	}
 	// Some normal filesystems (ext4, xfs, btrfs and ocfs2) tack quick works
 	if cl.IsCommandAvailable("fallocate") {
 		fillDiskByFallocate(ctx, size, dataFile)
 	}
 	// If execute fallocate command failed, use dd command to retry.
 	fillDiskByDD(ctx, dataFile, directory, size)
+}
+
+// calculateFileSize returns the size which should be filled, unit is M
+func calculateFileSize(directory, size, percent string) (string, error) {
+	if percent == "" {
+		return size, nil
+	}
+	p, err := strconv.Atoi(percent)
+	if err != nil {
+		return "", err
+	}
+
+	var stat syscall.Statfs_t
+	syscall.Statfs(directory, &stat)
+	allBytes := stat.Blocks * uint64(stat.Bsize)
+	availableBytes := stat.Bavail * uint64(stat.Bsize)
+	usedBytes := allBytes - availableBytes
+
+	usedPercentage, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(usedBytes)/float64(allBytes)), 64)
+	expectedPercentage, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(p)/100.0), 64)
+
+	if usedPercentage >= expectedPercentage {
+		return "", fmt.Errorf("the disk has been used %f", usedPercentage)
+	}
+	remainderPercentage := expectedPercentage - usedPercentage
+	logrus.Debugf("remainderPercentage: %f", remainderPercentage)
+	expectSize := math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
+	return fmt.Sprintf("%.f", expectSize), nil
 }
 
 func fillDiskByFallocate(ctx context.Context, size string, dataFile string) {
@@ -81,6 +120,7 @@ func fillDiskByFallocate(ctx context.Context, size string, dataFile string) {
 	if strings.Contains(response.Err, diskFillErrorMessage) {
 		bin.PrintOutputAndExit(fmt.Sprintf("success because of %s", diskFillErrorMessage))
 	}
+	logrus.Warningf("execute fallocate err, %s", response.Err)
 }
 
 func fillDiskByDD(ctx context.Context, dataFile string, directory string, size string) {

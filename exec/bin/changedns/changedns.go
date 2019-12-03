@@ -34,7 +34,7 @@ func main() {
 	flag.StringVar(&dnsIp, "ip", "", "dns ip")
 	flag.BoolVar(&changeDnsStart, "start", false, "start change dns")
 	flag.BoolVar(&changeDnsStop, "stop", false, "recover dns")
-	flag.Parse()
+	bin.ParseFlagAndInitLog()
 
 	if dnsDomain == "" || dnsIp == "" {
 		bin.PrintErrAndExit("less --domain or --ip flag")

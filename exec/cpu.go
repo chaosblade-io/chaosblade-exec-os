@@ -187,7 +187,7 @@ const burnCpuBin = "chaos_burncpu"
 
 // start burn cpu
 func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, cpuPercent int) *spec.Response {
-	args := fmt.Sprintf("--start --cpu-count %d --cpu-percent %d", cpuCount, cpuPercent)
+	args := fmt.Sprintf("--start --cpu-count %d --cpu-percent %d --debug=%t", cpuCount, cpuPercent, util.Debug)
 	if cpuList != "" {
 		args = fmt.Sprintf("%s --cpu-list %s", args, cpuList)
 	}
@@ -196,7 +196,8 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, 
 
 // stop burn cpu
 func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnCpuBin), "--stop")
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnCpuBin),
+		fmt.Sprintf("--stop --debug=%t", util.Debug))
 }
 
 func checkCpuExpEnv() error {

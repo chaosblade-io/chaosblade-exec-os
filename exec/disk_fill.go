@@ -42,9 +42,12 @@ func NewFillActionSpec() spec.ExpActionCommandSpec {
 			},
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
-					Name:     "size",
-					Desc:     "Disk fill size, unit is MB. The value is a positive integer without unit, for example, --size 1024",
-					Required: true,
+					Name: "size",
+					Desc: "Disk fill size, unit is MB. The value is a positive integer without unit, for example, --size 1024",
+				},
+				&spec.ExpFlag{
+					Name: "percent",
+					Desc: "Total percentage of disk occupied by the specified path. If size and the flag exist, use this flag first. The value must be positive integer without %",
 				},
 			},
 			ActionExecutor: &FillActionExecutor{},
@@ -94,26 +97,39 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return fae.stop(directory, ctx)
 	} else {
-		size := model.ActionFlags["size"]
-		if size == "" {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less size arg")
+		percent := model.ActionFlags["percent"]
+		if percent == "" {
+			size := model.ActionFlags["size"]
+			if size == "" {
+				return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less --size or --percent flag")
+			}
+			_, err := strconv.Atoi(size)
+			if err != nil {
+				return spec.ReturnFail(spec.Code[spec.IllegalParameters], "size must be positive integer")
+			}
+			return fae.start(directory, size, percent, ctx)
 		}
-		_, err := strconv.Atoi(size)
+		_, err := strconv.Atoi(percent)
 		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "size must be positive integer")
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "percent must be positive integer")
 		}
-		return fae.start(directory, size, ctx)
+		return fae.start(directory, "", percent, ctx)
 	}
 }
 
-func (fae *FillActionExecutor) start(directory, size string, ctx context.Context) *spec.Response {
-	return fae.channel.Run(ctx, path.Join(fae.channel.GetScriptPath(), fillDiskBin),
-		fmt.Sprintf("--directory %s --size %s --start", directory, size))
+func (fae *FillActionExecutor) start(directory, size, percent string, ctx context.Context) *spec.Response {
+	flags := fmt.Sprintf("--directory %s --start --debug=%t", directory, util.Debug)
+	if percent != "" {
+		flags = fmt.Sprintf("%s --percent %s", flags, percent)
+	} else {
+		flags = fmt.Sprintf("%s --size %s", flags, size)
+	}
+	return fae.channel.Run(ctx, path.Join(fae.channel.GetScriptPath(), fillDiskBin), flags)
 }
 
 func (fae *FillActionExecutor) stop(directory string, ctx context.Context) *spec.Response {
 	return fae.channel.Run(ctx, path.Join(fae.channel.GetScriptPath(), fillDiskBin),
-		fmt.Sprintf("--directory %s --stop", directory))
+		fmt.Sprintf("--directory %s --stop --debug=%t", directory, util.Debug))
 }
 
 func (fae *FillActionExecutor) SetChannel(channel spec.Channel) {

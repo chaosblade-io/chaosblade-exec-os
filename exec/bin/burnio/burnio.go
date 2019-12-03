@@ -43,8 +43,7 @@ func main() {
 	flag.BoolVar(&burnIOStart, "start", false, "start burn io")
 	flag.BoolVar(&burnIOStop, "stop", false, "stop burn io")
 	flag.BoolVar(&burnIONohup, "nohup", false, "start by nohup")
-
-	flag.Parse()
+	bin.ParseFlagAndInitLog()
 
 	if burnIOStart {
 		startBurnIO(burnIODirectory, burnIOSize, burnIORead, burnIOWrite)

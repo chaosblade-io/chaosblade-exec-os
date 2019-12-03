@@ -49,9 +49,7 @@ func main() {
 	flag.StringVar(&dlDestinationIp, "destination-ip", "", "destination ip")
 	flag.BoolVar(&dlNetStart, "start", false, "start delay")
 	flag.BoolVar(&dlNetStop, "stop", false, "stop delay")
-	util.AddDebugFlag()
-	flag.Parse()
-	util.InitLog(util.Bin)
+	bin.ParseFlagAndInitLog()
 	if dlNetInterface == "" {
 		bin.PrintErrAndExit("less --interface flag")
 	}

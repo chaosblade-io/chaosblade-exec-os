@@ -45,7 +45,7 @@ func main() {
 	flag.BoolVar(&burnMemStop, "stop", false, "stop burn memory")
 	flag.BoolVar(&burnMemNohup, "nohup", false, "nohup to run burn memory")
 	flag.IntVar(&memPercent, "mem-percent", 0, "percent of burn memory")
-	flag.Parse()
+	bin.ParseFlagAndInitLog()
 
 	if burnMemStart {
 		startBurnMem()

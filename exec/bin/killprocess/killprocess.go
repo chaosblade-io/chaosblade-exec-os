@@ -33,8 +33,7 @@ var killProcessInCmd string
 func main() {
 	flag.StringVar(&killProcessName, "process", "", "process name")
 	flag.StringVar(&killProcessInCmd, "process-cmd", "", "process in command")
-
-	flag.Parse()
+	bin.ParseFlagAndInitLog()
 
 	killProcess(killProcessName, killProcessInCmd)
 }

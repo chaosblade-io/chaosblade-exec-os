@@ -50,7 +50,7 @@ func main() {
 	flag.IntVar(&cpuCount, "cpu-count", runtime.NumCPU(), "number of cpus")
 	flag.IntVar(&cpuPercent, "cpu-percent", 100, "percent of burn-cpu")
 	flag.StringVar(&cpuProcessor, "cpu-processor", "0", "only used for identifying process of cpu burn")
-	flag.Parse()
+	bin.ParseFlagAndInitLog()
 
 	if cpuCount <= 0 || cpuCount > runtime.NumCPU() {
 		cpuCount = runtime.NumCPU()

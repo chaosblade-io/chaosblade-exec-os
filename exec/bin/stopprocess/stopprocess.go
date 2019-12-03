@@ -37,7 +37,7 @@ func main() {
 	flag.StringVar(&stopProcessInCmd, "process-cmd", "", "process in command")
 	flag.BoolVar(&startFakeDeath, "start", false, "start process fake death")
 	flag.BoolVar(&stopFakeDeath, "stop", false, "recover process fake death")
-	flag.Parse()
+	bin.ParseFlagAndInitLog()
 
 	if startFakeDeath == stopFakeDeath {
 		bin.PrintErrAndExit("must add --start or --stop flag")

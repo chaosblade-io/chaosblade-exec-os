@@ -17,8 +17,11 @@
 package bin
 
 import (
+	"flag"
 	"fmt"
 	"os"
+
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 const ErrPrefix = "Error:"
@@ -38,4 +41,10 @@ func PrintErrAndExit(message string) {
 func PrintOutputAndExit(message string) {
 	fmt.Fprintf(os.Stdout, message)
 	ExitFunc(0)
+}
+
+func ParseFlagAndInitLog() {
+	util.AddDebugFlag()
+	flag.Parse()
+	util.InitLog(util.Bin)
 }

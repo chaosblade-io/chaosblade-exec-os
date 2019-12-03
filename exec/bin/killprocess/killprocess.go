@@ -29,16 +29,18 @@ import (
 
 var killProcessName string
 var killProcessInCmd string
+var killProcessCount int
 
 func main() {
 	flag.StringVar(&killProcessName, "process", "", "process name")
 	flag.StringVar(&killProcessInCmd, "process-cmd", "", "process in command")
+	flag.IntVar(&killProcessCount, "count", 0, "limit count")
 	bin.ParseFlagAndInitLog()
 
-	killProcess(killProcessName, killProcessInCmd)
+	killProcess(killProcessName, killProcessInCmd, killProcessCount)
 }
 
-func killProcess(process, processCmd string) {
+func killProcess(process, processCmd string, count int) {
 	var pids []string
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
@@ -59,6 +61,9 @@ func killProcess(process, processCmd string) {
 	if pids == nil || len(pids) == 0 {
 		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", killProcessName))
 		return
+	}
+	if count > 0 && len(pids) > count {
+		pids = pids[:count]
 	}
 	response := channel.NewLocalChannel().Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 	if !response.Success {

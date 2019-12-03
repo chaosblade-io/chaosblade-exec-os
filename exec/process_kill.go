@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strconv"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
@@ -40,6 +41,10 @@ func NewKillProcessActionCommandSpec() spec.ExpActionCommandSpec {
 				&spec.ExpFlag{
 					Name: "process-cmd",
 					Desc: "Process name in command",
+				},
+				&spec.ExpFlag{
+					Name: "count",
+					Desc: "limit count, 0 means unlimited",
 				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
@@ -85,12 +90,20 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return spec.ReturnSuccess(uid)
 	}
+	countValue := model.ActionFlags["count"]
 	process := model.ActionFlags["process"]
 	processCmd := model.ActionFlags["process-cmd"]
 	if process == "" && processCmd == "" {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less process matcher")
 	}
 	flags := fmt.Sprintf("--debug=%t", util.Debug)
+	if countValue != "" {
+		count, err := strconv.Atoi(countValue)
+		if err != nil {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+		}
+		flags = fmt.Sprintf("%s --count %d", flags, count)
+	}
 	if process != "" {
 		flags = fmt.Sprintf("%s --process %s", flags, process)
 	} else if processCmd != "" {

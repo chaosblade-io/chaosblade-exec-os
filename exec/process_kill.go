@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 type KillProcessActionCommandSpec struct {
@@ -89,11 +90,11 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	if process == "" && processCmd == "" {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less process matcher")
 	}
-	flags := ""
+	flags := fmt.Sprintf("--debug=%t", util.Debug)
 	if process != "" {
-		flags = fmt.Sprintf("--process %s", process)
+		flags = fmt.Sprintf("%s --process %s", flags, process)
 	} else if processCmd != "" {
-		flags = fmt.Sprintf("--process-cmd %s", processCmd)
+		flags = fmt.Sprintf("%s --process-cmd %s", flags, processCmd)
 	}
 	return kpe.channel.Run(ctx, path.Join(kpe.channel.GetScriptPath(), killProcessBin), flags)
 }

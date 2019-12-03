@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 type LossActionSpec struct {
@@ -99,7 +100,7 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 
 func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, percent string,
 	ctx context.Context) *spec.Response {
-	args := fmt.Sprintf("--start --interface %s --percent %s", netInterface, percent)
+	args := fmt.Sprintf("--start --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
 	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, args)
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
@@ -109,7 +110,7 @@ func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, exclu
 
 func (nle *NetworkLossExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
 	return nle.channel.Run(ctx, path.Join(nle.channel.GetScriptPath(), dlNetworkBin),
-		fmt.Sprintf("--stop --interface %s", netInterface))
+		fmt.Sprintf("--stop --interface %s --debug=%t", netInterface, util.Debug))
 }
 
 func (nle *NetworkLossExecutor) SetChannel(channel spec.Channel) {

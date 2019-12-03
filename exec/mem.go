@@ -24,6 +24,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 type MemCommandModelSpec struct {
@@ -145,13 +146,14 @@ const burnMemBin = "chaos_burnmem"
 
 // start burn mem
 func (ce *memExecutor) start(ctx context.Context, memPercent int) *spec.Response {
-	args := fmt.Sprintf("--start --mem-percent %d", memPercent)
+	args := fmt.Sprintf("--start --mem-percent %d --debug=%t", memPercent, util.Debug)
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), args)
 }
 
 // stop burn mem
 func (ce *memExecutor) stop(ctx context.Context) *spec.Response {
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), "--stop")
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin),
+		fmt.Sprintf("--stop --debug=%t", util.Debug))
 }
 
 func checkMemoryExpEnv() error {

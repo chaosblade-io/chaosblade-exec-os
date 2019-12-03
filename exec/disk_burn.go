@@ -126,12 +126,12 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 
 func (be *BurnIOExecutor) start(ctx context.Context, read, write bool, directory, size string) *spec.Response {
 	return be.channel.Run(ctx, path.Join(be.channel.GetScriptPath(), burnIOBin),
-		fmt.Sprintf("--read=%t --write=%t --directory %s --size %s --start", read, write, directory, size))
+		fmt.Sprintf("--read=%t --write=%t --directory %s --size %s --start --debug=%t", read, write, directory, size, util.Debug))
 }
 
 func (be *BurnIOExecutor) stop(ctx context.Context, read, write bool, directory string) *spec.Response {
 	return be.channel.Run(ctx, path.Join(be.channel.GetScriptPath(), burnIOBin),
-		fmt.Sprintf("--read=%t --write=%t --directory %s --stop", read, write, directory))
+		fmt.Sprintf("--read=%t --write=%t --directory %s --stop --debug=%t", read, write, directory, util.Debug))
 }
 
 func (be *BurnIOExecutor) SetChannel(channel spec.Channel) {

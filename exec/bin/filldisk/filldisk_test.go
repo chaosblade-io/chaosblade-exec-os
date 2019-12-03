@@ -27,12 +27,14 @@ import (
 
 func Test_startFill_startSuccessful(t *testing.T) {
 	type args struct {
-		path string
-		size string
+		path    string
+		size    string
+		percent string
 	}
 	as := &args{
-		path: "/dev",
-		size: "10",
+		path:    "/dev",
+		size:    "10",
+		percent: "",
 	}
 
 	var exitCode int
@@ -46,7 +48,7 @@ func Test_startFill_startSuccessful(t *testing.T) {
 		T:        t,
 	}
 
-	startFill(as.path, as.size)
+	startFill(as.path, as.size, as.percent)
 	if exitCode != 0 {
 		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
 	}

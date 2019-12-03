@@ -23,6 +23,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 type DropActionSpec struct {
@@ -92,7 +93,7 @@ func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spe
 }
 
 func (ne *NetworkDropExecutor) start(localPort, remotePort string, ctx context.Context) *spec.Response {
-	args := "--start"
+	args := fmt.Sprintf("--start --debug=%t", util.Debug)
 	if localPort != "" {
 		args = fmt.Sprintf("%s --local-port %s", args, localPort)
 	}
@@ -103,7 +104,7 @@ func (ne *NetworkDropExecutor) start(localPort, remotePort string, ctx context.C
 }
 
 func (ne *NetworkDropExecutor) stop(localPort, remotePort string, ctx context.Context) *spec.Response {
-	args := "--stop"
+	args := fmt.Sprintf("--stop --debug=%t", util.Debug)
 	if localPort != "" {
 		args = fmt.Sprintf("%s --local-port %s", args, localPort)
 	}

@@ -22,6 +22,7 @@ import (
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 type StopProcessActionCommandSpec struct {
@@ -103,13 +104,13 @@ func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 }
 
 func (spe *StopProcessExecutor) stopProcess(flags string, ctx context.Context) *spec.Response {
-	args := "--start"
+	args := fmt.Sprintf("--start --debug=%t", util.Debug)
 	flags = fmt.Sprintf("%s %s", args, flags)
 	return spe.channel.Run(ctx, path.Join(spe.channel.GetScriptPath(), stopProcessBin), flags)
 }
 
 func (spe *StopProcessExecutor) recoverProcess(flags string, ctx context.Context) *spec.Response {
-	args := "--stop"
+	args := fmt.Sprintf("--stop --debug=%t", util.Debug)
 	flags = fmt.Sprintf("%s %s", args, flags)
 	return spe.channel.Run(ctx, path.Join(spe.channel.GetScriptPath(), stopProcessBin), flags)
 }

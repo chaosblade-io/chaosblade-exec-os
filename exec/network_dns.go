@@ -23,6 +23,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 type DnsActionSpec struct {
@@ -101,12 +102,12 @@ func (ns *NetworkDnsExecutor) Exec(uid string, ctx context.Context, model *spec.
 
 func (ns *NetworkDnsExecutor) start(ctx context.Context, domain, ip string) *spec.Response {
 	return ns.channel.Run(ctx, path.Join(ns.channel.GetScriptPath(), changeDnsBin),
-		fmt.Sprintf("--start --domain %s --ip %s", domain, ip))
+		fmt.Sprintf("--start --domain %s --ip %s --debug=%t", domain, ip, util.Debug))
 }
 
 func (ns *NetworkDnsExecutor) stop(ctx context.Context, domain, ip string) *spec.Response {
 	return ns.channel.Run(ctx, path.Join(ns.channel.GetScriptPath(), changeDnsBin),
-		fmt.Sprintf("--stop --domain %s --ip %s", domain, ip))
+		fmt.Sprintf("--stop --domain %s --ip %s --debug=%t", domain, ip, util.Debug))
 }
 
 func (ns *NetworkDnsExecutor) SetChannel(channel spec.Channel) {

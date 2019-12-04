@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
-	github.com/chaosblade-io/chaosblade-spec-go v0.0.2-0.20191128032435-a99b601f1c34
+	github.com/chaosblade-io/chaosblade-spec-go v0.0.2-0.20191204092630-fdbbba275476
 	github.com/containerd/cgroups v0.0.0-20191011165608-5fbad35c2a7e
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2-0.20190716192640-c9a5f6194441

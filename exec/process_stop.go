@@ -91,9 +91,9 @@ func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 	flags := ""
 	if process != "" {
-		flags = fmt.Sprintf("--process %s", process)
+		flags = fmt.Sprintf(`--process "%s"`, process)
 	} else if processCmd != "" {
-		flags = fmt.Sprintf("--process-cmd %s", processCmd)
+		flags = fmt.Sprintf(`--process-cmd "%s"`, processCmd)
 	}
 
 	if _, ok := spec.IsDestroy(ctx); ok {

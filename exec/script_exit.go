@@ -104,7 +104,7 @@ func (see *ScriptExitExecutor) Exec(uid string, ctx context.Context, model *spec
 func (see *ScriptExitExecutor) start(ctx context.Context, scriptFile, functionName, exitMessage, exitCode string) *spec.Response {
 	var content string
 	if exitMessage != "" {
-		content = fmt.Sprintf(`echo '%s';`, exitMessage)
+		content = fmt.Sprintf(`echo "%s";`, exitMessage)
 	}
 	if exitCode == "" {
 		exitCode = "1"

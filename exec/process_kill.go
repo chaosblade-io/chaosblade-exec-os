@@ -105,9 +105,9 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 		flags = fmt.Sprintf("%s --count %d", flags, count)
 	}
 	if process != "" {
-		flags = fmt.Sprintf("%s --process %s", flags, process)
+		flags = fmt.Sprintf(`%s --process "%s"`, flags, process)
 	} else if processCmd != "" {
-		flags = fmt.Sprintf("%s --process-cmd %s", flags, processCmd)
+		flags = fmt.Sprintf(`%s --process-cmd "%s"`, flags, processCmd)
 	}
 	return kpe.channel.Run(ctx, path.Join(kpe.channel.GetScriptPath(), killProcessBin), flags)
 }

@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/cgroups"
+	v1 "github.com/containerd/cgroups/stats/v1"
 	"github.com/shirou/gopsutil/mem"
 
 	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
@@ -35,9 +37,11 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
+const PAGE_COUNTER_MAX uint64 = 9223372036854771712
+
 var (
 	burnMemStart, burnMemStop, burnMemNohup bool
-	memPercent                              int
+	memPercent, memReserve                  int
 )
 
 func main() {
@@ -45,6 +49,7 @@ func main() {
 	flag.BoolVar(&burnMemStop, "stop", false, "stop burn memory")
 	flag.BoolVar(&burnMemNohup, "nohup", false, "nohup to run burn memory")
 	flag.IntVar(&memPercent, "mem-percent", 0, "percent of burn memory")
+	flag.IntVar(&memReserve, "reserve", 0, "reserve to burn memory, unit is M")
 	bin.ParseFlagAndInitLog()
 
 	if burnMemStart {
@@ -56,7 +61,7 @@ func main() {
 	} else if burnMemNohup {
 		burnMem()
 	} else {
-		bin.PrintAndExitWithErrPrefix("less --start of --stop flag")
+		bin.PrintAndExitWithErrPrefix("less --start or --stop flag")
 	}
 
 }
@@ -84,28 +89,20 @@ func burnMem() {
 
 	filePath := path.Join(path.Join(util.GetProgramPath(), dirName), fileName)
 
-	avPercent := 100 - memPercent
+	//avPercent := 100 - memPercent
 
 	go func() {
 		t := time.NewTicker(3 * time.Second)
 		for {
 			select {
 			case <-t.C:
-				virtualMemory, err := mem.VirtualMemory()
+				memSum := getMem(filePath)
+				expectMem, err := calculateMemSize(memPercent, memReserve)
 				if err != nil {
 					bin.PrintErrAndExit(err.Error())
 				}
 
-				// diff := float64(virtualMemory.Available)/float64(virtualMemory.Total) - float64(avPercent)/100.0
-
-				// if diff > -0.001 && diff < 0.001 {
-				// 	continue
-				// }
-
-				memSum := getMem(filePath)
-
-				needMem := (int64(virtualMemory.Available)-int64(virtualMemory.Total)*int64(avPercent)/100)/1024/1024 + memSum
-
+				needMem := expectMem + memSum
 				if needMem <= 0 {
 					for i := 0; i < fileCount; i++ {
 						os.Remove(filePath + strconv.Itoa(i))
@@ -173,12 +170,12 @@ func startBurnMem() {
 		bin.PrintErrAndExit(response.Error())
 	}
 
-	runBurnMemFunc(ctx, memPercent)
+	runBurnMemFunc(ctx, memPercent, memReserve)
 }
 
-func runBurnMem(ctx context.Context, memPercent int) int {
-	args := fmt.Sprintf(`%s --nohup --mem-percent %d`,
-		path.Join(util.GetProgramPath(), burnMemBin), memPercent)
+func runBurnMem(ctx context.Context, memPercent, memReserve int) int {
+	args := fmt.Sprintf(`%s --nohup --mem-percent %d --reserve %d`,
+		path.Join(util.GetProgramPath(), burnMemBin), memPercent, memReserve)
 
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
 	response := channel.Run(ctx, "nohup", args)
@@ -216,4 +213,36 @@ func stopBurnMem() (success bool, errs string) {
 	}
 
 	return true, errs
+}
+
+func calculateMemSize(percent, reserve int) (int64, error) {
+	mc := cgroups.NewMemory("/sys/fs/cgroup", cgroups.IgnoreModules("memsw"))
+	stats := v1.Metrics{}
+	if err := mc.Stat("", &stats); err != nil {
+		return 0, err
+	}
+
+	total := int64(0)
+	available := int64(0)
+	//no limit
+	if stats.Memory.Usage.Limit == PAGE_COUNTER_MAX {
+		virtualMemory, err := mem.VirtualMemory()
+		if err != nil {
+			return 0, err
+		}
+		total = int64(virtualMemory.Total)
+		available = int64(virtualMemory.Available)
+	} else {
+		total = int64(stats.Memory.Usage.Limit)
+		available = int64(stats.Memory.Usage.Limit - stats.Memory.Usage.Usage)
+	}
+
+	expectSize := int64(0)
+	if percent != 0 {
+		expectSize = (available - total*int64(100-percent)/100) / 1024 / 1024
+	} else {
+		expectSize = available/1024/1024 - int64(reserve)
+	}
+
+	return expectSize, nil
 }

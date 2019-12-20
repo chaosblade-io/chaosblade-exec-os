@@ -34,7 +34,7 @@ import (
 )
 
 var fillDataFile = "chaos_filldisk.log.dat"
-var fillDiskSize, fillDiskDirectory, fillDiskPercent string
+var fillDiskSize, fillDiskDirectory, fillDiskPercent, ReserveDiskSize string
 var fillDiskStart, fillDiskStop bool
 
 const diskFillErrorMessage = "No space left on device"
@@ -42,6 +42,7 @@ const diskFillErrorMessage = "No space left on device"
 func main() {
 	flag.StringVar(&fillDiskDirectory, "directory", "", "the directory where the disk is populated")
 	flag.StringVar(&fillDiskSize, "size", "", "fill size, unit is M")
+	flag.StringVar(&ReserveDiskSize, "reserve", "", "reserve size, unit is M")
 	flag.StringVar(&fillDiskPercent, "percent", "", "percentage of disk, positive integer without %")
 	flag.BoolVar(&fillDiskStart, "start", false, "start fill or not")
 	flag.BoolVar(&fillDiskStop, "stop", false, "stop fill or not")
@@ -51,7 +52,7 @@ func main() {
 		bin.PrintErrAndExit("must specify start or stop operation")
 	}
 	if fillDiskStart {
-		startFill(fillDiskDirectory, fillDiskSize, fillDiskPercent)
+		startFill(fillDiskDirectory, fillDiskSize, fillDiskPercent, ReserveDiskSize)
 	} else if fillDiskStop {
 		stopFill(fillDiskDirectory)
 	} else {
@@ -61,20 +62,21 @@ func main() {
 
 var channel = cl.NewLocalChannel()
 
-func startFill(directory, size, percent string) {
+func startFill(directory, size, percent, reserve string) {
 	ctx := context.TODO()
 	if directory == "" {
 		bin.PrintErrAndExit("--directory flag value is empty")
 	}
-	if size == "" && percent == "" {
-		bin.PrintErrAndExit("less --size or --percent flag")
+	if size == "" && percent == "" && reserve == "" {
+		bin.PrintErrAndExit("less --size or --percent or --reserve  flag")
 	}
 	dataFile := path.Join(directory, fillDataFile)
 	// calculate the fill size
-	size, err := calculateFileSize(directory, size, percent)
+	size, err := calculateFileSize(directory, size, percent, reserve)
 	if err != nil {
 		bin.PrintErrAndExit(fmt.Sprintf("calculate size err, %v", err))
 	}
+
 	// Some normal filesystems (ext4, xfs, btrfs and ocfs2) tack quick works
 	if cl.IsCommandAvailable("fallocate") {
 		fillDiskByFallocate(ctx, size, dataFile)
@@ -84,13 +86,9 @@ func startFill(directory, size, percent string) {
 }
 
 // calculateFileSize returns the size which should be filled, unit is M
-func calculateFileSize(directory, size, percent string) (string, error) {
-	if percent == "" {
+func calculateFileSize(directory, size, percent, reserve string) (string, error) {
+	if percent == "" && reserve == "" {
 		return size, nil
-	}
-	p, err := strconv.Atoi(percent)
-	if err != nil {
-		return "", err
 	}
 
 	var stat syscall.Statfs_t
@@ -99,16 +97,35 @@ func calculateFileSize(directory, size, percent string) (string, error) {
 	availableBytes := stat.Bavail * uint64(stat.Bsize)
 	usedBytes := allBytes - availableBytes
 
-	usedPercentage, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(usedBytes)/float64(allBytes)), 64)
-	expectedPercentage, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(p)/100.0), 64)
+	if percent != "" {
+		p, err := strconv.Atoi(percent)
+		if err != nil {
+			return "", err
+		}
 
-	if usedPercentage >= expectedPercentage {
-		return "", fmt.Errorf("the disk has been used %f", usedPercentage)
+		usedPercentage, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(usedBytes)/float64(allBytes)), 64)
+		expectedPercentage, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(p)/100.0), 64)
+
+		if usedPercentage >= expectedPercentage {
+			return "", fmt.Errorf("the disk has been used %.2f, large than expected", usedPercentage)
+		}
+		remainderPercentage := expectedPercentage - usedPercentage
+		logrus.Debugf("remainderPercentage: %f", remainderPercentage)
+		expectSize := math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
+		return fmt.Sprintf("%.f", expectSize), nil
+	} else {
+		r, err := strconv.ParseFloat(reserve, 64)
+		if err != nil {
+			return "", err
+		}
+
+		availableMB := float64(availableBytes) / (1024.0 * 1024.0)
+		if availableMB <= r {
+			return "", fmt.Errorf("the disk has available size %.2f, less than expected", availableMB)
+		}
+		expectSize := math.Floor(availableMB - r)
+		return fmt.Sprintf("%.f", expectSize), nil
 	}
-	remainderPercentage := expectedPercentage - usedPercentage
-	logrus.Debugf("remainderPercentage: %f", remainderPercentage)
-	expectSize := math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
-	return fmt.Sprintf("%.f", expectSize), nil
 }
 
 func fillDiskByFallocate(ctx context.Context, size string, dataFile string) {
@@ -142,6 +159,9 @@ func fillDiskByDD(ctx context.Context, dataFile string, directory string, size s
 // stopFill contains kill the filldisk process and delete the temp file actions
 func stopFill(directory string) {
 	ctx := context.Background()
+	if directory == "" {
+		bin.PrintErrAndExit("--directory flag value is empty")
+	}
 	pids, _ := cl.GetPidsByProcessName(fillDataFile, ctx)
 	if pids != nil || len(pids) >= 0 {
 		channel.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))

@@ -49,6 +49,10 @@ func NewFillActionSpec() spec.ExpActionCommandSpec {
 					Name: "percent",
 					Desc: "Total percentage of disk occupied by the specified path. If size and the flag exist, use this flag first. The value must be positive integer without %",
 				},
+				&spec.ExpFlag{
+					Name: "reserve",
+					Desc: "Disk reserve size, unit is MB. The value is a positive integer without unit. If size, percent and reserve flags exit, the priority is as follows: percent > reserve > size",
+				},
 			},
 			ActionExecutor: &FillActionExecutor{},
 		},
@@ -99,28 +103,38 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 	} else {
 		percent := model.ActionFlags["percent"]
 		if percent == "" {
-			size := model.ActionFlags["size"]
-			if size == "" {
-				return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less --size or --percent flag")
+			reserve := model.ActionFlags["reserve"]
+			if reserve == "" {
+				size := model.ActionFlags["size"]
+				if size == "" {
+					return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less --size or --percent flag")
+				}
+				_, err := strconv.Atoi(size)
+				if err != nil {
+					return spec.ReturnFail(spec.Code[spec.IllegalParameters], "size must be positive integer")
+				}
+				return fae.start(directory, size, percent, reserve, ctx)
 			}
-			_, err := strconv.Atoi(size)
+			_, err := strconv.Atoi(reserve)
 			if err != nil {
-				return spec.ReturnFail(spec.Code[spec.IllegalParameters], "size must be positive integer")
+				return spec.ReturnFail(spec.Code[spec.IllegalParameters], "reserve must be positive integer")
 			}
-			return fae.start(directory, size, percent, ctx)
+			return fae.start(directory, "", percent, reserve, ctx)
 		}
 		_, err := strconv.Atoi(percent)
 		if err != nil {
 			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "percent must be positive integer")
 		}
-		return fae.start(directory, "", percent, ctx)
+		return fae.start(directory, "", percent, "", ctx)
 	}
 }
 
-func (fae *FillActionExecutor) start(directory, size, percent string, ctx context.Context) *spec.Response {
+func (fae *FillActionExecutor) start(directory, size, percent, reserve string, ctx context.Context) *spec.Response {
 	flags := fmt.Sprintf("--directory %s --start --debug=%t", directory, util.Debug)
 	if percent != "" {
 		flags = fmt.Sprintf("%s --percent %s", flags, percent)
+	} else if reserve != "" {
+		flags = fmt.Sprintf("%s --reserve %s", flags, reserve)
 	} else {
 		flags = fmt.Sprintf("%s --size %s", flags, size)
 	}

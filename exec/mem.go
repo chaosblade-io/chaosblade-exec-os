@@ -49,6 +49,11 @@ func NewMemCommandModelSpec() spec.ExpModelCommandSpec {
 					Desc:     "percent of burn Memory (0-100)",
 					Required: false,
 				},
+				&spec.ExpFlag{
+					Name:     "reserve",
+					Desc:     "reserve to burn Memory, unit is MB. If the mem-percent flag exist, use mem-percent first.",
+					Required: false,
+				},
 			},
 		},
 	}
@@ -121,9 +126,10 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ce.stop(ctx)
 	}
-	var memPercent int
+	var memPercent, memReserve int
 
 	memPercentStr := model.ActionFlags["mem-percent"]
+	memReserveStr := model.ActionFlags["reserve"]
 	if memPercentStr != "" {
 		var err error
 		memPercent, err = strconv.Atoi(memPercentStr)
@@ -133,20 +139,26 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		}
 		if memPercent > 100 || memPercent < 0 {
 			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				"--mem-percent value must be a prositive integer and not bigger than 100")
+				"--mem-percent value must be a positive integer and not bigger than 100")
+		}
+	} else if memReserveStr != "" {
+		memReserve, err = strconv.Atoi(memReserveStr)
+		if err != nil {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
+				"--reserve value must be a positive integer")
 		}
 	} else {
 		memPercent = 100
 	}
 
-	return ce.start(ctx, memPercent)
+	return ce.start(ctx, memPercent, memReserve)
 }
 
 const burnMemBin = "chaos_burnmem"
 
 // start burn mem
-func (ce *memExecutor) start(ctx context.Context, memPercent int) *spec.Response {
-	args := fmt.Sprintf("--start --mem-percent %d --debug=%t", memPercent, util.Debug)
+func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve int) *spec.Response {
+	args := fmt.Sprintf("--start --mem-percent %d --reserve %d --debug=%t", memPercent, memReserve, util.Debug)
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), args)
 }
 

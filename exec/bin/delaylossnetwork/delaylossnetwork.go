@@ -35,6 +35,7 @@ var dlNetInterface, dlLocalPort, dlRemotePort, dlExcludePort string
 var dlDestinationIp string
 var lossNetPercent, delayNetTime, delayNetOffset string
 var dlNetStart, dlNetStop bool
+var dlIgnorePeerPorts bool
 
 const delimiter = ","
 
@@ -49,6 +50,7 @@ func main() {
 	flag.StringVar(&dlDestinationIp, "destination-ip", "", "destination ip")
 	flag.BoolVar(&dlNetStart, "start", false, "start delay")
 	flag.BoolVar(&dlNetStop, "stop", false, "stop delay")
+	flag.BoolVar(&dlIgnorePeerPorts, "ignore-peer-port", false, "ignore excluding all ports communicating with this port, generally used when the ss command does not exist")
 	bin.ParseFlagAndInitLog()
 	if dlNetInterface == "" {
 		bin.PrintErrAndExit("less --interface flag")
@@ -227,14 +229,37 @@ func addExcludePortFilterForDL(ctx context.Context, channel spec.Channel,
 		netInterface, classRule, netInterface, classRule, netInterface, classRule, netInterface)
 	ports := strings.Split(excludePort, delimiter)
 
-	for idx := range ports {
+	// add peer ports
+	portSet := make(map[string]interface{}, 0)
+	for _, p := range ports {
+		if _, ok := portSet[p]; !ok {
+			portSet[p] = struct{}{}
+		}
+		if !dlIgnorePeerPorts {
+			peerPorts, err := getPeerPorts(p)
+			if err != nil {
+				logrus.Warningf("get peer ports for %s err, %v", p, err)
+				errMsg := fmt.Sprintf("get peer ports for %s err, %v, please solve the problem or skip to exclude peer ports by --ignore-peer-port flag", p, err)
+				stopDLNetFunc(netInterface)
+				bin.PrintErrAndExit(errMsg)
+				return spec.ReturnFail(spec.Code[spec.ExecCommandError], errMsg)
+			}
+			logrus.Infof("peer ports for %s: %v", p, peerPorts)
+			for _, mp := range peerPorts {
+				if _, ok := portSet[mp]; ok {
+					continue
+				}
+				portSet[mp] = struct{}{}
+			}
+		}
+	}
+	for k := range portSet {
 		args = fmt.Sprintf(
 			`%s && \
 			tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip sport %s 0xffff flowid 1:4 && \
 			tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip dport %s 0xffff flowid 1:4`,
-			args, netInterface, ipRule, ports[idx], netInterface, ipRule, ports[idx])
+			args, netInterface, ipRule, k, netInterface, ipRule, k)
 	}
-
 	response := channel.Run(ctx, "tc", args)
 	if !response.Success {
 		stopDLNetFunc(netInterface)
@@ -260,4 +285,45 @@ func stopNet(netInterface string) {
 	ctx := context.Background()
 	channel.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
 	channel.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
+}
+
+// getPeerPorts returns all ports communicating with the port
+func getPeerPorts(port string) ([]string, error) {
+	response := channel.Run(context.TODO(), "command", "-v ss")
+	if !response.Success {
+		return nil, fmt.Errorf("ss command not found")
+	}
+	response = channel.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
+	if !response.Success {
+		return nil, fmt.Errorf(response.Err)
+	}
+	if util.IsNil(response.Result) {
+		return []string{}, nil
+	}
+	result := response.Result.(string)
+	ssMsg := strings.TrimSpace(result)
+	if ssMsg == "" {
+		return []string{}, nil
+	}
+	sockets := strings.Split(ssMsg, "\n")
+	logrus.Infof("sockets for %s, %v", port, sockets)
+	mappingPorts := make([]string, 0)
+	for idx, s := range sockets {
+		if idx == 0 {
+			continue
+		}
+		fields := strings.Fields(s)
+		for _, f := range fields {
+			if !strings.Contains(f, ":") {
+				continue
+			}
+			ipPort := strings.Split(f, ":")
+			if len(ipPort) != 2 {
+				logrus.Warningf("illegal socket address: %s", f)
+				continue
+			}
+			mappingPorts = append(mappingPorts, ipPort[1])
+		}
+	}
+	return mappingPorts, nil
 }

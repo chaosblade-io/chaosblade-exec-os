@@ -82,6 +82,11 @@ var commFlags = []spec.ExpFlagSpec{
 		Desc: "destination ip. Support for using mask to specify the ip range, for example, 192.168.1.0/24. You can also use 192.168.1.1 or 192.168.1.1/32 to specify it.",
 	},
 	&spec.ExpFlag{
+		Name:   "ignore-peer-port",
+		Desc:   "ignore excluding all ports communicating with this port, generally used when the ss command does not exist",
+		NoArgs: true,
+	},
+	&spec.ExpFlag{
 		Name:                  "interface",
 		Desc:                  "Network interface, for example, eth0",
 		Required:              true,
@@ -89,7 +94,7 @@ var commFlags = []spec.ExpFlagSpec{
 	},
 }
 
-func getCommArgs(localPort, remotePort, excludePort, destinationIp string, args string) (string, error) {
+func getCommArgs(localPort, remotePort, excludePort, destinationIp string, args string, ignorePeerPort bool) (string, error) {
 	if localPort != "" {
 		localPorts, err := util.ParseIntegerListToStringSlice(localPort)
 		if err != nil {
@@ -113,6 +118,9 @@ func getCommArgs(localPort, remotePort, excludePort, destinationIp string, args 
 	}
 	if destinationIp != "" {
 		args = fmt.Sprintf("%s --destination-ip %s", args, destinationIp)
+	}
+	if ignorePeerPort {
+		args = fmt.Sprintf("%s --ignore-peer-port", args)
 	}
 	return args, nil
 }

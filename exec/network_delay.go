@@ -100,14 +100,15 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 		remotePort := model.ActionFlags["remote-port"]
 		excludePort := model.ActionFlags["exclude-port"]
 		destIp := model.ActionFlags["destination-ip"]
-		return de.start(localPort, remotePort, excludePort, destIp, time, offset, netInterface, ctx)
+		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
+		return de.start(localPort, remotePort, excludePort, destIp, time, offset, netInterface, ignorePeerPort, ctx)
 	}
 }
 
 func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp, time, offset, netInterface string,
-	ctx context.Context) *spec.Response {
+	ignorePeerPort bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --interface %s --time %s --offset %s --debug=%t", netInterface, time, offset, util.Debug)
-	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, args)
+	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, args, ignorePeerPort)
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}

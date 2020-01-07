@@ -36,7 +36,7 @@ func Test_startBurnMem(t *testing.T) {
 		exitCode = code
 	}
 
-	runBurnMemFunc = func(context.Context, int) int {
+	runBurnMemFunc = func(context.Context, int, int, int, string) int {
 		return 1
 	}
 
@@ -60,7 +60,10 @@ func Test_startBurnMem(t *testing.T) {
 
 func Test_runBurnMem_failed(t *testing.T) {
 	type args struct {
-		memPercent int
+		memPercent  int
+		memReserve  int
+		memRate     int
+		burnMemMode string
 	}
 	as := &args{
 		memPercent: 50,
@@ -82,7 +85,7 @@ func Test_runBurnMem_failed(t *testing.T) {
 		return true, ""
 	}
 
-	runBurnMem(context.Background(), as.memPercent)
+	runBurnMem(context.Background(), as.memPercent, as.memReserve, as.memRate, as.burnMemMode)
 
 	if exitCode != 1 {
 		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)

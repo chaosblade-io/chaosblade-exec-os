@@ -54,6 +54,16 @@ func NewMemCommandModelSpec() spec.ExpModelCommandSpec {
 					Desc:     "reserve to burn Memory, unit is MB. If the mem-percent flag exist, use mem-percent first.",
 					Required: false,
 				},
+				&spec.ExpFlag{
+					Name:     "rate",
+					Desc:     "burn memory rate, unit is M/S, only support for ram mode.",
+					Required: false,
+				},
+				&spec.ExpFlag{
+					Name:     "mode",
+					Desc:     "burn memory mode, cache or ram.",
+					Required: false,
+				},
 			},
 		},
 	}
@@ -126,10 +136,12 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ce.stop(ctx)
 	}
-	var memPercent, memReserve int
+	var memPercent, memReserve, memRate int
 
 	memPercentStr := model.ActionFlags["mem-percent"]
 	memReserveStr := model.ActionFlags["reserve"]
+	memRateStr := model.ActionFlags["rate"]
+	burnMemModeStr := model.ActionFlags["mode"]
 	if memPercentStr != "" {
 		var err error
 		memPercent, err = strconv.Atoi(memPercentStr)
@@ -150,15 +162,27 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	} else {
 		memPercent = 100
 	}
-
-	return ce.start(ctx, memPercent, memReserve)
+	if memRateStr != "" {
+		memRate, err = strconv.Atoi(memRateStr)
+		if err != nil {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
+				"--rate value must be a positive integer")
+		}
+	}
+	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr)
 }
 
 const burnMemBin = "chaos_burnmem"
 
 // start burn mem
-func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve int) *spec.Response {
+func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string) *spec.Response {
 	args := fmt.Sprintf("--start --mem-percent %d --reserve %d --debug=%t", memPercent, memReserve, util.Debug)
+	if memRate != 0 {
+		args = fmt.Sprintf("%s --rate %d", args, memRate)
+	}
+	if burnMemMode != "" {
+		args = fmt.Sprintf("%s --mode %s", args, burnMemMode)
+	}
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), args)
 }
 

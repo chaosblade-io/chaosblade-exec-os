@@ -101,7 +101,7 @@ func burnMemWithRam() {
 	if err != nil {
 		bin.PrintErrAndExit(err.Error())
 	}
-	buffChan := make(chan Block, int(total*1024/32))
+	buffChan := make(chan Block, total*1024/32)
 	defer close(buffChan)
 	for {
 		t := time.NewTicker(1 * time.Second)
@@ -112,7 +112,7 @@ func burnMemWithRam() {
 				bin.PrintErrAndExit(err.Error())
 			}
 			if expectMem > 0 {
-				if expectMem > int64(memRate) {
+				if expectMem > int64(memRate) && memRate > 0 {
 					fillBuffChan(int64(memRate), buffChan)
 				} else {
 					fillBuffChan(expectMem, buffChan)

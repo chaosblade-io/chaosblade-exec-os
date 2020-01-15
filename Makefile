@@ -31,6 +31,8 @@ endif
 # build os
 build: pre_build build_yaml build_osbin
 
+build_darwin: pre_build build_yaml build_osbin_darwin
+
 pre_build:
 	rm -rf $(BUILD_TARGET_PKG_DIR) $(BUILD_TARGET_PKG_FILE_PATH)
 	mkdir -p $(BUILD_TARGET_BIN) $(BUILD_TARGET_LIB)
@@ -39,6 +41,8 @@ build_yaml: build/spec.go
 	$(GO) run $< $(OS_YAML_FILE_PATH)
 
 build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_dlnetwork build_dropnetwork build_filldisk
+
+build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns
 
 # build burn-cpu chaos tools
 build_burncpu: exec/bin/burncpu/burncpu.go

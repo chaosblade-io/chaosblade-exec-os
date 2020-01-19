@@ -25,55 +25,51 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
-type DelayActionSpec struct {
+type DuplicateActionSpec struct {
 	spec.BaseExpActionCommandSpec
 }
 
-func NewDelayActionSpec() spec.ExpActionCommandSpec {
-	return &DelayActionSpec{
+func NewDuplicateActionSpec() spec.ExpActionCommandSpec {
+	return &DuplicateActionSpec{
 		spec.BaseExpActionCommandSpec{
 			ActionMatchers: commFlags,
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
-					Name:     "time",
-					Desc:     "Delay time, ms",
+					Name:     "percent",
+					Desc:     "Duplication percent, must be positive integer without %, for example, --percent 50",
 					Required: true,
 				},
-				&spec.ExpFlag{
-					Name: "offset",
-					Desc: "Delay offset time, ms",
-				},
 			},
-			ActionExecutor: &NetworkDelayExecutor{},
+			ActionExecutor: &NetworkDuplicateExecutor{},
 		},
 	}
 }
 
-func (*DelayActionSpec) Name() string {
-	return "delay"
+func (*DuplicateActionSpec) Name() string {
+	return "duplicate"
 }
 
-func (*DelayActionSpec) Aliases() []string {
+func (*DuplicateActionSpec) Aliases() []string {
 	return []string{}
 }
 
-func (*DelayActionSpec) ShortDesc() string {
-	return "Delay experiment"
+func (*DuplicateActionSpec) ShortDesc() string {
+	return "Duplicate experiment"
 }
 
-func (*DelayActionSpec) LongDesc() string {
-	return "Delay experiment"
+func (*DuplicateActionSpec) LongDesc() string {
+	return "Duplicate experiment"
 }
 
-type NetworkDelayExecutor struct {
+type NetworkDuplicateExecutor struct {
 	channel spec.Channel
 }
 
-func (de *NetworkDelayExecutor) Name() string {
-	return "delay"
+func (de *NetworkDuplicateExecutor) Name() string {
+	return "duplicate"
 }
 
-func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+func (de *NetworkDuplicateExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkNetworkExpEnv()
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
@@ -88,26 +84,22 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return de.stop(netInterface, ctx)
 	} else {
-		time := model.ActionFlags["time"]
-		if time == "" {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less time flag")
-		}
-		offset := model.ActionFlags["offset"]
-		if offset == "" {
-			offset = "10"
+		percent := model.ActionFlags["percent"]
+		if percent == "" {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less percent flag")
 		}
 		localPort := model.ActionFlags["local-port"]
 		remotePort := model.ActionFlags["remote-port"]
 		excludePort := model.ActionFlags["exclude-port"]
 		destIp := model.ActionFlags["destination-ip"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
-		return de.start(localPort, remotePort, excludePort, destIp, time, offset, netInterface, ignorePeerPort, ctx)
+		return de.start(netInterface, localPort, remotePort, excludePort, destIp, percent, ignorePeerPort, ctx)
 	}
 }
 
-func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp, time, offset, netInterface string,
+func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, percent string,
 	ignorePeerPort bool, ctx context.Context) *spec.Response {
-	args := fmt.Sprintf("--start --type delay --interface %s --time %s --offset %s --debug=%t", netInterface, time, offset, util.Debug)
+	args := fmt.Sprintf("--start --type duplicate --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
 	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, args, ignorePeerPort)
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
@@ -115,11 +107,11 @@ func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp
 	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), tcNetworkBin), args)
 }
 
-func (de *NetworkDelayExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
+func (de *NetworkDuplicateExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
 	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), tcNetworkBin),
-		fmt.Sprintf("--stop --type delay --interface %s --debug=%t", netInterface, util.Debug))
+		fmt.Sprintf("--stop --type duplicate --interface %s --debug=%t", netInterface, util.Debug))
 }
 
-func (de *NetworkDelayExecutor) SetChannel(channel spec.Channel) {
+func (de *NetworkDuplicateExecutor) SetChannel(channel spec.Channel) {
 	de.channel = channel
 }

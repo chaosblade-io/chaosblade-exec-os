@@ -40,7 +40,7 @@ pre_build:
 build_yaml: build/spec.go
 	$(GO) run $< $(OS_YAML_FILE_PATH)
 
-build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_dlnetwork build_dropnetwork build_filldisk
+build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk
 
 build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns
 
@@ -67,8 +67,8 @@ build_stopprocess: exec/bin/stopprocess/stopprocess.go
 build_changedns: exec/bin/changedns/changedns.go
 	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_changedns $<
 
-build_dlnetwork: exec/bin/delaylossnetwork/delaylossnetwork.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_dlnetwork $<
+build_tcnetwork: exec/bin/tcnetwork/tcnetwork.go
+	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_tcnetwork $<
 
 build_dropnetwork: exec/bin/dropnetwork/dropnetwork.go
 	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_dropnetwork $<

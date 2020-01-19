@@ -206,3 +206,38 @@ func Test_addQdiscForDelay(t *testing.T) {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
 }
+
+func Test_startDuplicateNet(t *testing.T) {
+	type args struct {
+		netInterface string
+		classRule    string
+		localPort    string
+		remotePort   string
+		excludePort  string
+		destIp       string
+	}
+
+	as := &args{
+		netInterface: "eth0",
+		classRule:    "netem duplicate 50%",
+		localPort:    "",
+		remotePort:   "",
+		excludePort:  "",
+	}
+
+	var exitCode int
+	bin.ExitFunc = func(code int) {
+		exitCode = code
+	}
+	channel = &channel2.MockLocalChannel{
+		Response: spec.ReturnSuccess("success"),
+		ExpectedCommands: []string{
+			`ifconfig eth0 txqueuelen 1000`,
+			`tc qdisc add dev eth0 root netem duplicate 50%`},
+		T: t,
+	}
+	startNet(as.netInterface, as.classRule, as.localPort, as.remotePort, as.excludePort, as.destIp)
+	if exitCode != 0 {
+		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
+	}
+}

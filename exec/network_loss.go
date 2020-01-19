@@ -84,12 +84,12 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 		}
 		dev = netInterface
 	}
+	if _, ok := spec.IsDestroy(ctx); ok {
+		return nle.stop(dev, ctx)
+	}
 	percent := model.ActionFlags["percent"]
 	if percent == "" {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less percent flag")
-	}
-	if _, ok := spec.IsDestroy(ctx); ok {
-		return nle.stop(dev, ctx)
 	}
 	localPort := model.ActionFlags["local-port"]
 	remotePort := model.ActionFlags["remote-port"]
@@ -101,17 +101,17 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 
 func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, percent string,
 	ignorePeerPort bool, ctx context.Context) *spec.Response {
-	args := fmt.Sprintf("--start --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
+	args := fmt.Sprintf("--start --type loss --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
 	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, args, ignorePeerPort)
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}
-	return nle.channel.Run(ctx, path.Join(nle.channel.GetScriptPath(), dlNetworkBin), args)
+	return nle.channel.Run(ctx, path.Join(nle.channel.GetScriptPath(), tcNetworkBin), args)
 }
 
 func (nle *NetworkLossExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return nle.channel.Run(ctx, path.Join(nle.channel.GetScriptPath(), dlNetworkBin),
-		fmt.Sprintf("--stop --interface %s --debug=%t", netInterface, util.Debug))
+	return nle.channel.Run(ctx, path.Join(nle.channel.GetScriptPath(), tcNetworkBin),
+		fmt.Sprintf("--stop --type loss --interface %s --debug=%t", netInterface, util.Debug))
 }
 
 func (nle *NetworkLossExecutor) SetChannel(channel spec.Channel) {

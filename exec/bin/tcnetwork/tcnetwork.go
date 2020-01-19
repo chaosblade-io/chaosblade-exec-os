@@ -31,41 +31,56 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var dlNetInterface, dlLocalPort, dlRemotePort, dlExcludePort string
-var dlDestinationIp string
-var lossNetPercent, delayNetTime, delayNetOffset string
-var dlNetStart, dlNetStop bool
-var dlIgnorePeerPorts bool
+var tcNetInterface, tcLocalPort, tcRemotePort, tcExcludePort string
+var tcDestinationIp string
+var netPercent, delayNetTime, delayNetOffset string
+var tcNetStart, tcNetStop bool
+var tcIgnorePeerPorts bool
+var actionType string
 
 const delimiter = ","
+const (
+	Delay     = "delay"
+	Loss      = "loss"
+	Duplicate = "duplicate"
+	Corrupt   = "corrupt"
+	Reorder   = "reorder"
+)
 
 func main() {
-	flag.StringVar(&dlNetInterface, "interface", "", "network interface")
+	flag.StringVar(&tcNetInterface, "interface", "", "network interface")
 	flag.StringVar(&delayNetTime, "time", "", "delay time")
 	flag.StringVar(&delayNetOffset, "offset", "", "delay offset")
-	flag.StringVar(&lossNetPercent, "percent", "", "loss percent")
-	flag.StringVar(&dlLocalPort, "local-port", "", "local ports, for example: 80,8080,8081")
-	flag.StringVar(&dlRemotePort, "remote-port", "", "remote ports, for example: 80,8080,8081")
-	flag.StringVar(&dlExcludePort, "exclude-port", "", "exclude ports, for example: 22,23")
-	flag.StringVar(&dlDestinationIp, "destination-ip", "", "destination ip")
-	flag.BoolVar(&dlNetStart, "start", false, "start delay")
-	flag.BoolVar(&dlNetStop, "stop", false, "stop delay")
-	flag.BoolVar(&dlIgnorePeerPorts, "ignore-peer-port", false, "ignore excluding all ports communicating with this port, generally used when the ss command does not exist")
+	flag.StringVar(&netPercent, "percent", "", "loss percent")
+	flag.StringVar(&tcLocalPort, "local-port", "", "local ports, for example: 80,8080,8081")
+	flag.StringVar(&tcRemotePort, "remote-port", "", "remote ports, for example: 80,8080,8081")
+	flag.StringVar(&tcExcludePort, "exclude-port", "", "exclude ports, for example: 22,23")
+	flag.StringVar(&tcDestinationIp, "destination-ip", "", "destination ip")
+	flag.BoolVar(&tcNetStart, "start", false, "start delay")
+	flag.BoolVar(&tcNetStop, "stop", false, "stop delay")
+	flag.BoolVar(&tcIgnorePeerPorts, "ignore-peer-port", false, "ignore excluding all ports communicating with this port, generally used when the ss command does not exist")
+	flag.StringVar(&actionType, "type", "", "network experiment type, value is delay|loss|duplicate|corrupt|reorder, required")
 	bin.ParseFlagAndInitLog()
-	if dlNetInterface == "" {
+
+	if tcNetInterface == "" {
 		bin.PrintErrAndExit("less --interface flag")
 	}
 
-	if dlNetStart {
+	if tcNetStart {
 		var classRule string
-		if lossNetPercent != "" {
-			classRule = fmt.Sprintf("netem loss %s%%", lossNetPercent)
-		} else if delayNetTime != "" {
+		switch actionType {
+		case Delay:
 			classRule = fmt.Sprintf("netem delay %sms %sms", delayNetTime, delayNetOffset)
+		case Loss:
+			classRule = fmt.Sprintf("netem loss %s%%", netPercent)
+		case Duplicate:
+			classRule = fmt.Sprintf("netem duplicate %s%%", netPercent)
+		default:
+			bin.PrintErrAndExit("unsupported type for network experiments")
 		}
-		startNet(dlNetInterface, classRule, dlLocalPort, dlRemotePort, dlExcludePort, dlDestinationIp)
-	} else if dlNetStop {
-		stopNet(dlNetInterface)
+		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp)
+	} else if tcNetStop {
+		stopNet(tcNetInterface)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
@@ -235,7 +250,7 @@ func addExcludePortFilterForDL(ctx context.Context, channel spec.Channel,
 		if _, ok := portSet[p]; !ok {
 			portSet[p] = struct{}{}
 		}
-		if !dlIgnorePeerPorts {
+		if !tcIgnorePeerPorts {
 			peerPorts, err := getPeerPorts(p)
 			if err != nil {
 				logrus.Warningf("get peer ports for %s err, %v", p, err)

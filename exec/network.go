@@ -37,6 +37,7 @@ func NewNetworkCommandSpec() spec.ExpModelCommandSpec {
 				NewDropActionSpec(),
 				NewDnsActionSpec(),
 				NewLossActionSpec(),
+				NewDuplicateActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},
@@ -61,8 +62,8 @@ func (*NetworkCommandSpec) Example() string {
 # You can execute "blade query network interface" command to query the interfaces`
 }
 
-// dlNetworkBin for delay and loss experiments
-var dlNetworkBin = "chaos_dlnetwork"
+// tcNetworkBin for network delay, loss, duplicate, reorder and corrupt experiments
+var tcNetworkBin = "chaos_tcnetwork"
 
 var commFlags = []spec.ExpFlagSpec{
 	&spec.ExpFlag{

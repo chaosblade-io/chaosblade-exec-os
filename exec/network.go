@@ -38,6 +38,8 @@ func NewNetworkCommandSpec() spec.ExpModelCommandSpec {
 				NewDnsActionSpec(),
 				NewLossActionSpec(),
 				NewDuplicateActionSpec(),
+				NewCorruptActionSpec(),
+				NewReorderActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},

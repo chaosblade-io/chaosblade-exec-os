@@ -82,7 +82,7 @@ var commFlags = []spec.ExpFlagSpec{
 	},
 	&spec.ExpFlag{
 		Name: "destination-ip",
-		Desc: "destination ip. Support for using mask to specify the ip range, for example, 192.168.1.0/24. You can also use 192.168.1.1 or 192.168.1.1/32 to specify it.",
+		Desc: "destination ip. Support for using mask to specify the ip range such as 92.168.1.0/24 or comma separated multiple ips, for example 10.0.0.1,11.0.0.1.",
 	},
 	&spec.ExpFlag{
 		Name:   "ignore-peer-port",

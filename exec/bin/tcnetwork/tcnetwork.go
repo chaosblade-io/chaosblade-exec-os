@@ -37,6 +37,8 @@ var netPercent, delayNetTime, delayNetOffset string
 var tcNetStart, tcNetStop bool
 var tcIgnorePeerPorts bool
 var actionType string
+var reorderGap string
+var correlation string
 
 const delimiter = ","
 const (
@@ -60,6 +62,8 @@ func main() {
 	flag.BoolVar(&tcNetStop, "stop", false, "stop delay")
 	flag.BoolVar(&tcIgnorePeerPorts, "ignore-peer-port", false, "ignore excluding all ports communicating with this port, generally used when the ss command does not exist")
 	flag.StringVar(&actionType, "type", "", "network experiment type, value is delay|loss|duplicate|corrupt|reorder, required")
+	flag.StringVar(&reorderGap, "gap", "", "packets gap")
+	flag.StringVar(&correlation, "correlation", "0", "correlation on previous packet")
 	bin.ParseFlagAndInitLog()
 
 	if tcNetInterface == "" {
@@ -75,6 +79,14 @@ func main() {
 			classRule = fmt.Sprintf("netem loss %s%%", netPercent)
 		case Duplicate:
 			classRule = fmt.Sprintf("netem duplicate %s%%", netPercent)
+		case Corrupt:
+			classRule = fmt.Sprintf("netem corrupt %s%%", netPercent)
+		case Reorder:
+			classRule = fmt.Sprintf("netem reorder %s%% %s%%", netPercent, correlation)
+			if reorderGap != "" {
+				classRule = fmt.Sprintf("%s gap %s", classRule, reorderGap)
+			}
+			classRule = fmt.Sprintf("%s delay %sms", classRule, delayNetTime)
 		default:
 			bin.PrintErrAndExit("unsupported type for network experiments")
 		}

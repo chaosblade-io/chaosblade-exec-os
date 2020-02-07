@@ -143,9 +143,9 @@ func burnWrite(directory, size string) {
 
 // read burn
 func burnRead(directory, size string) {
-	// create a 1g file under the directory
+	// create a 600M file under the directory
 	tmpFileForRead := path.Join(directory, readFile)
-	createArgs := fmt.Sprintf("if=/dev/zero of=%s bs=%sM count=%d oflag=dsync", tmpFileForRead, size, count)
+	createArgs := fmt.Sprintf("if=/dev/zero of=%s bs=%dM count=%d oflag=dsync", tmpFileForRead, 6, count)
 	response := channel.Run(context.TODO(), "dd", createArgs)
 	if !response.Success {
 		bin.PrintAndExitWithErrPrefix(

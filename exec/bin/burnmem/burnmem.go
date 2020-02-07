@@ -20,27 +20,29 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
+	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/containerd/cgroups"
 	v1 "github.com/containerd/cgroups/stats/v1"
 	"github.com/shirou/gopsutil/mem"
 
-	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/sirupsen/logrus"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 const PAGE_COUNTER_MAX uint64 = 9223372036854771712
 
-//32K
-type Block [8 * 1024]int32
+// 128K
+type Block [32 * 1024]int32
 
 var (
 	burnMemStart, burnMemStop, burnMemNohup bool
@@ -70,7 +72,6 @@ func main() {
 		} else if burnMemMode == "ram" {
 			burnMemWithRam()
 		}
-
 	} else {
 		bin.PrintAndExitWithErrPrefix("less --start or --stop flag")
 	}
@@ -97,34 +98,40 @@ func getMem(filePath string) int64 {
 }
 
 func burnMemWithRam() {
-	total, _, err := calculateMemSize(memPercent, memReserve)
-	if err != nil {
-		bin.PrintErrAndExit(err.Error())
+	tick := time.Tick(time.Second)
+	var cache = make(map[int][]Block, 1)
+	var count = 1
+	cache[count] = make([]Block, 0)
+	if memRate <= 0 {
+		memRate = 100
 	}
-	buffChan := make(chan Block, total*1024/32)
-	defer close(buffChan)
-	for {
-		t := time.NewTicker(1 * time.Second)
-		select {
-		case <-t.C:
-			_, expectMem, err := calculateMemSize(memPercent, memReserve)
-			if err != nil {
-				bin.PrintErrAndExit(err.Error())
-			}
-			if expectMem > 0 {
-				if expectMem > int64(memRate) && memRate > 0 {
-					fillBuffChan(int64(memRate), buffChan)
-				} else {
-					fillBuffChan(expectMem, buffChan)
+	for range tick {
+		_, expectMem, err := calculateMemSize(memPercent, memReserve)
+		if err != nil {
+			bin.PrintErrAndExit(err.Error())
+		}
+		fillMem := expectMem
+		if expectMem > 0 {
+			if expectMem > int64(memRate) {
+				fillMem = int64(memRate)
+			} else {
+				fillMem = expectMem / 10
+				if fillMem == 0 {
+					continue
 				}
 			}
+			fillSize := int(8 * fillMem)
+			buf := cache[count]
+			if cap(buf)-len(buf) < fillSize &&
+				int(math.Floor(float64(cap(buf))*1.25)) >= int(8*expectMem) {
+				count += 1
+				cache[count] = make([]Block, 0)
+				buf = cache[count]
+			}
+			logrus.Debugf("count: %d, len(buf): %d, cap(buf): %d, expect mem: %d, fill size: %d",
+				count, len(buf), cap(buf), expectMem, fillSize)
+			cache[count] = append(buf, make([]Block, fillSize)...)
 		}
-	}
-}
-
-func fillBuffChan(memSize int64, buffChan chan Block) {
-	for i := int64(0); i < memSize*1024/32; i++ {
-		buffChan <- Block{0}
 	}
 }
 
@@ -209,17 +216,28 @@ func startBurnMem() {
 	runBurnMemFunc(ctx, memPercent, memReserve, memRate, burnMemMode)
 }
 
-func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string) int {
+func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string) {
 	args := fmt.Sprintf(`%s --nohup --mem-percent %d --reserve %d --rate %d --mode %s`,
 		path.Join(util.GetProgramPath(), burnMemBin), memPercent, memReserve, memRate, burnMemMode)
-
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
 	response := channel.Run(ctx, "nohup", args)
 	if !response.Success {
 		stopBurnMemFunc()
 		bin.PrintErrAndExit(response.Err)
 	}
-	return -1
+	// check pid
+	newCtx := context.WithValue(context.Background(), cl.ProcessKey, "--nohup")
+	pids, err := cl.GetPidsByProcessName(burnMemBin, newCtx)
+	if err != nil {
+		stopBurnMemFunc()
+		bin.PrintErrAndExit(fmt.Sprintf("run burn memory by %s mode failed, cannot get the burning program pid, %v",
+			burnMemMode, err))
+	}
+	if len(pids) == 0 {
+		stopBurnMemFunc()
+		bin.PrintErrAndExit(fmt.Sprintf("run burn memory by %s mode failed, cannot find the burning program pid",
+			burnMemMode))
+	}
 }
 
 func stopBurnMem() (success bool, errs string) {
@@ -236,11 +254,9 @@ func stopBurnMem() (success bool, errs string) {
 		dirPath := path.Join(util.GetProgramPath(), dirName)
 		if _, err := os.Stat(dirPath); err == nil {
 			response = channel.Run(ctx, "umount", dirPath)
-
 			if !response.Success {
 				bin.PrintErrAndExit(response.Error())
 			}
-
 			err = os.RemoveAll(dirPath)
 			if err != nil {
 				bin.PrintErrAndExit(err.Error())
@@ -272,12 +288,15 @@ func calculateMemSize(percent, reserve int) (int64, int64, error) {
 		available = int64(stats.Memory.Usage.Limit - stats.Memory.Usage.Usage)
 	}
 
-	expectSize := int64(0)
+	reserved := int64(0)
 	if percent != 0 {
-		expectSize = (available - total*int64(100-percent)/100) / 1024 / 1024
+		reserved = (total * int64(100-percent) / 100) / 1024 / 1024
 	} else {
-		expectSize = available/1024/1024 - int64(reserve)
+		reserved = int64(reserve)
 	}
-
+	expectSize := available/1024/1024 - reserved
+	if expectSize < 0 {
+		expectSize = int64(0)
+	}
 	return total / 1024 / 1024, expectSize, nil
 }

@@ -51,7 +51,7 @@ func NewFillActionSpec() spec.ExpActionCommandSpec {
 				},
 				&spec.ExpFlag{
 					Name: "reserve",
-					Desc: "Disk reserve size, unit is MB. The value is a positive integer without unit. If size, percent and reserve flags exit, the priority is as follows: percent > reserve > size",
+					Desc: "Disk reserve size, unit is MB. The value is a positive integer without unit. If size, percent and reserve flags exist, the priority is as follows: percent > reserve > size",
 				},
 			},
 			ActionExecutor: &FillActionExecutor{},

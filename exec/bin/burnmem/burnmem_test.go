@@ -36,8 +36,7 @@ func Test_startBurnMem(t *testing.T) {
 		exitCode = code
 	}
 
-	runBurnMemFunc = func(context.Context, int, int, int, string) int {
-		return 1
+	runBurnMemFunc = func(context.Context, int, int, int, string) {
 	}
 
 	stopBurnMemFunc = func() (bool, string) {

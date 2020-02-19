@@ -1,6 +1,6 @@
 .PHONY: build clean
 
-BLADE_SRC_ROOT=`pwd`
+BLADE_SRC_ROOT=$(shell pwd)
 
 GO_ENV=CGO_ENABLED=1
 GO_MODULE=GO111MODULE=on
@@ -81,26 +81,9 @@ build_linux:
 	docker build -f build/image/musl/Dockerfile -t chaosblade-build-musl:latest build/image/musl
 	docker run --rm \
 		-v $(shell echo -n ${GOPATH}):/go \
-		-w /go/src/github.com/chaosblade-io/chaosblade-exec-os \
+		-v $(BLADE_SRC_ROOT):/chaosblade-exec-os \
+		-w /chaosblade-exec-os \
 		chaosblade-build-musl:latest
-
-# build chaosblade image for chaos
-build_image: build_linux
-	rm -rf $(BUILD_IMAGE_PATH)/$(BUILD_TARGET_DIR_NAME)
-
-	cp -R $(BUILD_TARGET_PKG_DIR) $(BUILD_IMAGE_PATH)
-	docker build -f $(BUILD_IMAGE_PATH)/Dockerfile \
-		--build-arg BLADE_VERSION=$(BLADE_VERSION) \
-		-t chaosblade-agent:$(BLADE_VERSION) \
-		$(BUILD_IMAGE_PATH)
-
-	rm -rf $(BUILD_IMAGE_PATH)/$(BUILD_TARGET_DIR_NAME)
-
-# build docker image with multi-stage builds
-docker_image: clean
-	docker build -f ./Dockerfile \
-		--build-arg BLADE_VERSION=$(BLADE_VERSION) \
-		-t chaosblade:$(BLADE_VERSION) $(BLADE_SRC_ROOT)
 
 # test
 test:

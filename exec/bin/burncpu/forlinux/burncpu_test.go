@@ -20,13 +20,14 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"reflect"
 	"testing"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/containerd/cgroups"
 
-	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
@@ -63,7 +64,6 @@ func Test_runBurnCpu_failed(t *testing.T) {
 		pidNeeded bool
 		processor string
 	}
-	burnBin := path.Join(util.GetProgramPath(), "chaos_burncpu")
 	as := &args{
 		cpuCount:  2,
 		pidNeeded: false,
@@ -74,24 +74,25 @@ func Test_runBurnCpu_failed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	var invokeTime int
 	stopBurnCpuFunc = func() (bool, string) {
-		invokeTime++
 		return true, ""
 	}
-
-	channel = &cl.MockLocalChannel{
-		Response:         spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found"),
-		ExpectedCommands: []string{fmt.Sprintf(`nohup %s --nohup --cpu-count 2 > /dev/null 2>&1 &`, burnBin)},
-		T:                t,
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	actualCommands := make([]string, 0)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found")
 	}
+	burnBin := path.Join(util.GetProgramPath(), "chaos_burncpu")
+	expectedCommands := []string{fmt.Sprintf(`nohup %s --nohup --cpu-count 2 > /dev/null 2>&1 &`, burnBin)}
 
 	runBurnCpu(context.Background(), as.cpuCount, as.pidNeeded, as.processor)
 	if exitCode != 1 {
-		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
+		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
-	if invokeTime != 1 {
-		t.Errorf("unexpected invoke time %d, expected result: %d", invokeTime, 1)
+	if !reflect.DeepEqual(expectedCommands, actualCommands) {
+		t.Errorf("unexpected commands: %+v, expected commands: %+v", actualCommands, expectedCommands)
 	}
 }
 
@@ -111,15 +112,21 @@ func Test_bindBurnCpu(t *testing.T) {
 	}
 	stopBurnCpuFunc = func() (bool, string) { return true, "" }
 
-	channel = &cl.MockLocalChannel{
-		Response:         spec.ReturnFail(spec.Code[spec.CommandNotFound], "taskset command not found"),
-		ExpectedCommands: []string{fmt.Sprintf(`taskset -a -cp 0 25233`)},
-		T:                t,
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	actualCommands := make([]string, 0)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "taskset command not found")
 	}
+	expectedCommands := []string{fmt.Sprintf(`taskset -a -cp 0 25233`)}
 
 	bindBurnCpuByTaskset(context.Background(), as.core, as.pid)
 	if exitCode != 1 {
-		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
+		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
+	}
+	if !reflect.DeepEqual(expectedCommands, actualCommands) {
+		t.Errorf("unexpected commands: %+v, expected commands: %+v", actualCommands, expectedCommands)
 	}
 }
 func Test_checkBurnCpu(t *testing.T) {

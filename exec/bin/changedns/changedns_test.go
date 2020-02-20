@@ -17,10 +17,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
@@ -62,15 +64,21 @@ func Test_startChangeDns_failed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	channel = &channel2.MockLocalChannel{
-		Response:         spec.ReturnSuccess("DnsPair has exists"),
-		ExpectedCommands: []string{fmt.Sprintf(`grep -q "208.80.152.2 abc.com #chaosblade" /etc/hosts`)},
-		T:                t,
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	actualCommands := make([]string, 0)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
+		return spec.ReturnSuccess("DnsPair has exists")
 	}
+	expectedCommands := []string{fmt.Sprintf(`grep -q "208.80.152.2 abc.com #chaosblade" /etc/hosts`)}
 
 	startChangeDns(as.domain, as.ip)
 	if exitCode != 1 {
-		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
+		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
+	}
+	if !reflect.DeepEqual(expectedCommands, actualCommands) {
+		t.Errorf("unexpected commands: %+v, expected commands: %+v", actualCommands, expectedCommands)
 	}
 }
 
@@ -89,14 +97,19 @@ func Test_recoverDns_failed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	channel = &channel2.MockLocalChannel{
-		Response:         spec.ReturnFail(spec.Code[spec.CommandNotFound], "grep command not found"),
-		ExpectedCommands: []string{fmt.Sprintf(`grep -q "208.80.152.2 abc.com #chaosblade" /etc/hosts`)},
-		T:                t,
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	actualCommands := make([]string, 0)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "grep command not found")
 	}
-
+	expectedCommands := []string{fmt.Sprintf(`grep -q "208.80.152.2 abc.com #chaosblade" /etc/hosts`)}
 	recoverDns(as.domain, as.ip)
 	if exitCode != 0 {
-		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
+		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
+	}
+	if !reflect.DeepEqual(expectedCommands, actualCommands) {
+		t.Errorf("unexpected commands: %+v, expected commands: %+v", actualCommands, expectedCommands)
 	}
 }

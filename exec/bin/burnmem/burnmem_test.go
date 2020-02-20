@@ -20,9 +20,10 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"reflect"
 	"testing"
 
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
@@ -44,17 +45,23 @@ func Test_startBurnMem(t *testing.T) {
 	}
 
 	flPath := path.Join(util.GetProgramPath(), dirName)
-	channel = &channel2.MockLocalChannel{
-		Response:         spec.ReturnSuccess("success"),
-		ExpectedCommands: []string{fmt.Sprintf("mount -t tmpfs tmpfs %s -o size=", flPath) + "100%"},
-		T:                t,
+
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	actualCommands := make([]string, 0)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
+		return spec.ReturnSuccess("success")
 	}
+	expectedCommands := []string{fmt.Sprintf("mount -t tmpfs tmpfs %s -o size=", flPath) + "100%"}
 
 	startBurnMem()
 	if exitCode != 0 {
-		t.Errorf("unexpected result %d, expected result: %d", exitCode, 0)
+		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 0)
 	}
-
+	if !reflect.DeepEqual(expectedCommands, actualCommands) {
+		t.Errorf("unexpected commands: %+v, expected commands: %+v", actualCommands, expectedCommands)
+	}
 }
 
 func Test_runBurnMem_failed(t *testing.T) {
@@ -73,23 +80,25 @@ func Test_runBurnMem_failed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-
-	channel = &channel2.MockLocalChannel{
-		Response:         spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found"),
-		ExpectedCommands: []string{fmt.Sprintf(`nohup %s --nohup --mem-percent 50 > /dev/null 2>&1 &`, burnBin)},
-		T:                t,
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	actualCommands := make([]string, 0)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found")
 	}
-
+	expectedCommands := []string{fmt.Sprintf(`nohup %s --nohup --mem-percent 50 > /dev/null 2>&1 &`, burnBin)}
 	stopBurnMemFunc = func() (bool, string) {
 		return true, ""
 	}
 
 	runBurnMem(context.Background(), as.memPercent, as.memReserve, as.memRate, as.burnMemMode)
-
 	if exitCode != 1 {
-		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
+		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
-
+	if !reflect.DeepEqual(expectedCommands, actualCommands) {
+		t.Errorf("unexpected commands: %+v, expected commands: %+v", actualCommands, expectedCommands)
+	}
 }
 
 func Test_stopBurnMem(t *testing.T) {
@@ -98,7 +107,7 @@ func Test_stopBurnMem(t *testing.T) {
 	}{
 		{"stop"},
 	}
-	channel = channel2.NewLocalChannel()
+	cl = channel.NewLocalChannel()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stopBurnMem()

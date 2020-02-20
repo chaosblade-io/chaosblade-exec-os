@@ -127,7 +127,7 @@ func insertContentToScriptBy(channel spec.Channel, functionName string, newConte
 func checkScriptExpEnv() error {
 	commands := []string{"cat", "rm", "sed", "awk", "rm"}
 	for _, command := range commands {
-		if !channel.IsCommandAvailable(command) {
+		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)
 		}
 	}

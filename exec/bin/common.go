@@ -27,18 +27,22 @@ import (
 const ErrPrefix = "Error:"
 
 var ExitFunc = os.Exit
+var ExitMessageForTesting string
 
 func PrintAndExitWithErrPrefix(message string) {
+	ExitMessageForTesting = fmt.Sprintf("%s %s", ErrPrefix, message)
 	fmt.Fprint(os.Stderr, fmt.Sprintf("%s %s", ErrPrefix, message))
 	ExitFunc(1)
 }
 
 func PrintErrAndExit(message string) {
+	ExitMessageForTesting = message
 	fmt.Fprint(os.Stderr, message)
 	ExitFunc(1)
 }
 
 func PrintOutputAndExit(message string) {
+	ExitMessageForTesting = message
 	fmt.Fprintf(os.Stdout, message)
 	ExitFunc(0)
 }

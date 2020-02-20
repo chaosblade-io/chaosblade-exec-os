@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
@@ -78,18 +78,14 @@ func Test_handleDropSpecifyPort(t *testing.T) {
 		invokeTime++
 	}
 	for _, tt := range tests {
-		invokeTime = 0
-		channel = &channel2.MockLocalChannel{
-			Response: tt.input.response,
-			NoCheck:  true,
-			T:        t,
+		cl = channel.NewMockLocalChannel()
+		mockChannel := cl.(*channel.MockLocalChannel)
+		mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+			return tt.input.response
 		}
-		handleDropSpecifyPort(tt.input.remotePort, tt.input.localPort, channel, context.Background())
+		handleDropSpecifyPort(tt.input.remotePort, tt.input.localPort, context.Background())
 		if exitCode != tt.expect.exitCode {
 			t.Errorf("unexpected result: %d, expected result: %d", exitCode, tt.expect.exitCode)
-		}
-		if invokeTime != tt.expect.invokeTime {
-			t.Errorf("unexpected invoke time %d, expected result: %d", invokeTime, tt.expect.invokeTime)
 		}
 	}
 }

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/containerd/cgroups"
@@ -163,7 +163,7 @@ func burnMemWithCache() {
 					if needMem/128 > memSum/128 {
 						for i := memSum / 128; i < needMem/128; i++ {
 							nFilePath := filePath + strconv.FormatInt(i, 10)
-							response := channel.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, 128))
+							response := cl.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, 128))
 							if !response.Success {
 								bin.PrintErrAndExit(response.Error())
 							}
@@ -177,7 +177,7 @@ func burnMemWithCache() {
 					fileCount = int(needMem / 128)
 					if needMem%128 != 0 {
 						nFilePath := filePath + strconv.Itoa(fileCount)
-						response := channel.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, needMem%128))
+						response := cl.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, needMem%128))
 						if !response.Success {
 							bin.PrintErrAndExit(response.Error())
 						}
@@ -192,7 +192,7 @@ func burnMemWithCache() {
 
 var burnMemBin = "chaos_burnmem"
 
-var channel = cl.NewLocalChannel()
+var cl = channel.NewLocalChannel()
 
 var stopBurnMemFunc = stopBurnMem
 
@@ -208,7 +208,7 @@ func startBurnMem() {
 				bin.PrintErrAndExit(err.Error())
 			}
 		}
-		response := channel.Run(ctx, "mount", fmt.Sprintf("-t tmpfs tmpfs %s -o size=", flPath)+"100%")
+		response := cl.Run(ctx, "mount", fmt.Sprintf("-t tmpfs tmpfs %s -o size=", flPath)+"100%")
 		if !response.Success {
 			bin.PrintErrAndExit(response.Error())
 		}
@@ -220,13 +220,13 @@ func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMe
 	args := fmt.Sprintf(`%s --nohup --mem-percent %d --reserve %d --rate %d --mode %s`,
 		path.Join(util.GetProgramPath(), burnMemBin), memPercent, memReserve, memRate, burnMemMode)
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
-	response := channel.Run(ctx, "nohup", args)
+	response := cl.Run(ctx, "nohup", args)
 	if !response.Success {
 		stopBurnMemFunc()
 		bin.PrintErrAndExit(response.Err)
 	}
 	// check pid
-	newCtx := context.WithValue(context.Background(), cl.ProcessKey, "--nohup")
+	newCtx := context.WithValue(context.Background(), channel.ProcessKey, "--nohup")
 	pids, err := cl.GetPidsByProcessName(burnMemBin, newCtx)
 	if err != nil {
 		stopBurnMemFunc()
@@ -241,11 +241,11 @@ func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMe
 }
 
 func stopBurnMem() (success bool, errs string) {
-	ctx := context.WithValue(context.Background(), cl.ProcessKey, "nohup")
+	ctx := context.WithValue(context.Background(), channel.ProcessKey, "nohup")
 	pids, _ := cl.GetPidsByProcessName(burnMemBin, ctx)
 	var response *spec.Response
 	if pids != nil && len(pids) != 0 {
-		response = channel.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
+		response = cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 		if !response.Success {
 			return false, response.Err
 		}
@@ -253,7 +253,7 @@ func stopBurnMem() (success bool, errs string) {
 	if burnMemMode == "cache" {
 		dirPath := path.Join(util.GetProgramPath(), dirName)
 		if _, err := os.Stat(dirPath); err == nil {
-			response = channel.Run(ctx, "umount", dirPath)
+			response = cl.Run(ctx, "umount", dirPath)
 			if !response.Success {
 				bin.PrintErrAndExit(response.Error())
 			}

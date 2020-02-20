@@ -17,11 +17,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"path"
+	"reflect"
 	"testing"
 
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
@@ -48,22 +50,22 @@ func Test_startBurnIO_startFailed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	var invokeTime int
-	stopBurnIOFunc = func(directory string, read, write bool) {
-		invokeTime++
+	stopBurnIOFunc = func(directory string, read, write bool) {}
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	actualCommands := make([]string, 0)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
+		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found")
 	}
-	channel = &channel2.MockLocalChannel{
-		Response:         spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found"),
-		ExpectedCommands: []string{fmt.Sprintf(`nohup %s --directory /home/admin --size 1024 --read=true --write=true --nohup=true > %s 2>&1 &`, burnBin, logFile)},
-		T:                t,
-	}
+	expectedCommands := []string{fmt.Sprintf(`nohup %s --directory /home/admin --size 1024 --read=true --write=true --nohup=true > %s 2>&1 &`, burnBin, logFile)}
 
 	startBurnIO(as.directory, as.size, as.read, as.write)
 	if exitCode != 1 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
-	if invokeTime != 1 {
-		t.Errorf("unexpected invoke time %d, expected result: %d", invokeTime, 1)
+	if !reflect.DeepEqual(expectedCommands, actualCommands) {
+		t.Errorf("unexpected commands: %+v, expected commands: %+v", actualCommands, expectedCommands)
 	}
 }
 
@@ -81,7 +83,7 @@ func Test_stopBurnIO(t *testing.T) {
 			write:     true,
 		},
 	}
-	channel = channel2.NewLocalChannel()
+	cl = channel.NewMockLocalChannel()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stopBurnIO(tt.directory, tt.read, tt.write)

@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/sirupsen/logrus"
@@ -98,7 +98,7 @@ func main() {
 	}
 }
 
-var channel = channel2.NewLocalChannel()
+var cl = channel.NewLocalChannel()
 
 func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp string) {
 	// check device txqueuelen size, if the size is zero, then set the value to 1000
@@ -109,29 +109,29 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	ctx := context.Background()
 	// assert localPort and remotePort
 	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" {
-		response := channel.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
+		response := cl.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 		}
 		bin.PrintOutputAndExit(response.Result.(string))
 		return
 	}
-	response = addQdiscForDL(channel, ctx, netInterface)
+	response = addQdiscForDL(cl, ctx, netInterface)
 	// only ip
 	if localPort == "" && remotePort == "" && excludePort == "" {
-		response = addIpFilterForDL(ctx, channel, netInterface, classRule, destIp)
+		response = addIpFilterForDL(ctx, cl, netInterface, classRule, destIp)
 		bin.PrintOutputAndExit(response.Result.(string))
 		return
 	}
 	ipRules := getIpRules(destIp)
 	// exclude
 	if localPort == "" && remotePort == "" && excludePort != "" {
-		response = addExcludePortFilterForDL(ctx, channel, netInterface, classRule, excludePort, ipRules)
+		response = addExcludePortFilterForDL(ctx, cl, netInterface, classRule, excludePort, ipRules)
 		bin.PrintOutputAndExit(response.Result.(string))
 		return
 	}
 	// local port or remote port
-	response = addLocalOrRemotePortForTC(ctx, channel, netInterface, classRule, localPort, remotePort, ipRules)
+	response = addLocalOrRemotePortForTC(ctx, cl, netInterface, classRule, localPort, remotePort, ipRules)
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
@@ -140,7 +140,7 @@ func preHandleTxqueue(netInterface string) *spec.Response {
 	isExist := util.IsExist(txFile)
 	if isExist {
 		// check the value
-		response := channel.Run(context.TODO(), "head", fmt.Sprintf("-1 %s", txFile))
+		response := cl.Run(context.TODO(), "head", fmt.Sprintf("-1 %s", txFile))
 		if response.Success {
 			txlen := strings.TrimSpace(response.Result.(string))
 			len, err := strconv.Atoi(txlen)
@@ -156,7 +156,7 @@ func preHandleTxqueue(netInterface string) *spec.Response {
 		}
 	}
 	// set to 1000 directly
-	response := channel.Run(context.TODO(), "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
+	response := cl.Run(context.TODO(), "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
 	if !response.Success {
 		logrus.Warningf("set txqueuelen for %s err, %s", netInterface, response.Err)
 	}
@@ -325,17 +325,17 @@ func addQdiscForDL(channel spec.Channel, ctx context.Context, netInterface strin
 // stopNet, no need to add os.Exit
 func stopNet(netInterface string) {
 	ctx := context.Background()
-	channel.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
-	channel.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
+	cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+	cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
 }
 
 // getPeerPorts returns all ports communicating with the port
 func getPeerPorts(port string) ([]string, error) {
-	response := channel.Run(context.TODO(), "command", "-v ss")
+	response := cl.Run(context.TODO(), "command", "-v ss")
 	if !response.Success {
 		return nil, fmt.Errorf("ss command not found")
 	}
-	response = channel.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
+	response = cl.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
 	if !response.Success {
 		return nil, fmt.Errorf(response.Err)
 	}

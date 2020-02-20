@@ -52,18 +52,20 @@ func main() {
 	}
 }
 
+var cl = channel.NewLocalChannel()
+
 func doStopProcess(process, processCmd string) {
 	var pids []string
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
 	if process != "" {
-		pids, err = channel.GetPidsByProcessName(process, ctx)
+		pids, err = cl.GetPidsByProcessName(process, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
 		stopProcessName = process
 	} else if processCmd != "" {
-		pids, err = channel.GetPidsByProcessCmdName(processCmd, ctx)
+		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
@@ -86,13 +88,13 @@ func doRecoverProcess(process, processCmd string) {
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
 	if process != "" {
-		pids, err = channel.GetPidsByProcessName(process, ctx)
+		pids, err = cl.GetPidsByProcessName(process, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
 		stopProcessName = process
 	} else if processCmd != "" {
-		pids, err = channel.GetPidsByProcessCmdName(processCmd, ctx)
+		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}

@@ -21,7 +21,7 @@ import (
 	"flag"
 	"fmt"
 
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
@@ -49,7 +49,7 @@ func main() {
 	}
 }
 
-var channel = channel2.NewLocalChannel()
+var cl = channel.NewLocalChannel()
 
 var stopDropNetFunc = stopDropNet
 
@@ -59,20 +59,20 @@ func startDropNet(localPort, remotePort string) {
 		bin.PrintErrAndExit("must specify port flag")
 		return
 	}
-	handleDropSpecifyPort(remotePort, localPort, channel, ctx)
+	handleDropSpecifyPort(remotePort, localPort, ctx)
 }
 
-func handleDropSpecifyPort(remotePort string, localPort string, channel spec.Channel, ctx context.Context) {
+func handleDropSpecifyPort(remotePort string, localPort string, ctx context.Context) {
 	var response *spec.Response
 	if localPort != "" {
-		response = channel.Run(ctx, "iptables",
+		response = cl.Run(ctx, "iptables",
 			fmt.Sprintf(`-A INPUT -p tcp --dport %s -j DROP`, localPort))
 		if !response.Success {
 			stopDropNetFunc(localPort, remotePort)
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
-		response = channel.Run(ctx, "iptables",
+		response = cl.Run(ctx, "iptables",
 			fmt.Sprintf(`-A INPUT -p udp --dport %s -j DROP`, localPort))
 		if !response.Success {
 			stopDropNetFunc(localPort, remotePort)
@@ -81,14 +81,14 @@ func handleDropSpecifyPort(remotePort string, localPort string, channel spec.Cha
 		}
 	}
 	if remotePort != "" {
-		response = channel.Run(ctx, "iptables",
+		response = cl.Run(ctx, "iptables",
 			fmt.Sprintf(`-A OUTPUT -p tcp --dport %s -j DROP`, remotePort))
 		if !response.Success {
 			stopDropNetFunc(localPort, remotePort)
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
-		response = channel.Run(ctx, "iptables",
+		response = cl.Run(ctx, "iptables",
 			fmt.Sprintf(`-A OUTPUT -p udp --dport %s -j DROP`, remotePort))
 		if !response.Success {
 			stopDropNetFunc(localPort, remotePort)
@@ -102,11 +102,11 @@ func handleDropSpecifyPort(remotePort string, localPort string, channel spec.Cha
 func stopDropNet(localPort, remotePort string) {
 	ctx := context.Background()
 	if localPort != "" {
-		channel.Run(ctx, "iptables", fmt.Sprintf(`-D INPUT -p tcp --dport %s -j DROP`, localPort))
-		channel.Run(ctx, "iptables", fmt.Sprintf(`-D INPUT -p udp --dport %s -j DROP`, localPort))
+		cl.Run(ctx, "iptables", fmt.Sprintf(`-D INPUT -p tcp --dport %s -j DROP`, localPort))
+		cl.Run(ctx, "iptables", fmt.Sprintf(`-D INPUT -p udp --dport %s -j DROP`, localPort))
 	}
 	if remotePort != "" {
-		channel.Run(ctx, "iptables", fmt.Sprintf(`-D OUTPUT -p tcp --dport %s -j DROP`, remotePort))
-		channel.Run(ctx, "iptables", fmt.Sprintf(`-D OUTPUT -p udp --dport %s -j DROP`, remotePort))
+		cl.Run(ctx, "iptables", fmt.Sprintf(`-D OUTPUT -p tcp --dport %s -j DROP`, remotePort))
+		cl.Run(ctx, "iptables", fmt.Sprintf(`-D OUTPUT -p udp --dport %s -j DROP`, remotePort))
 	}
 }

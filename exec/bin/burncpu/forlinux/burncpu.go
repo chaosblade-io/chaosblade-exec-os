@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/cgroups"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
-	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
@@ -93,7 +93,7 @@ const cfsPeriodUs = uint64(200000)
 
 const cfsQuotaUs = int64(2000)
 
-var channel = cl.NewLocalChannel()
+var cl = channel.NewLocalChannel()
 
 var stopBurnCpuFunc = stopBurnCpu
 
@@ -147,14 +147,14 @@ func runBurnCpu(ctx context.Context, cpuCount int, pidNeeded bool, processor str
 		args = fmt.Sprintf("%s --cpu-processor %s", args, processor)
 	}
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
-	response := channel.Run(ctx, "nohup", args)
+	response := cl.Run(ctx, "nohup", args)
 	if !response.Success {
 		stopBurnCpuFunc()
 		bin.PrintErrAndExit(response.Err)
 	}
 	if pidNeeded {
 		// parse pid
-		newCtx := context.WithValue(context.Background(), cl.ProcessKey, fmt.Sprintf("cpu-processor %s", processor))
+		newCtx := context.WithValue(context.Background(), channel.ProcessKey, fmt.Sprintf("cpu-processor %s", processor))
 		pids, err := cl.GetPidsByProcessName(burnCpuBin, newCtx)
 		if err != nil {
 			stopBurnCpuFunc()
@@ -175,7 +175,7 @@ func runBurnCpu(ctx context.Context, cpuCount int, pidNeeded bool, processor str
 
 // bindBurnCpu by taskset command
 func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
-	response := channel.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
+	response := cl.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
 	if !response.Success {
 		stopBurnCpuFunc()
 		bin.PrintErrAndExit(response.Err)
@@ -194,7 +194,7 @@ func bindBurnCpuByCpuset(cgctrl cgroups.Cgroup, cpuList string) {
 func checkBurnCpu(ctx context.Context) {
 	time.Sleep(time.Second)
 	// query process
-	ctx = context.WithValue(ctx, cl.ProcessKey, "nohup")
+	ctx = context.WithValue(ctx, channel.ProcessKey, "nohup")
 	pids, _ := cl.GetPidsByProcessName(burnCpuBin, ctx)
 	if pids == nil || len(pids) == 0 {
 		bin.PrintErrAndExit(fmt.Sprintf("%s pid not found", burnCpuBin))
@@ -204,12 +204,12 @@ func checkBurnCpu(ctx context.Context) {
 // stopBurnCpu
 func stopBurnCpu() (success bool, errs string) {
 	// add grep nohup
-	ctx := context.WithValue(context.Background(), cl.ProcessKey, "nohup")
+	ctx := context.WithValue(context.Background(), channel.ProcessKey, "nohup")
 	pids, _ := cl.GetPidsByProcessName(burnCpuBin, ctx)
 	if pids == nil || len(pids) == 0 {
 		return true, errs
 	}
-	response := channel.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
+	response := cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 	if !response.Success {
 		return false, response.Err
 	}

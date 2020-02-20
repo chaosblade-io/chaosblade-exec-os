@@ -121,7 +121,7 @@ func (ne *NetworkDropExecutor) SetChannel(channel spec.Channel) {
 func checkNetworkDropExpEnv() error {
 	commands := []string{"iptables"}
 	for _, command := range commands {
-		if !channel.IsCommandAvailable(command) {
+		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)
 		}
 	}

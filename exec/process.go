@@ -58,7 +58,7 @@ func (*ProcessCommandModelSpec) Example() string {
 func checkProcessExpEnv() error {
 	commands := []string{"ps", "kill", "grep", "tr", "awk"}
 	for _, command := range commands {
-		if !channel.IsCommandAvailable(command) {
+		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)
 		}
 	}

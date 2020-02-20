@@ -155,7 +155,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 
 	cpuListStr := model.ActionFlags["cpu-list"]
 	if cpuListStr != "" {
-		if !channel.IsCommandAvailable("taskset") {
+		if !channel.NewLocalChannel().IsCommandAvailable("taskset") {
 			return spec.ReturnFail(spec.Code[spec.EnvironmentError],
 				"taskset command not exist")
 		}
@@ -203,7 +203,7 @@ func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
 func checkCpuExpEnv() error {
 	commands := []string{"ps", "awk", "grep", "kill", "nohup", "tr"}
 	for _, command := range commands {
-		if !channel.IsCommandAvailable(command) {
+		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)
 		}
 	}

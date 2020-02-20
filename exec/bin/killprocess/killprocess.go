@@ -23,49 +23,62 @@ import (
 	"strings"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var killProcessName string
-var killProcessInCmd string
+var killProcessName, killProcessInCmd, killProcessLocalPorts string
 var killProcessCount int
 
 func main() {
 	flag.StringVar(&killProcessName, "process", "", "process name")
 	flag.StringVar(&killProcessInCmd, "process-cmd", "", "process in command")
 	flag.IntVar(&killProcessCount, "count", 0, "limit count")
+	flag.StringVar(&killProcessLocalPorts, "local-port", "", "local service ports")
 	bin.ParseFlagAndInitLog()
 
-	killProcess(killProcessName, killProcessInCmd, killProcessCount)
+	killProcess(killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessCount)
 }
 
-func killProcess(process, processCmd string, count int) {
+var cl = channel.NewLocalChannel()
+
+func killProcess(process, processCmd, localPorts string, count int) {
 	var pids []string
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
 	if process != "" {
-		pids, err = channel.GetPidsByProcessName(process, ctx)
+		pids, err = cl.GetPidsByProcessName(process, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
 		killProcessName = process
 	} else if processCmd != "" {
-		pids, err = channel.GetPidsByProcessCmdName(processCmd, ctx)
+		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
 		killProcessName = processCmd
+	} else if localPorts != "" {
+		ports, err := util.ParseIntegerListToStringSlice(localPorts)
+		if err != nil {
+			bin.PrintErrAndExit(err.Error())
+		}
+		pids, err = cl.GetPidsByLocalPorts(ports)
+		if err != nil {
+			bin.PrintErrAndExit(err.Error())
+		}
 	}
-
 	if pids == nil || len(pids) == 0 {
 		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", killProcessName))
 		return
 	}
+	// remove duplicates
+	pids = util.RemoveDuplicates(pids)
 	if count > 0 && len(pids) > count {
 		pids = pids[:count]
 	}
-	response := channel.NewLocalChannel().Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+	response := cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return

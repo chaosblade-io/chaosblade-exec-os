@@ -195,7 +195,7 @@ func (ce *memExecutor) stop(ctx context.Context) *spec.Response {
 func checkMemoryExpEnv() error {
 	commands := []string{"ps", "awk", "grep", "kill", "nohup", "dd", "mount", "umount"}
 	for _, command := range commands {
-		if !channel.IsCommandAvailable(command) {
+		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)
 		}
 	}

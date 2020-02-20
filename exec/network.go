@@ -131,7 +131,7 @@ func getCommArgs(localPort, remotePort, excludePort, destinationIp string, args 
 func checkNetworkExpEnv() error {
 	commands := []string{"tc", "head", "ifconfig"}
 	for _, command := range commands {
-		if !channel.IsCommandAvailable(command) {
+		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)
 		}
 	}

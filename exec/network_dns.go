@@ -117,7 +117,7 @@ func (ns *NetworkDnsExecutor) SetChannel(channel spec.Channel) {
 func checkNetworkDnsExpEnv() error {
 	commands := []string{"grep", "cat", "rm", "echo"}
 	for _, command := range commands {
-		if !channel.IsCommandAvailable(command) {
+		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)
 		}
 	}

@@ -21,7 +21,7 @@ import (
 	"flag"
 	"fmt"
 
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
@@ -51,18 +51,18 @@ func main() {
 const hosts = "/etc/hosts"
 const tmpHosts = "/tmp/chaos-hosts.tmp"
 
-var channel = channel2.NewLocalChannel()
+var cl = channel.NewLocalChannel()
 
 // startChangeDns by the domain and ip
 func startChangeDns(domain, ip string) {
 	ctx := context.Background()
 	dnsPair := createDnsPair(domain, ip)
-	response := channel.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
+	response := cl.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
 	if response.Success {
 		bin.PrintErrAndExit(fmt.Sprintf("%s has been exist", dnsPair))
 		return
 	}
-	response = channel.Run(ctx, "echo", fmt.Sprintf(`"%s" >> %s`, dnsPair, hosts))
+	response = cl.Run(ctx, "echo", fmt.Sprintf(`"%s" >> %s`, dnsPair, hosts))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return
@@ -74,18 +74,18 @@ func startChangeDns(domain, ip string) {
 func recoverDns(domain, ip string) {
 	ctx := context.Background()
 	dnsPair := createDnsPair(domain, ip)
-	response := channel.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
+	response := cl.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
 	if !response.Success {
 		bin.PrintOutputAndExit("nothing to do")
 		return
 	}
-	response = channel.Run(ctx, "cat", fmt.Sprintf(`%s | grep -v "%s" > %s && cat %s > %s`,
+	response = cl.Run(ctx, "cat", fmt.Sprintf(`%s | grep -v "%s" > %s && cat %s > %s`,
 		hosts, dnsPair, tmpHosts, tmpHosts, hosts))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return
 	}
-	channel.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, tmpHosts))
+	cl.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, tmpHosts))
 }
 
 func createDnsPair(domain, ip string) string {

@@ -23,7 +23,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -39,7 +38,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-const PAGE_COUNTER_MAX uint64 = 9223372036854771712
+const PAGE_COUNTER_MAX uint64 = 9223372036854770000
 
 // 128K
 type Block [32 * 1024]int32
@@ -56,7 +55,7 @@ func main() {
 	flag.BoolVar(&burnMemNohup, "nohup", false, "nohup to run burn memory")
 	flag.IntVar(&memPercent, "mem-percent", 0, "percent of burn memory")
 	flag.IntVar(&memReserve, "reserve", 0, "reserve to burn memory, unit is M")
-	flag.IntVar(&memRate, "rate", 0, "burn memory rate, unit is M/S, only support for ram mode")
+	flag.IntVar(&memRate, "rate", 100, "burn memory rate, unit is M/S, only support for ram mode")
 	flag.StringVar(&burnMemMode, "mode", "cache", "burn memory mode, cache or ram")
 	bin.ParseFlagAndInitLog()
 
@@ -82,20 +81,7 @@ var dirName = "burnmem_tmpfs"
 
 var fileName = "file"
 
-var fileCount = 0
-
-func getMem(filePath string) int64 {
-	sum := int64(0)
-	if 0 == fileCount {
-		return sum
-	}
-	fileInfo, err := os.Stat(filePath + strconv.Itoa(fileCount-1))
-	if err != nil {
-		bin.PrintErrAndExit(err.Error())
-	}
-	sum += fileInfo.Size()/1024/1024 + int64(fileCount-1)*128
-	return sum
-}
+var fileCount = 1
 
 func burnMemWithRam() {
 	tick := time.Tick(time.Second)
@@ -108,6 +94,7 @@ func burnMemWithRam() {
 	for range tick {
 		_, expectMem, err := calculateMemSize(memPercent, memReserve)
 		if err != nil {
+			stopBurnMemFunc()
 			bin.PrintErrAndExit(err.Error())
 		}
 		fillMem := expectMem
@@ -137,57 +124,27 @@ func burnMemWithRam() {
 
 func burnMemWithCache() {
 	filePath := path.Join(path.Join(util.GetProgramPath(), dirName), fileName)
-	go func() {
-		t := time.NewTicker(3 * time.Second)
-		for {
-			select {
-			case <-t.C:
-				memSum := getMem(filePath)
-				_, expectMem, err := calculateMemSize(memPercent, memReserve)
-				if err != nil {
-					bin.PrintErrAndExit(err.Error())
-				}
-
-				needMem := expectMem + memSum
-				if needMem <= 0 {
-					for i := 0; i < fileCount; i++ {
-						os.Remove(filePath + strconv.Itoa(i))
-					}
-					fileCount = 0
-				} else {
-					if memSum%128 != 0 {
-						os.Remove(filePath + strconv.Itoa(fileCount-1))
-						memSum -= memSum % 128
-						fileCount--
-					}
-					if needMem/128 > memSum/128 {
-						for i := memSum / 128; i < needMem/128; i++ {
-							nFilePath := filePath + strconv.FormatInt(i, 10)
-							response := cl.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, 128))
-							if !response.Success {
-								bin.PrintErrAndExit(response.Error())
-							}
-						}
-					} else {
-						for i := needMem / 128; i < memSum/128; i++ {
-							nFilePath := filePath + strconv.FormatInt(i, 10)
-							os.RemoveAll(nFilePath)
-						}
-					}
-					fileCount = int(needMem / 128)
-					if needMem%128 != 0 {
-						nFilePath := filePath + strconv.Itoa(fileCount)
-						response := cl.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, needMem%128))
-						if !response.Success {
-							bin.PrintErrAndExit(response.Error())
-						}
-						fileCount++
-					}
-				}
-			}
+	tick := time.Tick(time.Second)
+	for range tick {
+		_, expectMem, err := calculateMemSize(memPercent, memReserve)
+		if err != nil {
+			stopBurnMemFunc()
+			bin.PrintErrAndExit(err.Error())
 		}
-	}()
-	select {}
+		fillMem := expectMem
+		if expectMem > 0 {
+			if expectMem > int64(memRate) {
+				fillMem = int64(memRate)
+			}
+			nFilePath := fmt.Sprintf("%s%d", filePath, fileCount)
+			response := cl.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, fillMem))
+			if !response.Success {
+				stopBurnMemFunc()
+				bin.PrintErrAndExit(response.Error())
+			}
+			fileCount++
+		}
+	}
 }
 
 var burnMemBin = "chaos_burnmem"
@@ -255,7 +212,9 @@ func stopBurnMem() (success bool, errs string) {
 		if _, err := os.Stat(dirPath); err == nil {
 			response = cl.Run(ctx, "umount", dirPath)
 			if !response.Success {
-				bin.PrintErrAndExit(response.Error())
+				if !strings.Contains(response.Err, "not mounted") {
+					bin.PrintErrAndExit(response.Error())
+				}
 			}
 			err = os.RemoveAll(dirPath)
 			if err != nil {
@@ -267,27 +226,27 @@ func stopBurnMem() (success bool, errs string) {
 }
 
 func calculateMemSize(percent, reserve int) (int64, int64, error) {
-	mc := cgroups.NewMemory("/sys/fs/cgroup", cgroups.IgnoreModules("memsw"))
-	stats := v1.Metrics{}
-	if err := mc.Stat("", &stats); err != nil {
-		return 0, 0, err
-	}
-
 	total := int64(0)
 	available := int64(0)
-	//no limit
-	if stats.Memory.Usage.Limit == PAGE_COUNTER_MAX {
+	memoryStat, err := getMemoryStatsByCGroup()
+	if err != nil {
+		logrus.Infof("get memory stats by cgroup failed, used proc memory, %v", err)
+	}
+	if memoryStat == nil || memoryStat.Usage.Limit >= PAGE_COUNTER_MAX {
+		//no limit
 		virtualMemory, err := mem.VirtualMemory()
 		if err != nil {
 			return 0, 0, err
 		}
 		total = int64(virtualMemory.Total)
 		available = int64(virtualMemory.Available)
+		if burnMemMode == "cache" {
+			available = int64(virtualMemory.Free)
+		}
 	} else {
-		total = int64(stats.Memory.Usage.Limit)
-		available = int64(stats.Memory.Usage.Limit - stats.Memory.Usage.Usage)
+		total = int64(memoryStat.Usage.Limit)
+		available = int64(memoryStat.Usage.Limit - memoryStat.Usage.Usage)
 	}
-
 	reserved := int64(0)
 	if percent != 0 {
 		reserved = (total * int64(100-percent) / 100) / 1024 / 1024
@@ -295,8 +254,21 @@ func calculateMemSize(percent, reserve int) (int64, int64, error) {
 		reserved = int64(reserve)
 	}
 	expectSize := available/1024/1024 - reserved
-	if expectSize < 0 {
-		expectSize = int64(0)
-	}
+
+	logrus.Debugf("available: %d, percent: %d, reserved: %d, expectSize: %d",
+		available/1024/1024, percent, reserved, expectSize)
+
 	return total / 1024 / 1024, expectSize, nil
+}
+
+func getMemoryStatsByCGroup() (*v1.MemoryStat, error) {
+	cgroup, err := cgroups.Load(cgroups.V1, cgroups.StaticPath("/"))
+	if err != nil {
+		return nil, fmt.Errorf("load cgroup error, %v", err)
+	}
+	stats, err := cgroup.Stat(cgroups.IgnoreNotExist)
+	if err != nil {
+		return nil, fmt.Errorf("load cgroup stat error, %v", err)
+	}
+	return stats.Memory, nil
 }

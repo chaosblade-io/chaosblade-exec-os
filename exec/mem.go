@@ -134,7 +134,7 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
-		return ce.stop(ctx)
+		return ce.stop(ctx, model.ActionFlags["mode"])
 	}
 	var memPercent, memReserve, memRate int
 
@@ -187,9 +187,9 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 }
 
 // stop burn mem
-func (ce *memExecutor) stop(ctx context.Context) *spec.Response {
+func (ce *memExecutor) stop(ctx context.Context, burnMemMode string) *spec.Response {
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin),
-		fmt.Sprintf("--stop --debug=%t", util.Debug))
+		fmt.Sprintf("--stop --mode %s --debug=%t", burnMemMode, util.Debug))
 }
 
 func checkMemoryExpEnv() error {

@@ -95,14 +95,15 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 	remotePort := model.ActionFlags["remote-port"]
 	excludePort := model.ActionFlags["exclude-port"]
 	destIp := model.ActionFlags["destination-ip"]
+	excludeIp := model.ActionFlags["exclude-ip"]
 	ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
-	return nle.start(dev, localPort, remotePort, excludePort, destIp, percent, ignorePeerPort, ctx)
+	return nle.start(dev, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, ctx)
 }
 
-func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, percent string,
+func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
 	ignorePeerPort bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type loss --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
-	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, args, ignorePeerPort)
+	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort)
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}

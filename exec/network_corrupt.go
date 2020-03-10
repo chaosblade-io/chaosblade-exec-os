@@ -92,15 +92,16 @@ func (ce *NetworkCorruptExecutor) Exec(uid string, ctx context.Context, model *s
 		remotePort := model.ActionFlags["remote-port"]
 		excludePort := model.ActionFlags["exclude-port"]
 		destIp := model.ActionFlags["destination-ip"]
+		excludeIp := model.ActionFlags["exclude-ip"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
-		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, percent, ignorePeerPort, ctx)
+		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, ctx)
 	}
 }
 
-func (ce *NetworkCorruptExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, percent string,
+func (ce *NetworkCorruptExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
 	ignorePeerPort bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type corrupt --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
-	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, args, ignorePeerPort)
+	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort)
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}

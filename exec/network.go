@@ -97,7 +97,7 @@ var commFlags = []spec.ExpFlagSpec{
 	},
 }
 
-func getCommArgs(localPort, remotePort, excludePort, destinationIp string, args string, ignorePeerPort bool) (string, error) {
+func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp string, args string, ignorePeerPort bool) (string, error) {
 	if localPort != "" {
 		localPorts, err := util.ParseIntegerListToStringSlice(localPort)
 		if err != nil {
@@ -121,6 +121,9 @@ func getCommArgs(localPort, remotePort, excludePort, destinationIp string, args 
 	}
 	if destinationIp != "" {
 		args = fmt.Sprintf("%s --destination-ip %s", args, destinationIp)
+	}
+	if excludeIp != "" {
+		args = fmt.Sprintf("%s --exclude-ip %s", args, excludeIp)
 	}
 	if ignorePeerPort {
 		args = fmt.Sprintf("%s --ignore-peer-port", args)

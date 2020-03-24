@@ -26,7 +26,7 @@ import (
 	"strings"
 	"syscall"
 
-	cl "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/sirupsen/logrus"
 
@@ -60,7 +60,7 @@ func main() {
 	}
 }
 
-var channel = cl.NewLocalChannel()
+var cl = channel.NewLocalChannel()
 
 func startFill(directory, size, percent, reserve string) {
 	ctx := context.TODO()
@@ -129,7 +129,7 @@ func calculateFileSize(directory, size, percent, reserve string) (string, error)
 }
 
 func fillDiskByFallocate(ctx context.Context, size string, dataFile string) {
-	response := channel.Run(ctx, "fallocate", fmt.Sprintf(`-l %sM %s`, size, dataFile))
+	response := cl.Run(ctx, "fallocate", fmt.Sprintf(`-l %sM %s`, size, dataFile))
 	if response.Success {
 		bin.PrintOutputAndExit(response.Result.(string))
 	}
@@ -142,12 +142,12 @@ func fillDiskByFallocate(ctx context.Context, size string, dataFile string) {
 
 func fillDiskByDD(ctx context.Context, dataFile string, directory string, size string) {
 	// Because of filling disk slowly using dd, so execute dd with 1b size first to test the command.
-	response := channel.Run(ctx, "dd", fmt.Sprintf(`if=/dev/zero of=%s bs=1b count=1 iflag=fullblock`, dataFile))
+	response := cl.Run(ctx, "dd", fmt.Sprintf(`if=/dev/zero of=%s bs=1b count=1 iflag=fullblock`, dataFile))
 	if !response.Success {
 		stopFill(directory)
 		bin.PrintErrAndExit(response.Err)
 	}
-	response = channel.Run(ctx, "nohup",
+	response = cl.Run(ctx, "nohup",
 		fmt.Sprintf(`dd if=/dev/zero of=%s bs=1M count=%s iflag=fullblock >/dev/null 2>&1 &`, dataFile, size))
 	if !response.Success {
 		stopFill(directory)
@@ -164,11 +164,11 @@ func stopFill(directory string) {
 	}
 	pids, _ := cl.GetPidsByProcessName(fillDataFile, ctx)
 	if pids != nil || len(pids) >= 0 {
-		channel.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+		cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 	}
 	fileName := path.Join(directory, fillDataFile)
 	if util.IsExist(fileName) {
-		response := channel.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, fileName))
+		response := cl.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, fileName))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 		}

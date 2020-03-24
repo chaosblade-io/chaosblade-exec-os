@@ -17,9 +17,10 @@
 package main
 
 import (
+	"context"
 	"testing"
 
-	channel2 "github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
@@ -30,11 +31,13 @@ func Test_startFill_startSuccessful(t *testing.T) {
 		path    string
 		size    string
 		percent string
+		reserve string
 	}
 	as := &args{
 		path:    "/dev",
 		size:    "10",
 		percent: "",
+		reserve: "",
 	}
 
 	var exitCode int
@@ -42,23 +45,23 @@ func Test_startFill_startSuccessful(t *testing.T) {
 		exitCode = code
 	}
 
-	channel = &channel2.MockLocalChannel{
-		Response: spec.ReturnSuccess("success"),
-		NoCheck:  true,
-		T:        t,
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		return spec.ReturnSuccess("success")
 	}
 
-	startFill(as.path, as.size, as.percent)
+	startFill(as.path, as.size, as.percent, as.reserve)
 	if exitCode != 0 {
 		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
 	}
 }
 
 func Test_stopFill(t *testing.T) {
-	channel = &channel2.MockLocalChannel{
-		Response: spec.ReturnSuccess("success"),
-		NoCheck:  true,
-		T:        t,
+	cl = channel.NewMockLocalChannel()
+	mockChannel := cl.(*channel.MockLocalChannel)
+	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
+		return spec.ReturnSuccess("success")
 	}
 	bin.ExitFunc = func(code int) {}
 	type args struct {

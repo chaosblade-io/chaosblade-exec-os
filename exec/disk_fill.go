@@ -35,9 +35,8 @@ func NewFillActionSpec() spec.ExpActionCommandSpec {
 		spec.BaseExpActionCommandSpec{
 			ActionMatchers: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
-					Name:                  "path",
-					Desc:                  "The path of directory where the disk is populated, default value is /",
-					RequiredWhenDestroyed: true,
+					Name: "path",
+					Desc: "The path of directory where the disk is populated, default value is /",
 				},
 			},
 			ActionFlags: []spec.ExpFlagSpec{

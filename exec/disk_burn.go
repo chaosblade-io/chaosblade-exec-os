@@ -50,9 +50,8 @@ func NewBurnActionSpec() spec.ExpActionCommandSpec {
 					Desc: "Block size, MB, default is 10",
 				},
 				&spec.ExpFlag{
-					Name:                  "path",
-					Desc:                  "The path of directory where the disk is burning, default value is /",
-					RequiredWhenDestroyed: true,
+					Name: "path",
+					Desc: "The path of directory where the disk is burning, default value is /",
 				},
 			},
 			ActionExecutor: &BurnIOExecutor{},

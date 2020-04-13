@@ -36,8 +36,6 @@ func NewStopProcessActionCommandSpec() spec.ExpActionCommandSpec {
 				&spec.ExpFlag{
 					Name: "process",
 					Desc: "Process name",
-					// TODO: Temporarily use this flag as a required parameter for the destroy operation
-					RequiredWhenDestroyed: true,
 				},
 				&spec.ExpFlag{
 					Name: "process-cmd",

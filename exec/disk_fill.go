@@ -52,6 +52,11 @@ func NewFillActionSpec() spec.ExpActionCommandSpec {
 					Name: "reserve",
 					Desc: "Disk reserve size, unit is MB. The value is a positive integer without unit. If size, percent and reserve flags exist, the priority is as follows: percent > reserve > size",
 				},
+				&spec.ExpFlag{
+					Name:   "retain-handle",
+					Desc:   "Whether to retain the big file handle, default value is false.",
+					NoArgs: true,
+				},
 			},
 			ActionExecutor: &FillActionExecutor{},
 		},
@@ -100,6 +105,7 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return fae.stop(directory, ctx)
 	} else {
+		retainHandle := model.ActionFlags["retain-handle"] == "true"
 		percent := model.ActionFlags["percent"]
 		if percent == "" {
 			reserve := model.ActionFlags["reserve"]
@@ -112,24 +118,24 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 				if err != nil {
 					return spec.ReturnFail(spec.Code[spec.IllegalParameters], "size must be positive integer")
 				}
-				return fae.start(directory, size, percent, reserve, ctx)
+				return fae.start(directory, size, percent, reserve, retainHandle, ctx)
 			}
 			_, err := strconv.Atoi(reserve)
 			if err != nil {
 				return spec.ReturnFail(spec.Code[spec.IllegalParameters], "reserve must be positive integer")
 			}
-			return fae.start(directory, "", percent, reserve, ctx)
+			return fae.start(directory, "", percent, reserve, retainHandle, ctx)
 		}
 		_, err := strconv.Atoi(percent)
 		if err != nil {
 			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "percent must be positive integer")
 		}
-		return fae.start(directory, "", percent, "", ctx)
+		return fae.start(directory, "", percent, "", retainHandle, ctx)
 	}
 }
 
-func (fae *FillActionExecutor) start(directory, size, percent, reserve string, ctx context.Context) *spec.Response {
-	flags := fmt.Sprintf("--directory %s --start --debug=%t", directory, util.Debug)
+func (fae *FillActionExecutor) start(directory, size, percent, reserve string, retainHandle bool, ctx context.Context) *spec.Response {
+	flags := fmt.Sprintf("--directory %s --start --debug=%t --retain-handle=%t", directory, util.Debug, retainHandle)
 	if percent != "" {
 		flags = fmt.Sprintf("%s --percent %s", flags, percent)
 	} else if reserve != "" {

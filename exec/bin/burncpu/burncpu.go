@@ -24,6 +24,7 @@ import (
 	"os/signal"
 	"path"
 	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"syscall"
@@ -42,6 +43,7 @@ var (
 	cpuCount, cpuPercent                    int
 	cpuList                                 string
 	cpuProcessor                            string
+	cpuProfile                              string
 )
 
 func main() {
@@ -52,10 +54,21 @@ func main() {
 	flag.IntVar(&cpuCount, "cpu-count", runtime.NumCPU(), "number of cpus")
 	flag.IntVar(&cpuPercent, "cpu-percent", 100, "percent of burn-cpu")
 	flag.StringVar(&cpuProcessor, "cpu-processor", "0", "only used for identifying process of cpu burn")
+	flag.StringVar(&cpuProfile, "cpu-profile", "", "write cpu profile to file")
 	bin.ParseFlagAndInitLog()
 
 	if cpuCount <= 0 || cpuCount > runtime.NumCPU() {
 		cpuCount = runtime.NumCPU()
+	}
+
+	// Setup profiling if desired
+	if cpuProfile != "" {
+		if f, errs := os.Create(cpuProfile); errs != nil {
+			bin.PrintErrAndExit(errs.Error())
+		} else {
+			_ = pprof.StartCPUProfile(f)
+			defer pprof.StopCPUProfile()
+		}
 	}
 
 	if burnCpuStart {

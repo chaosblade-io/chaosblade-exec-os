@@ -86,6 +86,10 @@ var commFlags = []spec.ExpFlagSpec{
 		Desc: "destination ip. Support for using mask to specify the ip range such as 92.168.1.0/24 or comma separated multiple ips, for example 10.0.0.1,11.0.0.1.",
 	},
 	&spec.ExpFlag{
+		Name: "exclude-ip",
+		Desc: "exclude ip"
+	},
+	&spec.ExpFlag{
 		Name:   "ignore-peer-port",
 		Desc:   "ignore excluding all ports communicating with this port, generally used when the ss command does not exist",
 		NoArgs: true,

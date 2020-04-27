@@ -95,6 +95,16 @@ var commFlags = []spec.ExpFlagSpec{
 		Required:              true,
 		RequiredWhenDestroyed: true,
 	},
+	&spec.ExpFlag{
+		Name:                  "interface",
+		Desc:                  "Network interface, for example, eth0",
+		Required:              true,
+		RequiredWhenDestroyed: true,
+	},
+	&spec.ExpFlag{
+		Name: "exclude-ip",
+		Desc: "Exclude ips. Support for using mask to specify the ip range such as 92.168.1.0/24 or comma separated multiple ips, for example 10.0.0.1,11.0.0.1",
+	},
 }
 
 func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp string, args string, ignorePeerPort bool) (string, error) {

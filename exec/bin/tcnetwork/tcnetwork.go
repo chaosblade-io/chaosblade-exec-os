@@ -35,7 +35,7 @@ var tcNetInterface, tcLocalPort, tcRemotePort, tcExcludePort string
 var tcDestinationIp, tcExcludeIp string
 var netPercent, delayNetTime, delayNetOffset string
 var tcNetStart, tcNetStop bool
-var tcIgnorePeerPorts bool
+var tcIgnorePeerPorts, tcForce bool
 var actionType string
 var reorderGap string
 var correlation string
@@ -65,6 +65,7 @@ func main() {
 	flag.StringVar(&actionType, "type", "", "network experiment type, value is delay|loss|duplicate|corrupt|reorder, required")
 	flag.StringVar(&reorderGap, "gap", "", "packets gap")
 	flag.StringVar(&correlation, "correlation", "0", "correlation on previous packet")
+	flag.BoolVar(&tcForce, "force", false, "forcibly overwrites the original rules")
 	bin.ParseFlagAndInitLog()
 
 	if tcNetInterface == "" {
@@ -91,7 +92,7 @@ func main() {
 		default:
 			bin.PrintErrAndExit("unsupported type for network experiments")
 		}
-		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp)
+		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp, tcForce)
 	} else if tcNetStop {
 		stopNet(tcNetInterface)
 	} else {
@@ -101,11 +102,14 @@ func main() {
 
 var cl = channel.NewLocalChannel()
 
-func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string) {
+func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string, force bool) {
 	// check device txqueuelen size, if the size is zero, then set the value to 1000
 	response := preHandleTxqueue(netInterface)
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
+	}
+	if force {
+		stopNet(netInterface)
 	}
 	ctx := context.Background()
 	// assert localPort and remotePort

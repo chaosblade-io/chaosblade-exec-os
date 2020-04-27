@@ -40,6 +40,7 @@ func NewNetworkCommandSpec() spec.ExpModelCommandSpec {
 				NewDuplicateActionSpec(),
 				NewCorruptActionSpec(),
 				NewReorderActionSpec(),
+				NewOccupyActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},

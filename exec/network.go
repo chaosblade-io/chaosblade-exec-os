@@ -99,9 +99,15 @@ var commFlags = []spec.ExpFlagSpec{
 		Name: "exclude-ip",
 		Desc: "Exclude ips. Support for using mask to specify the ip range such as 92.168.1.0/24 or comma separated multiple ips, for example 10.0.0.1,11.0.0.1",
 	},
+	&spec.ExpFlag{
+		Name:   "force",
+		Desc:   "Forcibly overwrites the original rules",
+		NoArgs: true,
+	},
 }
 
-func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp string, args string, ignorePeerPort bool) (string, error) {
+func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp string,
+	args string, ignorePeerPort, force bool) (string, error) {
 	if localPort != "" {
 		localPorts, err := util.ParseIntegerListToStringSlice(localPort)
 		if err != nil {
@@ -131,6 +137,9 @@ func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp st
 	}
 	if ignorePeerPort {
 		args = fmt.Sprintf("%s --ignore-peer-port", args)
+	}
+	if force {
+		args = fmt.Sprintf("%s --force", args)
 	}
 	return args, nil
 }

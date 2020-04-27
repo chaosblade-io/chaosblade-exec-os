@@ -118,19 +118,20 @@ func (ce *NetworkReorderExecutor) Exec(uid string, ctx context.Context, model *s
 		destIp := model.ActionFlags["destination-ip"]
 		excludeIp := model.ActionFlags["exclude-ip"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
+		force := model.ActionFlags["force"] == "true"
 		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,
-			ignorePeerPort, gap, time, correlation, ctx)
+			ignorePeerPort, gap, time, correlation, force, ctx)
 	}
 }
 
 func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
-	ignorePeerPort bool, gap, time, correlation string, ctx context.Context) *spec.Response {
+	ignorePeerPort bool, gap, time, correlation string, force bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type reorder --interface %s --percent %s --correlation %s --time %s --debug=%t",
 		netInterface, percent, correlation, time, util.Debug)
 	if gap != "" {
 		args = fmt.Sprintf("%s --gap %s", args, gap)
 	}
-	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort)
+	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}

@@ -40,9 +40,9 @@ pre_build:
 build_yaml: build/spec.go
 	$(GO) run $< $(OS_YAML_FILE_PATH)
 
-build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk
+build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork
 
-build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns
+build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns build_occupynetwork
 
 # build burn-cpu chaos tools
 build_burncpu: exec/bin/burncpu/burncpu.go
@@ -75,6 +75,9 @@ build_dropnetwork: exec/bin/dropnetwork/dropnetwork.go
 
 build_filldisk: exec/bin/filldisk/filldisk.go
 	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_filldisk $<
+
+build_occupynetwork: exec/bin/occupynetwork/occupynetwork.go
+	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_occupynetwork $<
 
 # build chaosblade linux version by docker image
 build_linux:

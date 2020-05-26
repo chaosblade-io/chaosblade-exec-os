@@ -50,6 +50,10 @@ func NewKillProcessActionCommandSpec() spec.ExpActionCommandSpec {
 					Name: "local-port",
 					Desc: "Local service ports. Separate multiple ports with commas (,) or connector representing ranges, for example: 80,8000-8080",
 				},
+				&spec.ExpFlag{
+					Name: "signal",
+					Desc: "Killing process signal, such as 9,15",
+				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &KillProcessExecutor{},
@@ -98,6 +102,7 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	process := model.ActionFlags["process"]
 	processCmd := model.ActionFlags["process-cmd"]
 	localPorts := model.ActionFlags["local-port"]
+	signal := model.ActionFlags["signal"]
 	if process == "" && processCmd == "" && localPorts == "" {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less process matcher")
 	}
@@ -115,6 +120,9 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 		flags = fmt.Sprintf(`%s --process-cmd "%s"`, flags, processCmd)
 	} else if localPorts != "" {
 		flags = fmt.Sprintf(`%s --local-port "%s"`, flags, localPorts)
+	}
+	if signal != "" {
+		flags = fmt.Sprintf(`%s --signal %s`, flags, signal)
 	}
 	return kpe.channel.Run(ctx, path.Join(kpe.channel.GetScriptPath(), killProcessBin), flags)
 }

@@ -28,7 +28,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var killProcessName, killProcessInCmd, killProcessLocalPorts string
+var killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal string
 var killProcessCount int
 
 func main() {
@@ -36,14 +36,15 @@ func main() {
 	flag.StringVar(&killProcessInCmd, "process-cmd", "", "process in command")
 	flag.IntVar(&killProcessCount, "count", 0, "limit count")
 	flag.StringVar(&killProcessLocalPorts, "local-port", "", "local service ports")
+	flag.StringVar(&killProcessSignal, "signal", "9", "kill process signal")
 	bin.ParseFlagAndInitLog()
 
-	killProcess(killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessCount)
+	killProcess(killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessCount)
 }
 
 var cl = channel.NewLocalChannel()
 
-func killProcess(process, processCmd, localPorts string, count int) {
+func killProcess(process, processCmd, localPorts, signal string, count int) {
 	var pids []string
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
@@ -78,7 +79,7 @@ func killProcess(process, processCmd, localPorts string, count int) {
 	if count > 0 && len(pids) > count {
 		pids = pids[:count]
 	}
-	response := cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+	response := cl.Run(ctx, "kill", fmt.Sprintf("-%s %s", signal, strings.Join(pids, " ")))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return

@@ -28,7 +28,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal string
+var killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessExcludeProcess string
 var killProcessCount int
 
 func main() {
@@ -37,17 +37,19 @@ func main() {
 	flag.IntVar(&killProcessCount, "count", 0, "limit count")
 	flag.StringVar(&killProcessLocalPorts, "local-port", "", "local service ports")
 	flag.StringVar(&killProcessSignal, "signal", "9", "kill process signal")
+	flag.StringVar(&killProcessExcludeProcess, "exclude-process", "", "kill process exclude specific process")
 	bin.ParseFlagAndInitLog()
 
-	killProcess(killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessCount)
+	killProcess(killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessExcludeProcess, killProcessCount)
 }
 
 var cl = channel.NewLocalChannel()
 
-func killProcess(process, processCmd, localPorts, signal string, count int) {
+func killProcess(process, processCmd, localPorts, signal, excludeProcess string, count int) {
 	var pids []string
 	var err error
-	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
+	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
+	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, excludeProcessValue)
 	if process != "" {
 		pids, err = cl.GetPidsByProcessName(process, ctx)
 		if err != nil {

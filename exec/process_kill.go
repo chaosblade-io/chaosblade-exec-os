@@ -54,6 +54,10 @@ func NewKillProcessActionCommandSpec() spec.ExpActionCommandSpec {
 					Name: "signal",
 					Desc: "Killing process signal, such as 9,15",
 				},
+				&spec.ExpFlag{
+					Name: "exclude-process",
+					Desc: "Exclude process",
+				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &KillProcessExecutor{},
@@ -103,6 +107,7 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	processCmd := model.ActionFlags["process-cmd"]
 	localPorts := model.ActionFlags["local-port"]
 	signal := model.ActionFlags["signal"]
+	excludeProcess := model.ActionFlags["exclude-process"]
 	if process == "" && processCmd == "" && localPorts == "" {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less process matcher")
 	}
@@ -123,6 +128,9 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 	if signal != "" {
 		flags = fmt.Sprintf(`%s --signal %s`, flags, signal)
+	}
+	if excludeProcess != "" {
+		flags = fmt.Sprintf(`%s --exclude-process %s`, flags, excludeProcess)
 	}
 	return kpe.channel.Run(ctx, path.Join(kpe.channel.GetScriptPath(), killProcessBin), flags)
 }

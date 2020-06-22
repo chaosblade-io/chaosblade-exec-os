@@ -81,12 +81,12 @@ build_occupynetwork: exec/bin/occupynetwork/occupynetwork.go
 
 # build chaosblade linux version by docker image
 build_linux:
-	docker build -f build/image/musl/Dockerfile -t chaosblade-build-musl:latest build/image/musl
+	docker build -f build/image/musl/Dockerfile -t chaosblade-os-build-musl:latest build/image/musl
 	docker run --rm \
 		-v $(shell echo -n ${GOPATH}):/go \
 		-v $(BLADE_SRC_ROOT):/chaosblade-exec-os \
 		-w /chaosblade-exec-os \
-		chaosblade-build-musl:latest
+		chaosblade-os-build-musl:latest
 
 # test
 test:

@@ -56,7 +56,7 @@ func (*DiskCommandSpec) Example() string {
 }
 
 func checkDiskExpEnv() error {
-	commands := []string{"ps", "awk", "grep", "kill", "nohup", "rm", "dd"}
+	commands := []string{"rm", "dd"}
 	for _, command := range commands {
 		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)

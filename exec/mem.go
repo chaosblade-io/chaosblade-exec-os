@@ -64,6 +64,11 @@ func NewMemCommandModelSpec() spec.ExpModelCommandSpec {
 					Desc:     "burn memory mode, cache or ram.",
 					Required: false,
 				},
+				&spec.ExpFlag{
+					Name:     "include-buffer-cache",
+					Desc:     "Ram mode mem-percent is include buffer/cache",
+					NoArgs: 	true,
+				},
 			},
 		},
 	}
@@ -142,6 +147,8 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	memReserveStr := model.ActionFlags["reserve"]
 	memRateStr := model.ActionFlags["rate"]
 	burnMemModeStr := model.ActionFlags["mode"]
+	includeBufferCache := model.ActionFlags["include-buffer-cache"] == "true"
+
 	if memPercentStr != "" {
 		var err error
 		memPercent, err = strconv.Atoi(memPercentStr)
@@ -169,19 +176,22 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 				"--rate value must be a positive integer")
 		}
 	}
-	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr)
+	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, includeBufferCache)
 }
 
 const burnMemBin = "chaos_burnmem"
 
 // start burn mem
-func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string) *spec.Response {
+func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) *spec.Response {
 	args := fmt.Sprintf("--start --mem-percent %d --reserve %d --debug=%t", memPercent, memReserve, util.Debug)
 	if memRate != 0 {
 		args = fmt.Sprintf("%s --rate %d", args, memRate)
 	}
 	if burnMemMode != "" {
 		args = fmt.Sprintf("%s --mode %s", args, burnMemMode)
+	}
+	if includeBufferCache {
+		args = fmt.Sprintf("%s --include-buffer-cache=%t", args, includeBufferCache)
 	}
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), args)
 }

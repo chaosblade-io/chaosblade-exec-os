@@ -39,7 +39,8 @@ import (
 
 var (
 	burnCpuStart, burnCpuStop, burnCpuNohup bool
-	cpuCount, cpuPercent                    int
+	cpuCount, cpuPercent, climbTime				   int
+	slopePercent 											float64
 	cpuList                                 string
 	cpuProcessor                            string
 )
@@ -49,6 +50,7 @@ func main() {
 	flag.BoolVar(&burnCpuStop, "stop", false, "stop burn cpu")
 	flag.StringVar(&cpuList, "cpu-list", "", "CPUs in which to allow burning (1,3)")
 	flag.BoolVar(&burnCpuNohup, "nohup", false, "nohup to run burn cpu")
+	flag.IntVar(&climbTime, "climb-time", 1, "durations(s) to climb")
 	flag.IntVar(&cpuCount, "cpu-count", runtime.NumCPU(), "number of cpus")
 	flag.IntVar(&cpuPercent, "cpu-percent", 100, "percent of burn-cpu")
 	flag.StringVar(&cpuProcessor, "cpu-processor", "0", "only used for identifying process of cpu burn")
@@ -67,7 +69,7 @@ func main() {
 	} else if burnCpuNohup {
 		go burnCpu()
 
-		// Wait for signals
+		// Wait for exit signals
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGKILL)
 		for s := range ch {
@@ -111,6 +113,7 @@ func burnCpu() {
 		t := time.NewTicker(3 * time.Second)
 		for {
 			select {
+			// timer 3s
 			case <-t.C:
 				totalCpuPercent, err = cpu.Percent(time.Second, false)
 				if err != nil {
@@ -125,6 +128,20 @@ func burnCpu() {
 			}
 		}
 	}()
+
+	var ticker *time.Ticker = time.NewTicker(1 * time.Second)
+	slopePercent = totalCpuPercent[0]
+	var startPercent = float64(cpuPercent) - slopePercent
+	go func() {
+		for range ticker.C {
+			if slopePercent < float64(cpuPercent) {
+				slopePercent += startPercent / float64(climbTime)
+			} else if slopePercent > float64(cpuPercent) {
+				slopePercent -= startPercent / float64(climbTime)
+			}
+		}
+	}()
+
 	for i := 0; i < cpuCount; i++ {
 		go func() {
 			busy := int64(0)
@@ -135,7 +152,7 @@ func burnCpu() {
 			for i := 0; ; i = (i + 1) % 1000 {
 				startTime := time.Now().UnixNano()
 				if i == 0 {
-					dx = (float64(cpuPercent) - totalCpuPercent[0]) / otherCpuPercent
+					dx = (slopePercent - totalCpuPercent[0]) / otherCpuPercent
 					busy = busy + int64(dx*100000)
 					if busy < 0 {
 						busy = 0
@@ -174,20 +191,20 @@ func startBurnCpu() {
 		cpuCount = 1
 		cores := strings.Split(cpuList, ",")
 		for _, core := range cores {
-			pid := runBurnCpuFunc(ctx, cpuCount, cpuPercent, true, core)
+			pid := runBurnCpuFunc(ctx, cpuCount, cpuPercent, true, core, climbTime)
 			bindBurnCpuFunc(ctx, core, pid)
 		}
 	} else {
-		runBurnCpuFunc(ctx, cpuCount, cpuPercent, false, "")
+		runBurnCpuFunc(ctx, cpuCount, cpuPercent, false, "", climbTime)
 	}
 	checkBurnCpuFunc(ctx)
 }
 
 // runBurnCpu
-func runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string) int {
-	args := fmt.Sprintf(`%s --nohup --cpu-count %d --cpu-percent %d`,
-		path.Join(util.GetProgramPath(), burnCpuBin), cpuCount, cpuPercent)
-
+func runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climbTime int) int {
+	args := fmt.Sprintf(`%s --nohup --cpu-count %d --cpu-percent %d --climb-time %d`,
+		path.Join(util.GetProgramPath(), burnCpuBin), cpuCount, cpuPercent, climbTime)
+	fmt.Println(climbTime)
 	if pidNeeded {
 		args = fmt.Sprintf("%s --cpu-processor %s", args, processor)
 	}

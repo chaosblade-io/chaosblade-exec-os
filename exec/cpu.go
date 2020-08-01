@@ -149,7 +149,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		}
 		if cpuPercent > 100 || cpuPercent < 0 {
 			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				fmt.Sprintf("--cpu-percent value must be a prositive integer and not bigger than 100!"))
+				"--cpu-percent value must be a prositive integer and not bigger than 100!")
 		}
 	} else {
 		cpuPercent = 100

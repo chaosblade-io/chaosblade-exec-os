@@ -50,7 +50,7 @@ func main() {
 	flag.BoolVar(&burnCpuStop, "stop", false, "stop burn cpu")
 	flag.StringVar(&cpuList, "cpu-list", "", "CPUs in which to allow burning (1,3)")
 	flag.BoolVar(&burnCpuNohup, "nohup", false, "nohup to run burn cpu")
-	flag.IntVar(&climbTime, "climb-time", 1, "durations(s) to climb")
+	flag.IntVar(&climbTime, "climb-time", 0, "durations(s) to climb")
 	flag.IntVar(&cpuCount, "cpu-count", runtime.NumCPU(), "number of cpus")
 	flag.IntVar(&cpuPercent, "cpu-percent", 100, "percent of burn-cpu")
 	flag.StringVar(&cpuProcessor, "cpu-processor", "0", "only used for identifying process of cpu burn")
@@ -129,18 +129,22 @@ func burnCpu() {
 		}
 	}()
 
-	var ticker *time.Ticker = time.NewTicker(1 * time.Second)
-	slopePercent = totalCpuPercent[0]
-	var startPercent = float64(cpuPercent) - slopePercent
-	go func() {
-		for range ticker.C {
-			if slopePercent < float64(cpuPercent) {
-				slopePercent += startPercent / float64(climbTime)
-			} else if slopePercent > float64(cpuPercent) {
-				slopePercent -= startPercent / float64(climbTime)
+	if climbTime == 0 {
+		slopePercent = float64(cpuPercent)
+	} else {
+		var ticker *time.Ticker = time.NewTicker(1 * time.Second)
+		slopePercent = totalCpuPercent[0]
+		var startPercent = float64(cpuPercent) - slopePercent
+		go func() {
+			for range ticker.C {
+				if slopePercent < float64(cpuPercent) {
+					slopePercent += startPercent / float64(climbTime)
+				} else if slopePercent > float64(cpuPercent) {
+					slopePercent -= startPercent / float64(climbTime)
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	for i := 0; i < cpuCount; i++ {
 		go func() {
@@ -204,7 +208,6 @@ func startBurnCpu() {
 func runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climbTime int) int {
 	args := fmt.Sprintf(`%s --nohup --cpu-count %d --cpu-percent %d --climb-time %d`,
 		path.Join(util.GetProgramPath(), burnCpuBin), cpuCount, cpuPercent, climbTime)
-	fmt.Println(climbTime)
 	if pidNeeded {
 		args = fmt.Sprintf("%s --cpu-processor %s", args, processor)
 	}

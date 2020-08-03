@@ -61,6 +61,11 @@ func NewCpuCommandModelSpec() spec.ExpModelCommandSpec {
 					Desc:     "percent of burn CPU (0-100)",
 					Required: false,
 				},
+				&spec.ExpFlag{
+					Name:     "climb-time",
+					Desc:     "durations(s) to climb",
+					Required: false,
+				},
 			},
 		},
 	}
@@ -79,7 +84,7 @@ func (*CpuCommandModelSpec) LongDesc() string {
 }
 
 func (*CpuCommandModelSpec) Example() string {
-	return "blade create cpu load --cpu-percent 80"
+	return "blade create cpu load --cpu-percent 80 --climb-time 60"
 }
 
 type fullLoadActionCommand struct {
@@ -132,6 +137,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	var cpuCount int
 	var cpuList string
 	var cpuPercent int
+	var climbTime int
 
 	cpuPercentStr := model.ActionFlags["cpu-percent"]
 	if cpuPercentStr != "" {
@@ -176,14 +182,29 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			cpuCount = runtime.NumCPU()
 		}
 	}
-	return ce.start(ctx, cpuList, cpuCount, cpuPercent)
+
+	climbTimeStr := model.ActionFlags["climb-time"]
+	if climbTimeStr != "" {
+		var err error
+		climbTime, err = strconv.Atoi(climbTimeStr)
+		if err != nil {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
+				"--climb-time value must be a positive integer")
+		}
+		if climbTime > 600 || climbTime < 0 {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
+				"--climb-time value must be a prositive integer and not bigger than 600")
+		}
+	}
+
+	return ce.start(ctx, cpuList, cpuCount, cpuPercent, climbTime)
 }
 
 const burnCpuBin = "chaos_burncpu"
 
 // start burn cpu
-func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, cpuPercent int) *spec.Response {
-	args := fmt.Sprintf("--start --cpu-count %d --cpu-percent %d --debug=%t", cpuCount, cpuPercent, util.Debug)
+func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, cpuPercent int, climbTime int) *spec.Response {
+	args := fmt.Sprintf("--start --climb-time %d --cpu-count %d --cpu-percent %d --debug=%t", climbTime, cpuCount, cpuPercent, util.Debug)
 	if cpuList != "" {
 		args = fmt.Sprintf("%s --cpu-list %s", args, cpuList)
 	}

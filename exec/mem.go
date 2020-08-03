@@ -65,8 +65,8 @@ func NewMemCommandModelSpec() spec.ExpModelCommandSpec {
 					Required: false,
 				},
 				&spec.ExpFlag{
-					Name:     "exclude-buffer-cache",
-					Desc:     "Ram mode mem-percent is exclude buffer/cache",
+					Name:     "include-buffer-cache",
+					Desc:     "Ram mode mem-percent is include buffer/cache",
 					NoArgs: 	true,
 				},
 			},
@@ -147,7 +147,8 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	memReserveStr := model.ActionFlags["reserve"]
 	memRateStr := model.ActionFlags["rate"]
 	burnMemModeStr := model.ActionFlags["mode"]
-	excludeBufferCache := model.ActionFlags["exclude-buffer-cache"] == "true"
+	includeBufferCache := model.ActionFlags["include-buffer-cache"] == "true"
+  
 	if memPercentStr != "" {
 		var err error
 		memPercent, err = strconv.Atoi(memPercentStr)
@@ -175,13 +176,13 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 				"--rate value must be a positive integer")
 		}
 	}
-	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, excludeBufferCache)
+	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, includeBufferCache)
 }
 
 const burnMemBin = "chaos_burnmem"
 
 // start burn mem
-func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, excludeBufferCache bool) *spec.Response {
+func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) *spec.Response {
 	args := fmt.Sprintf("--start --mem-percent %d --reserve %d --debug=%t", memPercent, memReserve, util.Debug)
 	if memRate != 0 {
 		args = fmt.Sprintf("%s --rate %d", args, memRate)
@@ -189,8 +190,8 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 	if burnMemMode != "" {
 		args = fmt.Sprintf("%s --mode %s", args, burnMemMode)
 	}
-	if excludeBufferCache {
-		args = fmt.Sprintf("%s --exclude-buffer-cache=%t", args, excludeBufferCache)
+	if includeBufferCache {
+		args = fmt.Sprintf("%s --include-buffer-cache=%t", args, includeBufferCache)
 	}
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), args)
 }

@@ -44,7 +44,7 @@ const PAGE_COUNTER_MAX uint64 = 9223372036854770000
 type Block [32 * 1024]int32
 
 var (
-	burnMemStart, burnMemStop, burnMemNohup, excludeBufferCache bool
+	burnMemStart, burnMemStop, burnMemNohup, includeBufferCache bool
 	memPercent, memReserve, memRate                             int
 	burnMemMode                                                 string
 )
@@ -53,7 +53,7 @@ func main() {
 	flag.BoolVar(&burnMemStart, "start", false, "start burn memory")
 	flag.BoolVar(&burnMemStop, "stop", false, "stop burn memory")
 	flag.BoolVar(&burnMemNohup, "nohup", false, "nohup to run burn memory")
-	flag.BoolVar(&excludeBufferCache, "exclude-buffer-cache", false, "ram model mem-percent is exclude buffer/cache")
+	flag.BoolVar(&includeBufferCache, "include-buffer-cache", false, "ram model mem-percent is exclude buffer/cache")
 	flag.IntVar(&memPercent, "mem-percent", 0, "percent of burn memory")
 	flag.IntVar(&memReserve, "reserve", 0, "reserve to burn memory, unit is M")
 	flag.IntVar(&memRate, "rate", 100, "burn memory rate, unit is M/S, only support for ram mode")
@@ -171,12 +171,12 @@ func startBurnMem() {
 			bin.PrintErrAndExit(response.Error())
 		}
 	}
-	runBurnMemFunc(ctx, memPercent, memReserve, memRate, burnMemMode, excludeBufferCache)
+	runBurnMemFunc(ctx, memPercent, memReserve, memRate, burnMemMode, includeBufferCache)
 }
 
-func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, excludeBufferCache bool) {
-	args := fmt.Sprintf(`%s --nohup --mem-percent %d --reserve %d --rate %d --mode %s --exclude-buffer-cache=%t`,
-		path.Join(util.GetProgramPath(), burnMemBin), memPercent, memReserve, memRate, burnMemMode, excludeBufferCache)
+func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) {
+	args := fmt.Sprintf(`%s --nohup --mem-percent %d --reserve %d --rate %d --mode %s --include-buffer-cache=%t`,
+		path.Join(util.GetProgramPath(), burnMemBin), memPercent, memReserve, memRate, burnMemMode, includeBufferCache)
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
 	response := cl.Run(ctx, "nohup", args)
 	if !response.Success {
@@ -243,7 +243,7 @@ func calculateMemSize(percent, reserve int) (int64, int64, error) {
 		available = int64(virtualMemory.Available)
 		if burnMemMode == "cache" {
 			available = int64(virtualMemory.Free)
-		} else if burnMemMode == "ram" && excludeBufferCache {
+		} else if burnMemMode == "ram" && !includeBufferCache {
 			available = total - int64(virtualMemory.Used)
 		}
 	} else {

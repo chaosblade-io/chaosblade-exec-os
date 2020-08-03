@@ -45,6 +45,7 @@ func GetAllExpModels() []spec.ExpModelCommandSpec {
 		exec.NewNetworkCommandSpec(),
 		exec.NewDiskCommandSpec(),
 		exec.NewScriptCommandModelSpec(),
+		exec.NewFileCommandSpec(),
 	}
 }
 

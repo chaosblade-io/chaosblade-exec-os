@@ -46,6 +46,7 @@ func getModels() *spec.Models {
 		exec.NewNetworkCommandSpec(),
 		exec.NewDiskCommandSpec(),
 		exec.NewScriptCommandModelSpec(),
+		exec.NewFileCommandSpec(),
 	}
 	specModels := make([]*spec.Models, 0)
 	for _, modeSpec := range modelCommandSpecs {

@@ -24,10 +24,12 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"math/rand"
 	"os"
 	"os/signal"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -51,6 +53,9 @@ func main() {
 	if appendFileStart {
 		if content == "" || filepath == "" {
 			bin.PrintErrAndExit("less --content or --filepath flag")
+		}
+		if strings.Contains(content, "@@##") {
+			content = strings.Replace(content, "@@##", " ", -1)
 		}
 		startAppendFile(filepath, content, count, interval, escape)
 	} else if appendFileNoHup {
@@ -120,20 +125,7 @@ func startAppendFile(filepath, content string, count int, interval int, escape b
 
 func appendFile(filepath string, content string, count int, interval int, escape bool) {
 
-	reg := regexp.MustCompile(`\\?@\{(?s:([^(@{})]*[^\\]))\}|\\?@\[((?s:[^(@{})]*[^\\]))\]|\\?@\w+`)
-	result := reg.FindAllStringSubmatch(content, -1)
-	for _, text := range result {
-		if strings.HasPrefix(text[0], "\\@") {
-			content = strings.Replace(content, text[0], strings.Replace(text[0], "\\", "", 1), 1)
-			continue
-		}
-		if text[1] == "" {
-			content = strings.Replace(content, text[0], strings.Replace(text[0], "@", "$", 1), 1)
-		} else {
-			content = strings.Replace(content, text[0], "$("+text[1]+")", 1)
-		}
-	}
-
+	content = parseDate(content)
 	go func() {
 		ctx := context.Background()
 		// first append
@@ -150,10 +142,51 @@ func appendFile(filepath string, content string, count int, interval int, escape
 	}()
 }
 
+func parseDate(content string) string {
+	reg := regexp.MustCompile(`\\?@\{(?s:DATE\:([^(@{})]*[^\\]))\}`)
+	result := reg.FindAllStringSubmatch(content, -1)
+	for _, text := range result {
+		if strings.HasPrefix(text[0], "\\@") {
+			content = strings.Replace(content, text[0], strings.Replace(text[0], "\\", "", 1), 1)
+			continue
+		}
+		content = strings.Replace(content, text[0], "$(date \""+text[1]+"\")", 1)
+	}
+	return content
+}
+
+func parseRandom(content string) string {
+	reg := regexp.MustCompile(`\\?@\{(?s:RANDOM\:([0-9]+\-[0-9]+))\}`)
+	result := reg.FindAllStringSubmatch(content, -1)
+	for _, text := range result {
+		if strings.HasPrefix(text[0], "\\@") {
+			content = strings.Replace(content, text[0], strings.Replace(text[0], "\\", "", 1), 1)
+			continue
+		}
+		split := strings.Split(text[1], "-")
+		begin, err := strconv.Atoi(split[0])
+		if err != nil {
+			bin.PrintErrAndExit(fmt.Sprintf("run append file %s failed, radom expression can not parse", text[1]))
+		}
+
+		end, err := strconv.Atoi(split[1])
+		if err != nil {
+			bin.PrintErrAndExit(fmt.Sprintf("run append file %s failed, radom expression can not parse", text[1]))
+		}
+
+		if end <= begin {
+			bin.PrintErrAndExit(fmt.Sprintf("run append file %s failed, begin must < end", text[1]))
+		}
+		content = strings.Replace(content, text[0], strconv.Itoa(rand.Intn(end - begin) + begin), 1)
+	}
+	return content
+}
+
 func append(count int, ctx context.Context, content string, filepath string, escape bool) bool {
 	var response *spec.Response
 
 	for i := 0; i < count; i++ {
+		content = parseRandom(content)
 		if escape {
 			response = cl.Run(ctx, "echo", fmt.Sprintf(`-e "%s" >> "%s"`, content, filepath))
 		} else {

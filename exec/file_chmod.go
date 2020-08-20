@@ -33,13 +33,7 @@ type FileChmodActionSpec struct {
 func NewFileChmodActionSpec() spec.ExpActionCommandSpec {
 	return &FileChmodActionSpec{
 		spec.BaseExpActionCommandSpec{
-			ActionMatchers: []spec.ExpFlagSpec{
-				&spec.ExpFlag{
-					Name:     "filepath",
-					Desc:     "file path",
-					Required: true,
-				},
-			},
+			ActionMatchers: fileCommFlags,
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
 					Name:     "mark",
@@ -76,7 +70,7 @@ func (*FileChmodActionExecutor) Name() string {
 	return "chmod"
 }
 
-var appenefileBin = "chaos_chmodfile"
+var chmodFileBin = "chaos_chmodfile"
 
 func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkChmodFileExpEnv()
@@ -110,11 +104,11 @@ func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *s
 
 func (f *FileChmodActionExecutor) start(filepath string, mark string, ctx context.Context) *spec.Response {
 	flags := fmt.Sprintf(`--start --filepath "%s" --mark %s --debug=%t`, filepath, mark, util.Debug)
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), appenefileBin), flags)
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), chmodFileBin), flags)
 }
 
 func (f *FileChmodActionExecutor) stop(filepath string, ctx context.Context) *spec.Response {
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), appenefileBin),
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), chmodFileBin),
 		fmt.Sprintf(`--stop --filepath "%s" --debug=%t`, filepath, util.Debug))
 }
 

@@ -30,10 +30,21 @@ func NewFileCommandSpec() spec.ExpModelCommandSpec {
 			ExpActions: []spec.ExpActionCommandSpec{
 				NewFileAppendActionSpec(),
 				NewFileChmodActionSpec(),
+				NewFileAddActionSpec(),
+				NewFileDeleteActionSpec(),
+				NewFileMoveActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},
 	}
+}
+
+var fileCommFlags = []spec.ExpFlagSpec{
+	&spec.ExpFlag{
+		Name:     "filepath",
+		Desc:     "file path",
+		Required: true,
+	},
 }
 
 func (*FileCommandSpec) Name() string {

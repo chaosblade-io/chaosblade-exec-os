@@ -52,7 +52,6 @@ func main() {
 }
 
 var cl = channel.NewLocalChannel()
-var appendFileBin = "chaos_appendfile"
 
 const tmpFileChmod = "/tmp/chaos-file-chmod.tmp"
 

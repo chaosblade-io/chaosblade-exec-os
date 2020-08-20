@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
@@ -37,7 +38,7 @@ import (
 
 var content, filepath string
 var count, interval int
-var escape, appendFileStart, appendFileStop, appendFileNoHup bool
+var escape, enableBase64, appendFileStart, appendFileStop, appendFileNoHup bool
 
 func main() {
 	flag.StringVar(&content, "content", "", "content")
@@ -45,6 +46,7 @@ func main() {
 	flag.IntVar(&count, "count", 1, "append count")
 	flag.IntVar(&interval, "interval", 1, "append count")
 	flag.BoolVar(&escape, "escape", false, "symbols to escape")
+	flag.BoolVar(&enableBase64, "enable-base64", false, "append content enableBase64 encoding")
 	flag.BoolVar(&appendFileStart, "start", false, "start append file")
 	flag.BoolVar(&appendFileStop, "stop", false, "stop append file")
 	flag.BoolVar(&appendFileNoHup, "nohup", false, "nohup to run append file")
@@ -57,9 +59,9 @@ func main() {
 		if strings.Contains(content, "@@##") {
 			content = strings.Replace(content, "@@##", " ", -1)
 		}
-		startAppendFile(filepath, content, count, interval, escape)
+		startAppendFile(filepath, content, count, interval, escape, enableBase64)
 	} else if appendFileNoHup {
-		appendFile(filepath, content, count, interval, escape)
+		appendFile(filepath, content, count, interval, escape, enableBase64)
 		// Wait for signals
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGKILL)
@@ -83,7 +85,7 @@ func main() {
 var cl = channel.NewLocalChannel()
 var appendFileBin = "chaos_appendfile"
 
-func startAppendFile(filepath, content string, count int, interval int, escape bool) {
+func startAppendFile(filepath, content string, count int, interval int, escape bool, enableBase64 bool) {
 	// check pid
 	newCtx := context.WithValue(context.Background(), channel.ProcessKey,
 		fmt.Sprintf(`--nohup --filepath %s`, filepath))
@@ -99,8 +101,8 @@ func startAppendFile(filepath, content string, count int, interval int, escape b
 	}
 
 	ctx := context.Background()
-	args := fmt.Sprintf(`%s --nohup --filepath "%s" --content "%s" --count %d --interval %d --escape=%t`,
-		path.Join(util.GetProgramPath(), appendFileBin), filepath, content, count, interval, escape)
+	args := fmt.Sprintf(`%s --nohup --filepath "%s" --content "%s" --count %d --interval %d --escape=%t --enable-base64=%t`,
+		path.Join(util.GetProgramPath(), appendFileBin), filepath, content, count, interval, escape, enableBase64)
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
 	response := cl.Run(ctx, "nohup", args)
 	if !response.Success {
@@ -123,19 +125,18 @@ func startAppendFile(filepath, content string, count int, interval int, escape b
 	}
 }
 
-func appendFile(filepath string, content string, count int, interval int, escape bool) {
+func appendFile(filepath string, content string, count int, interval int, escape bool, enableBase64 bool) {
 
-	content = parseDate(content)
 	go func() {
 		ctx := context.Background()
 		// first append
-		if append(count, ctx, content, filepath, escape) {
+		if append(count, ctx, content, filepath, escape, enableBase64) {
 			return
 		}
 
 		ticker := time.NewTicker(time.Second * time.Duration(interval))
-		for _ = range ticker.C {
-			if append(count, ctx, content, filepath, escape) {
+		for range ticker.C {
+			if append(count, ctx, content, filepath, escape, enableBase64) {
 				return
 			}
 		}
@@ -182,9 +183,17 @@ func parseRandom(content string) string {
 	return content
 }
 
-func append(count int, ctx context.Context, content string, filepath string, escape bool) bool {
+func append(count int, ctx context.Context, content string, filepath string, escape bool, enableBase64 bool) bool {
 	var response *spec.Response
-
+	if enableBase64 {
+		decodeBytes, err := base64.StdEncoding.DecodeString(content)
+		if err != nil {
+			bin.PrintErrAndExit(err.Error())
+			return true
+		}
+		content = string(decodeBytes)
+	}
+	content = parseDate(content)
 	for i := 0; i < count; i++ {
 		content = parseRandom(content)
 		if escape {

@@ -59,6 +59,11 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 					Desc:   "symbols to escape, use --escape, at this --count is invalid",
 					NoArgs: true,
 				},
+				&spec.ExpFlag{
+					Name:   "enable-base64",
+					Desc:   "append content enable base64 encoding",
+					NoArgs: true,
+				},
 			},
 			ActionExecutor: &FileAppendActionExecutor{},
 		},
@@ -110,7 +115,6 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 	count := 1
 	// 1000 ms
 	interval := 1
-	var escape bool
 
 	content := model.ActionFlags["content"]
 	countStr := model.ActionFlags["count"]
@@ -130,18 +134,25 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		}
 	}
 
-	escape = model.ActionFlags["escape"] == "true"
+	escape := model.ActionFlags["escape"] == "true"
+	enableBase64 := model.ActionFlags["enable-base64"] == "true"
 
 	if !util.IsExist(filepath) {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
 			fmt.Sprintf("the %s file does not exist", filepath))
 	}
 
-	return f.start(filepath, content, count, interval, escape, ctx)
+	return f.start(filepath, content, count, interval, escape, enableBase64, ctx)
 }
 
-func (f *FileAppendActionExecutor) start(filepath string, content string, count int, interval int, escape bool, ctx context.Context) *spec.Response {
-	flags := fmt.Sprintf(`--start --filepath "%s" --content "%s" --count %d --interval %d --escape=%t --debug=%t`, filepath, content, count, interval, escape, util.Debug)
+func (f *FileAppendActionExecutor) start(filepath string, content string, count int, interval int, escape bool, enableBase64 bool, ctx context.Context) *spec.Response {
+	flags := fmt.Sprintf(`--start --filepath "%s" --content "%s" --count %d --interval %d --debug=%t`, filepath, content, count, interval, util.Debug)
+	if escape {
+		flags = fmt.Sprintf("%s --escape=true", flags)
+	}
+	if enableBase64 {
+		flags = fmt.Sprintf("%s --enable-base64=true", flags)
+	}
 	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), appeneFileBin), flags)
 }
 

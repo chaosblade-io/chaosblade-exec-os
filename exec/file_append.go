@@ -33,13 +33,7 @@ type FileAppendActionSpec struct {
 func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 	return &FileAppendActionSpec{
 		spec.BaseExpActionCommandSpec{
-			ActionMatchers: []spec.ExpFlagSpec{
-				&spec.ExpFlag{
-					Name:     "filepath",
-					Desc:     "file path",
-					Required: true,
-				},
-			},
+			ActionMatchers: fileCommFlags,
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
 					Name:     "content",

@@ -60,6 +60,10 @@ func startMoveFile(filepath, target string, force, autoCreateDir bool) {
 	if autoCreateDir && !util.IsExist(target) {
 		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, target))
 	}
+	if !util.IsDir(target) {
+		bin.PrintErrAndExit(fmt.Sprintf("the [%s] target file is not exists", target))
+		return
+	}
 	if force {
 		response = cl.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, filepath, target))
 	} else {

@@ -45,6 +45,11 @@ func NewFileMoveActionSpec() spec.ExpActionCommandSpec {
 					Desc:   "use --force flag overwrite target file",
 					NoArgs: true,
 				},
+				&spec.ExpFlag{
+					Name:   "auto-create-dir",
+					Desc:   "automatically creates a directory that does not exist",
+					NoArgs: true,
+				},
 			},
 			ActionExecutor: &FileMoveActionExecutor{},
 		},
@@ -99,12 +104,8 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 			fmt.Sprintf("the %s file does not exist", filepath))
 	}
 
-
 	force := model.ActionFlags["force"] == "true"
-	if !util.IsDir(target) {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("the %s target folder is not dir", target))
-	}
+	autoCreateDir := model.ActionFlags["auto-create-dir"] == "true"
 
 	if !force {
 		targetFile := path.Join(target, "/" , path.Base(filepath))
@@ -113,13 +114,16 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 				fmt.Sprintf("the [%s] target file is exist", targetFile))
 		}
 	}
-	return f.start(filepath, target, force, ctx)
+	return f.start(filepath, target, force, autoCreateDir, ctx)
 }
 
-func (f *FileMoveActionExecutor) start(filepath, target string, force bool, ctx context.Context) *spec.Response {
+func (f *FileMoveActionExecutor) start(filepath, target string, force, autoCreateDir bool, ctx context.Context) *spec.Response {
 	flags := fmt.Sprintf(`--start --filepath "%s" --target "%s" --debug=%t`, filepath, target, util.Debug)
 	if force {
 		flags = fmt.Sprintf(`%s --force=true`, flags)
+	}
+	if autoCreateDir {
+		flags = fmt.Sprintf(`%s --auto-create-dir=true`, flags)
 	}
 	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), moveFileBin), flags)
 }
@@ -138,7 +142,7 @@ func (f *FileMoveActionExecutor) SetChannel(channel spec.Channel) {
 }
 
 func checkMoveFileExpEnv() error {
-	commands := []string{"mv"}
+	commands := []string{"mv", "mkdir"}
 	for _, command := range commands {
 		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)

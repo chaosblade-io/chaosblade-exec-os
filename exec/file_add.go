@@ -40,12 +40,17 @@ func NewFileAddActionSpec() spec.ExpActionCommandSpec {
 					NoArgs: true,
 				},
 				&spec.ExpFlag{
-					Name:   "content",
-					Desc:   "--content, add file content",
+					Name: "content",
+					Desc: "--content, add file content",
 				},
 				&spec.ExpFlag{
 					Name:   "enable-base64",
 					Desc:   "--content use base64 encoding",
+					NoArgs: true,
+				},
+				&spec.ExpFlag{
+					Name:   "auto-create-dir",
+					Desc:   "automatically creates a directory that does not exist",
 					NoArgs: true,
 				},
 			},
@@ -103,17 +108,21 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 	directory := model.ActionFlags["directory"] == "true"
 	content := model.ActionFlags["content"]
 	enableBase64 := model.ActionFlags["enable-base64"] == "true"
+	autoCreateDir := model.ActionFlags["auto-create-dir"] == "true"
 
-	return f.start(filepath, directory, content, enableBase64, ctx)
+	return f.start(filepath, content, directory, enableBase64, autoCreateDir, ctx)
 }
 
-func (f *FileAddActionExecutor) start(filepath string, directory bool, content string, enableBase64 bool, ctx context.Context) *spec.Response {
+func (f *FileAddActionExecutor) start(filepath, content string, directory, enableBase64, autoCreateDir bool, ctx context.Context) *spec.Response {
 	flags := fmt.Sprintf(`--start --filepath "%s" --content "%s" --debug=%t`, filepath, content, util.Debug)
 	if directory {
 		flags = fmt.Sprintf(`%s --directory=true`, flags)
 	}
 	if enableBase64 {
 		flags = fmt.Sprintf(`%s --enable-base64=true`, flags)
+	}
+	if autoCreateDir {
+		flags = fmt.Sprintf(`%s --auto-create-dir=true`, flags)
 	}
 	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), addFileBin), flags)
 }

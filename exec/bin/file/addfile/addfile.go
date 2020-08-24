@@ -24,16 +24,19 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"path"
 )
 
 var filepath, content string
-var appendFileStart, appendFileStop, directory, enableBase64 bool
+var appendFileStart, appendFileStop, directory, enableBase64, autoCreateDir bool
 
 func main() {
 	flag.StringVar(&filepath, "filepath", "", "filepath")
 	flag.StringVar(&content, "content", "", "content")
 	flag.BoolVar(&directory, "directory", false, "is dir")
 	flag.BoolVar(&enableBase64, "enable-base64", false, "content support base64 encoding")
+	flag.BoolVar(&autoCreateDir, "auto-create-dir", false, "automatically creates a directory that does not exist")
 	flag.BoolVar(&appendFileStart, "start", false, "start append file")
 	flag.BoolVar(&appendFileStop, "stop", false, "stop append file")
 	bin.ParseFlagAndInitLog()
@@ -42,7 +45,7 @@ func main() {
 		if filepath == "" {
 			bin.PrintErrAndExit("less --filepath flag")
 		}
-		startAddFile(filepath, content, directory, enableBase64)
+		startAddFile(filepath, content, directory, enableBase64, autoCreateDir)
 	} else if appendFileStop {
 		stopAddFile(filepath)
 	} else {
@@ -52,12 +55,16 @@ func main() {
 
 var cl = channel.NewLocalChannel()
 
-func startAddFile(filepath, content string, directory, enableBase64 bool) {
+func startAddFile(filepath, content string, directory, enableBase64, autoCreateDir bool) {
 	ctx := context.Background()
 
 	var response *spec.Response
+	dir := path.Dir(filepath)
+	if autoCreateDir && !util.IsExist(dir) {
+		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, dir))
+	}
 	if directory {
-		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, filepath))
+		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`%s`, filepath))
 	} else {
 		if content == "" {
 			response = cl.Run(ctx, "touch", fmt.Sprintf(`%s`, filepath))

@@ -23,16 +23,18 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"path"
 )
 
 var target, filepath string
-var appendFileStart, appendFileStop, force bool
+var appendFileStart, appendFileStop, force, autoCreateDir bool
 
 func main() {
 	flag.StringVar(&target, "target", "", "content")
 	flag.StringVar(&filepath, "filepath", "", "filepath")
 	flag.BoolVar(&force, "force", false, "overwrite target file")
+	flag.BoolVar(&autoCreateDir, "auto-create-dir", false, "automatically creates a directory that does not exist")
 	flag.BoolVar(&appendFileStart, "start", false, "start append file")
 	flag.BoolVar(&appendFileStop, "stop", false, "stop append file")
 	bin.ParseFlagAndInitLog()
@@ -41,7 +43,7 @@ func main() {
 		if target == "" || filepath == "" {
 			bin.PrintErrAndExit("less --target or --filepath flag")
 		}
-		startMoveFile(filepath, target, force)
+		startMoveFile(filepath, target, force, autoCreateDir)
 	} else if appendFileStop {
 		stopMoveFile(filepath, target)
 	} else {
@@ -51,9 +53,13 @@ func main() {
 
 var cl = channel.NewLocalChannel()
 
-func startMoveFile(filepath, target string, force bool) {
+func startMoveFile(filepath, target string, force, autoCreateDir bool) {
 	ctx := context.Background()
 	var response *spec.Response
+
+	if autoCreateDir && !util.IsExist(target) {
+		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, target))
+	}
 	if force {
 		response = cl.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, filepath, target))
 	} else {

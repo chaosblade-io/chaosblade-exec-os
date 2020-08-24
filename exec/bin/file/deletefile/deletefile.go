@@ -62,7 +62,7 @@ func startDeleteFile(filepath string, force bool) {
 			return
 		}
 	} else {
-		target := path.Join(path.Dir(filepath), md5Hex(path.Base(filepath)))
+		target := path.Join(path.Dir(filepath), "." + md5Hex(path.Base(filepath)))
 		response = cl.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
@@ -77,7 +77,7 @@ func stopDeleteFile(filepath string, force bool) {
 		// nothing to do
 	} else {
 		ctx := context.Background()
-		target := path.Join(path.Dir(filepath), md5Hex(path.Base(filepath)))
+		target := path.Join(path.Dir(filepath), "." + md5Hex(path.Base(filepath)))
 		response := cl.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, target, filepath))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)

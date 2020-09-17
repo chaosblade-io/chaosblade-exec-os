@@ -65,9 +65,9 @@ func NewMemCommandModelSpec() spec.ExpModelCommandSpec {
 					Required: false,
 				},
 				&spec.ExpFlag{
-					Name:     "include-buffer-cache",
-					Desc:     "Ram mode mem-percent is include buffer/cache",
-					NoArgs: 	true,
+					Name:   "include-buffer-cache",
+					Desc:   "Ram mode mem-percent is include buffer/cache",
+					NoArgs: true,
 				},
 			},
 		},
@@ -198,8 +198,11 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 
 // stop burn mem
 func (ce *memExecutor) stop(ctx context.Context, burnMemMode string) *spec.Response {
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin),
-		fmt.Sprintf("--stop --mode %s --debug=%t", burnMemMode, util.Debug))
+	args := fmt.Sprintf("--stop --debug=%t", util.Debug)
+	if burnMemMode != "" {
+		args = fmt.Sprintf("%s --mode %s", args, burnMemMode)
+	}
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), args)
 }
 
 func checkMemoryExpEnv() error {

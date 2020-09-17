@@ -38,7 +38,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-const PAGE_COUNTER_MAX uint64 = 9223372036854770000
+const PageCounterMax uint64 = 9223372036854770000
+
 
 // 128K
 type Block [32 * 1024]int32
@@ -200,6 +201,7 @@ func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMe
 
 func stopBurnMem() (success bool, errs string) {
 	ctx := context.WithValue(context.Background(), channel.ProcessKey, "nohup")
+	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, "stop")
 	pids, _ := cl.GetPidsByProcessName(burnMemBin, ctx)
 	var response *spec.Response
 	if pids != nil && len(pids) != 0 {
@@ -233,7 +235,7 @@ func calculateMemSize(percent, reserve int) (int64, int64, error) {
 	if err != nil {
 		logrus.Infof("get memory stats by cgroup failed, used proc memory, %v", err)
 	}
-	if memoryStat == nil || memoryStat.Usage.Limit >= PAGE_COUNTER_MAX {
+	if memoryStat == nil || memoryStat.Usage.Limit >= PageCounterMax {
 		//no limit
 		virtualMemory, err := mem.VirtualMemory()
 		if err != nil {

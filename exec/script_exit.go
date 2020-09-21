@@ -45,6 +45,9 @@ func NewScriptExitActionCommand() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &ScriptExitExecutor{},
+			ActionExample:
+`# Add commands to the script "start0() { echo this-is-error-message; exit 1; ... }"
+blade create script exit --exit-code 1 --exit-message this-is-error-message --file test.sh --function-name start0`,
 		},
 	}
 }
@@ -61,7 +64,10 @@ func (*ScriptExitActionCommand) ShortDesc() string {
 	return "Exit script"
 }
 
-func (*ScriptExitActionCommand) LongDesc() string {
+func (s *ScriptExitActionCommand) LongDesc() string {
+	if s.ActionLongDesc != "" {
+		return s.ActionLongDesc
+	}
 	return "Exit script with specify message and code"
 }
 

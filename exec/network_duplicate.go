@@ -41,6 +41,9 @@ func NewDuplicateActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &NetworkDuplicateExecutor{},
+			ActionExample:
+`# Specify the network card eth0 and repeat the packet by 10%
+blade create network duplicate --percent=10 --interface=eth0`,
 		},
 	}
 }
@@ -57,7 +60,10 @@ func (*DuplicateActionSpec) ShortDesc() string {
 	return "Duplicate experiment"
 }
 
-func (*DuplicateActionSpec) LongDesc() string {
+func (d *DuplicateActionSpec) LongDesc() string {
+	if d.ActionLongDesc != "" {
+		return d.ActionLongDesc
+	}
 	return "Duplicate experiment"
 }
 

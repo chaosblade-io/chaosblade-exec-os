@@ -61,6 +61,16 @@ func NewKillProcessActionCommandSpec() spec.ExpActionCommandSpec {
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &KillProcessExecutor{},
+			ActionExample: `
+# Kill the process that contains the SimpleHTTPServer keyword
+blade create process kill --process SimpleHTTPServer
+
+# Kill the Java process
+blade create process kill --process-cmd java
+
+# Specifies the semaphore and local port to kill the process
+blade c process kill --local-port 8080 --signal 15`,
+
 		},
 	}
 }
@@ -77,7 +87,10 @@ func (*KillProcessActionCommandSpec) ShortDesc() string {
 	return "Kill process"
 }
 
-func (*KillProcessActionCommandSpec) LongDesc() string {
+func (k *KillProcessActionCommandSpec) LongDesc() string {
+	if k.ActionLongDesc != "" {
+		return k.ActionLongDesc
+	}
 	return "Kill process by process id or process name"
 }
 

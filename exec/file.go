@@ -59,7 +59,3 @@ func (*FileCommandSpec) LongDesc() string {
 	return "File experiment contains file content append, permission modification so on"
 }
 
-func (*FileCommandSpec) Example() string {
-	return `blade create file append --filepath /temp/1.log --content "hell world" --count 2 --interval=2`
-}
-

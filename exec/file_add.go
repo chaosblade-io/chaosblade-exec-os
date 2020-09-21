@@ -55,6 +55,19 @@ func NewFileAddActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileAddActionExecutor{},
+			ActionExample:
+`# Create a file named nginx.log in the /home directory
+blade create file add --filepath /home/nginx.log
+
+# Create a file named nginx.log in the /home directory with the contents of HELLO WORLD
+blade create file add --filepath /home/nginx.log --content "HELLO WORLD"
+
+# Create a file named nginx.log in the /temp directory and automatically create directories that don't exist
+blade create file add --filepath /temp/nginx.log --auto-create-dir
+
+# Create a directory named /nginx in the /temp directory and automatically create directories that don't exist
+blade create file add --directory --filepath /temp/nginx --auto-create-dir
+`,
 		},
 	}
 }

@@ -59,12 +59,6 @@ func (*NetworkCommandSpec) LongDesc() string {
 	return "Network experiment"
 }
 
-func (*NetworkCommandSpec) Example() string {
-	return `network delay --interface eth0 --time 3000
-
-# You can execute "blade query network interface" command to query the interfaces`
-}
-
 // tcNetworkBin for network delay, loss, duplicate, reorder and corrupt experiments
 var tcNetworkBin = "chaos_tcnetwork"
 

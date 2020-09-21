@@ -42,6 +42,13 @@ func NewFileDeleteActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileRemoveActionExecutor{},
+			ActionExample:
+`# Delete the file /home/logs/nginx.log
+blade create file delete --filepath /home/logs/nginx.log
+
+# Force delete the file /home/logs/nginx.log unrecoverable
+blade create file delete --filepath /home/logs/nginx.log --force
+`,
 		},
 	}
 }

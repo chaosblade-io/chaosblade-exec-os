@@ -41,6 +41,9 @@ func NewCorruptActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &NetworkCorruptExecutor{},
+			ActionExample:
+`# Access to the specified IP request packet is corrupted, 80% of the time
+blade create network corrupt --percent 80 --destination-ip 180.101.49.12 --interface eth0`,
 		},
 	}
 }
@@ -57,7 +60,10 @@ func (*CorruptActionSpec) ShortDesc() string {
 	return "Corrupt experiment"
 }
 
-func (*CorruptActionSpec) LongDesc() string {
+func (c *CorruptActionSpec) LongDesc() string {
+	if c.ActionLongDesc != "" {
+		return c.ActionLongDesc
+	}
 	return "Corrupt experiment"
 }
 

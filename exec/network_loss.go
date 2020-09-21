@@ -41,6 +41,19 @@ func NewLossActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &NetworkLossExecutor{},
+			ActionExample:
+`# Access to native 8080 and 8081 ports lost 70% of packets
+blade create network loss --percent 70 --interface eth0 --local-port 8080,8081
+
+# The machine accesses external 14.215.177.39 machine (ping www.baidu.com) 80 port packet loss rate 100%
+blade create network loss --percent 100 --interface eth0 --remote-port 80 --destination-ip 14.215.177.39
+
+# Do 60% packet loss for the entire network card Eth0, excluding ports 22 and 8000 to 8080
+blade create network loss --percent 60 --interface eth0 --exclude-port 22,8000-8080
+
+# Realize the whole network card is not accessible, not accessible time 20 seconds. After executing the following command, the current network is disconnected and restored in 20 seconds. Remember!! Don't forget -timeout parameter
+blade create network loss --percent 100 --interface eth0 --timeout 20`,
+
 		},
 	}
 }
@@ -57,7 +70,10 @@ func (*LossActionSpec) ShortDesc() string {
 	return "Loss network package"
 }
 
-func (*LossActionSpec) LongDesc() string {
+func (l *LossActionSpec) LongDesc() string {
+	if l.ActionLongDesc != "" {
+		return l.ActionLongDesc
+	}
 	return "Loss network package"
 }
 

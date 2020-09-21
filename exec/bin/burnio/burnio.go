@@ -98,7 +98,7 @@ func startBurnIO(directory, size string, read, write bool) {
 
 // stop burn io,  no need to add os.Exit
 func stopBurnIO(directory string, read, write bool) {
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), channel.ExcludeProcessKey, "--stop")
 	if read {
 		// dd process
 		pids, _ := cl.GetPidsByProcessName(readFile, ctx)

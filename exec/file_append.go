@@ -60,6 +60,19 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileAppendActionExecutor{},
+			ActionExample:
+`# Appends the content "HELLO WORLD" to the /home/logs/nginx.log file
+blade create file append --filepath=/home/logs/nginx.log --content="HELL WORLD"
+
+# Appends the content "HELLO WORLD" to the /home/logs/nginx.log file, interval 10 seconds
+blade create file append --filepath=/home/logs/nginx.log --content="HELL WORLD" --interval 10
+
+# Appends the content "HELLO WORLD" to the /home/logs/nginx.log file, enable base64 encoding
+blade create file append --filepath=/home/logs/nginx.log --content=SEVMTE8gV09STEQ=
+
+# mock interface timeout exception
+blade create file append --filepath=/home/logs/nginx.log --content="@{DATE:+%Y-%m-%d %H:%M:%S} ERROR invoke getUser timeout [@{RANDOM:100-200}]ms abc  mock exception"
+`,
 		},
 	}
 }

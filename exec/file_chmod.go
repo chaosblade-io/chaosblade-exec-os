@@ -42,6 +42,10 @@ func NewFileChmodActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileChmodActionExecutor{},
+			ActionExample:
+`# Modify /home/logs/nginx.log file permissions to 777
+blade create file chmod --filepath /home/logs/nginx.log --mark=777
+`,
 		},
 	}
 }

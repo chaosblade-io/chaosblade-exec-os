@@ -51,10 +51,6 @@ func (*DiskCommandSpec) LongDesc() string {
 	return "Disk experiment contains fill disk or burn io"
 }
 
-func (*DiskCommandSpec) Example() string {
-	return "blade create disk fill --path /home --size 1000"
-}
-
 func checkDiskExpEnv() error {
 	commands := []string{"rm", "dd"}
 	for _, command := range commands {

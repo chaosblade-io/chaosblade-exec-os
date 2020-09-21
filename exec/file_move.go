@@ -52,6 +52,16 @@ func NewFileMoveActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileMoveActionExecutor{},
+			ActionExample:
+`# Move the file /home/logs/nginx.log to /tmp
+blade create file delete --filepath /home/logs/nginx.log --target /tmp
+
+# Force Move the file /home/logs/nginx.log to /temp
+blade create file delete --filepath /home/logs/nginx.log --target /tmp --force
+
+# Move the file /home/logs/nginx.log to /temp/ and automatically create directories that don't exist
+blade create file delete --filepath /home/logs/nginx.log --target /temp --auto-create-dir
+`,
 		},
 	}
 }

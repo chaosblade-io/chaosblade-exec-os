@@ -45,6 +45,9 @@ func NewDropActionSpec() spec.ExpActionCommandSpec {
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &NetworkDropExecutor{},
+			ActionExample:
+`# Experimental scenario of network shielding
+blade create network drop`,
 		},
 	}
 }
@@ -61,7 +64,10 @@ func (*DropActionSpec) ShortDesc() string {
 	return "Drop experiment"
 }
 
-func (*DropActionSpec) LongDesc() string {
+func (d *DropActionSpec) LongDesc() string {
+	if d.ActionLongDesc != "" {
+		return d.ActionLongDesc
+	}
 	return "Drop network data"
 }
 

@@ -47,7 +47,3 @@ func (*ProcessCommandModelSpec) ShortDesc() string {
 func (*ProcessCommandModelSpec) LongDesc() string {
 	return "Process experiment, for example, kill process"
 }
-
-func (*ProcessCommandModelSpec) Example() string {
-	return "blade create process kill --process tomcat"
-}

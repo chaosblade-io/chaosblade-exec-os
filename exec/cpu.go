@@ -37,11 +37,26 @@ func NewCpuCommandModelSpec() spec.ExpModelCommandSpec {
 	return &CpuCommandModelSpec{
 		spec.BaseExpModelCommandSpec{
 			ExpActions: []spec.ExpActionCommandSpec{
-				&fullLoadActionCommand{
+				&FullLoadActionCommand{
 					spec.BaseExpActionCommandSpec{
 						ActionMatchers: []spec.ExpFlagSpec{},
 						ActionFlags:    []spec.ExpFlagSpec{},
 						ActionExecutor: &cpuExecutor{},
+						ActionExample:
+`# Create a CPU full load experiment
+blade create cpu load
+
+#Specifies two random kernel's full load
+blade create cpu load --cpu-percent 60 --cpu-count 2
+
+# Specifies that the kernel is full load with index 0, 3, and that the kernel's index starts at 0
+blade create cpu load --cpu-list 0,3
+
+# Specify the kernel full load of indexes 1-3
+blade create cpu load --cpu-list 1-3
+
+# Specified percentage load
+blade create cpu load --cpu-percent 60`,
 					},
 				},
 			},
@@ -83,35 +98,34 @@ func (*CpuCommandModelSpec) LongDesc() string {
 	return "Cpu experiment, for example full load"
 }
 
-func (*CpuCommandModelSpec) Example() string {
-	return "blade create cpu load --cpu-percent 80 --climb-time 60"
-}
-
-type fullLoadActionCommand struct {
+type FullLoadActionCommand struct {
 	spec.BaseExpActionCommandSpec
 }
 
-func (*fullLoadActionCommand) Name() string {
+func (*FullLoadActionCommand) Name() string {
 	return "fullload"
 }
 
-func (*fullLoadActionCommand) Aliases() []string {
+func (*FullLoadActionCommand) Aliases() []string {
 	return []string{"fl", "load"}
 }
 
-func (*fullLoadActionCommand) ShortDesc() string {
+func (*FullLoadActionCommand) ShortDesc() string {
 	return "cpu load"
 }
 
-func (*fullLoadActionCommand) LongDesc() string {
-	return "cpu load"
+func (f *FullLoadActionCommand) LongDesc() string {
+	if f.ActionLongDesc != "" {
+		return f.ActionLongDesc
+	}
+	return "Create chaos engineering experiments with CPU load"
 }
 
-func (*fullLoadActionCommand) Matchers() []spec.ExpFlagSpec {
+func (*FullLoadActionCommand) Matchers() []spec.ExpFlagSpec {
 	return []spec.ExpFlagSpec{}
 }
 
-func (*fullLoadActionCommand) Flags() []spec.ExpFlagSpec {
+func (*FullLoadActionCommand) Flags() []spec.ExpFlagSpec {
 	return []spec.ExpFlagSpec{}
 }
 

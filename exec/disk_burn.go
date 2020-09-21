@@ -55,6 +55,15 @@ func NewBurnActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &BurnIOExecutor{},
+			ActionExample:
+`# The data of rkB/s, wkB/s and % Util were mainly observed. Perform disk read IO high-load scenarios
+blade create disk burn --read --path /home
+
+# Perform disk write IO high-load scenarios
+blade create disk burn --write --path /home
+
+# Read and write IO load scenarios are performed at the same time. Path is not specified. The default is /
+blade create disk burn --read --write`,
 		},
 	}
 }
@@ -70,7 +79,10 @@ func (*BurnActionSpec) ShortDesc() string {
 	return "Increase disk read and write io load"
 }
 
-func (*BurnActionSpec) LongDesc() string {
+func (b *BurnActionSpec) LongDesc() string {
+	if b.ActionLongDesc != "" {
+		return b.ActionLongDesc
+	}
 	return "Increase disk read and write io load"
 }
 

@@ -66,12 +66,6 @@ func (*ScriptCommandModelSpec) LongDesc() string {
 	return "Script chaos experiment"
 }
 
-func (*ScriptCommandModelSpec) Example() string {
-	return `blade create script delay --time 2000 --file xxx.sh --function-name start
-
-blade create script exit --file xxx.sh --function-name offline --exit-message "error" --exit-code 2`
-}
-
 const bakFileSuffix = "_chaosblade.bak"
 
 // backScript

@@ -31,8 +31,14 @@ func GetAllOsExecutors() map[string]spec.Executor {
 		for key, value := range executorMap {
 			executors[key] = value
 		}
+		expFlagSpecs := append(expModel.Flags(), GetSSHExpFlags()...)
+		expModel.SetFlags(expFlagSpecs)
 	}
 	return executors
+}
+
+func GetSHHExecutor() spec.Executor {
+	return exec.NewSSHExecutor()
 }
 
 // GetAllExpModels returns the experiment model specs in the project.
@@ -55,4 +61,11 @@ func ExtractExecutorFromExpModel(expModel spec.ExpModelCommandSpec) map[string]s
 		executors[expModel.Name()+actionModel.Name()] = actionModel.Executor()
 	}
 	return executors
+}
+
+func GetSSHExpFlags() []spec.ExpFlagSpec {
+	flags := []spec.ExpFlagSpec{
+		exec.ChannelFlag, exec.SSHHostFlag, exec.SSHPortFlag, exec.SSHUserFlag, exec.BladeRelease,
+	}
+	return flags
 }

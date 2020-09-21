@@ -17,6 +17,7 @@
 package main
 
 import (
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 	"log"
 	"os"
 
@@ -50,6 +51,8 @@ func getModels() *spec.Models {
 	}
 	specModels := make([]*spec.Models, 0)
 	for _, modeSpec := range modelCommandSpecs {
+		flagSpecs := append(modeSpec.Flags(), model.GetSSHExpFlags()...)
+		modeSpec.SetFlags(flagSpecs)
 		specModel := util.ConvertSpecToModels(modeSpec, spec.ExpPrepareModel{}, "host")
 		specModels = append(specModels, specModel)
 	}

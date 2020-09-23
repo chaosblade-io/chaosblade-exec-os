@@ -5,6 +5,7 @@ BLADE_SRC_ROOT=$(shell pwd)
 GO_ENV=CGO_ENABLED=1
 GO_MODULE=GO111MODULE=on
 GO=env $(GO_ENV) $(GO_MODULE) go
+GO_FLAGS=-ldflags="-s -w"
 
 UNAME := $(shell uname)
 
@@ -24,7 +25,7 @@ OS_YAML_FILE_NAME=chaosblade-os-spec-$(BLADE_VERSION).yaml
 OS_YAML_FILE_PATH=$(BUILD_TARGET_BIN)/$(OS_YAML_FILE_NAME)
 
 ifeq ($(GOOS), linux)
-	GO_FLAGS=-ldflags="-linkmode external -extldflags -static"
+	GO_FLAGS=-ldflags="-linkmode external -extldflags -static -s -w"
 endif
 
 
@@ -41,8 +42,10 @@ build_yaml: build/spec.go
 	$(GO) run $< $(OS_YAML_FILE_PATH)
 
 build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile
+	upx -1 $(BUILD_TARGET_BIN)/chaos_*
 
 build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile
+	upx -1 $(BUILD_TARGET_BIN)/chaos_*
 
 # build burn-cpu chaos tools
 build_burncpu: exec/bin/burncpu/burncpu.go

@@ -12,4 +12,5 @@ require (
 	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect
 	github.com/sirupsen/logrus v1.5.0
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
+	github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c
 )

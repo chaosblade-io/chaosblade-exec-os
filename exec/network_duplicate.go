@@ -41,9 +41,10 @@ func NewDuplicateActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &NetworkDuplicateExecutor{},
-			ActionExample:
-`# Specify the network card eth0 and repeat the packet by 10%
+			ActionExample: `
+# Specify the network card eth0 and repeat the packet by 10%
 blade create network duplicate --percent=10 --interface=eth0`,
+			ActionPrograms: []string{TcNetworkBin},
 		},
 	}
 }
@@ -112,11 +113,11 @@ func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, e
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}
-	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), tcNetworkBin), args)
+	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), TcNetworkBin), args)
 }
 
 func (de *NetworkDuplicateExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), tcNetworkBin),
+	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), TcNetworkBin),
 		fmt.Sprintf("--stop --type duplicate --interface %s --debug=%t", netInterface, util.Debug))
 }
 

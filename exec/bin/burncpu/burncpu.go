@@ -34,13 +34,14 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/process"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var (
 	burnCpuStart, burnCpuStop, burnCpuNohup bool
-	cpuCount, cpuPercent, climbTime				   int
-	slopePercent 											float64
+	cpuCount, cpuPercent, climbTime         int
+	slopePercent                            float64
 	cpuList                                 string
 	cpuProcessor                            string
 )
@@ -176,7 +177,7 @@ func burnCpu() {
 	}
 }
 
-var burnCpuBin = "chaos_burncpu"
+var burnCpuBin = exec.BurnCpuBin
 
 var cl = channel.NewLocalChannel()
 

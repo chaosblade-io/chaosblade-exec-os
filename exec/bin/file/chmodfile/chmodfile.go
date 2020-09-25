@@ -20,13 +20,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var mark, filepath string

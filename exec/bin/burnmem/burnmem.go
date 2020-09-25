@@ -35,11 +35,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 const PageCounterMax uint64 = 9223372036854770000
-
 
 // 128K
 type Block [32 * 1024]int32
@@ -149,7 +149,7 @@ func burnMemWithCache() {
 	}
 }
 
-var burnMemBin = "chaos_burnmem"
+var burnMemBin = exec.BurnMemBin
 
 var cl = channel.NewLocalChannel()
 

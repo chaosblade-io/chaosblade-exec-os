@@ -27,6 +27,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
+const BurnMemBin = "chaos_burnmem"
+
 type MemCommandModelSpec struct {
 	spec.BaseExpModelCommandSpec
 }
@@ -40,8 +42,8 @@ func NewMemCommandModelSpec() spec.ExpModelCommandSpec {
 						ActionMatchers: []spec.ExpFlagSpec{},
 						ActionFlags:    []spec.ExpFlagSpec{},
 						ActionExecutor: &memExecutor{},
-						ActionExample:
-`# The execution memory footprint is 50%
+						ActionExample: `
+# The execution memory footprint is 50%
 blade create mem load --mode ram --mem-percent 50
 
 # The execution memory footprint is 50%, cache model
@@ -55,6 +57,7 @@ blade create mem load --mode ram --mem-percent 50 --timeout 200
 
 # 200M memory is reserved
 blade create mem load --mode ram --reserve 200 --rate 100`,
+						ActionPrograms: []string{BurnMemBin},
 					},
 				},
 			},
@@ -197,8 +200,6 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, includeBufferCache)
 }
 
-const burnMemBin = "chaos_burnmem"
-
 // start burn mem
 func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) *spec.Response {
 	args := fmt.Sprintf("--start --mem-percent %d --reserve %d --debug=%t", memPercent, memReserve, util.Debug)
@@ -211,7 +212,7 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 	if includeBufferCache {
 		args = fmt.Sprintf("%s --include-buffer-cache=%t", args, includeBufferCache)
 	}
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), args)
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), BurnMemBin), args)
 }
 
 // stop burn mem
@@ -220,7 +221,7 @@ func (ce *memExecutor) stop(ctx context.Context, burnMemMode string) *spec.Respo
 	if burnMemMode != "" {
 		args = fmt.Sprintf("%s --mode %s", args, burnMemMode)
 	}
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnMemBin), args)
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), BurnMemBin), args)
 }
 
 func checkMemoryExpEnv() error {

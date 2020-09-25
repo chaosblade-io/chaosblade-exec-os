@@ -50,13 +50,13 @@ func NewOccupyActionSpec() spec.ExpActionCommandSpec {
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &OccupyActionExecutor{},
-			ActionExample:
-`#Specify port 8080 occupancy
+			ActionExample: `
+#Specify port 8080 occupancy
 blade c network occupy --port 8080 --force
 
 # The machine accesses external 14.215.177.39 machine (ping www.baidu.com) 80 port packet loss rate 100%
 blade create network loss --percent 100 --interface eth0 --remote-port 80 --destination-ip 14.215.177.39`,
-
+			ActionPrograms: []string{TcNetworkBin},
 		},
 	}
 }

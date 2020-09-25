@@ -32,6 +32,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/sirupsen/logrus"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
@@ -127,7 +128,7 @@ func startFill(directory, size, percent, reserve string, retainHandle bool) (err
 	return fmt.Errorf(response.Err), ""
 }
 
-var fillDiskBin = "chaos_filldisk"
+var fillDiskBin = exec.FillDiskBin
 
 func startRetainProcess(ctx context.Context, directory string) *spec.Response {
 	logFile, err := util.GetLogFile(util.Bin)

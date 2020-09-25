@@ -19,11 +19,14 @@ package exec
 import (
 	"context"
 	"fmt"
+	"path"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"path"
 )
+
+const AddFileBin = "chaos_addfile"
 
 type FileAddActionSpec struct {
 	spec.BaseExpActionCommandSpec
@@ -55,8 +58,8 @@ func NewFileAddActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileAddActionExecutor{},
-			ActionExample:
-`# Create a file named nginx.log in the /home directory
+			ActionExample: `
+# Create a file named nginx.log in the /home directory
 blade create file add --filepath /home/nginx.log
 
 # Create a file named nginx.log in the /home directory with the contents of HELLO WORLD
@@ -68,6 +71,7 @@ blade create file add --filepath /temp/nginx.log --auto-create-dir
 # Create a directory named /nginx in the /temp directory and automatically create directories that don't exist
 blade create file add --directory --filepath /temp/nginx --auto-create-dir
 `,
+			ActionPrograms: []string{AddFileBin},
 		},
 	}
 }
@@ -95,8 +99,6 @@ type FileAddActionExecutor struct {
 func (*FileAddActionExecutor) Name() string {
 	return "add"
 }
-
-var addFileBin = "chaos_addfile"
 
 func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkAddFileExpEnv()
@@ -137,11 +139,11 @@ func (f *FileAddActionExecutor) start(filepath, content string, directory, enabl
 	if autoCreateDir {
 		flags = fmt.Sprintf(`%s --auto-create-dir=true`, flags)
 	}
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), addFileBin), flags)
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), AddFileBin), flags)
 }
 
 func (f *FileAddActionExecutor) stop(filepath string, ctx context.Context) *spec.Response {
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), addFileBin),
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), AddFileBin),
 		fmt.Sprintf(`--stop --filepath %s --debug=%t`, filepath, util.Debug))
 }
 

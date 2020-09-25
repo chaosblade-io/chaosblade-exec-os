@@ -19,12 +19,15 @@ package exec
 import (
 	"context"
 	"fmt"
+	"path"
+	"regexp"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"path"
-	"regexp"
 )
+
+const ChmodFileBin = "chaos_chmodfile"
 
 type FileChmodActionSpec struct {
 	spec.BaseExpActionCommandSpec
@@ -42,10 +45,11 @@ func NewFileChmodActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileChmodActionExecutor{},
-			ActionExample:
-`# Modify /home/logs/nginx.log file permissions to 777
+			ActionExample: `
+# Modify /home/logs/nginx.log file permissions to 777
 blade create file chmod --filepath /home/logs/nginx.log --mark=777
 `,
+			ActionPrograms: []string{ChmodFileBin},
 		},
 	}
 }
@@ -73,8 +77,6 @@ type FileChmodActionExecutor struct {
 func (*FileChmodActionExecutor) Name() string {
 	return "chmod"
 }
-
-var chmodFileBin = "chaos_chmodfile"
 
 func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkChmodFileExpEnv()
@@ -108,11 +110,11 @@ func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *s
 
 func (f *FileChmodActionExecutor) start(filepath string, mark string, ctx context.Context) *spec.Response {
 	flags := fmt.Sprintf(`--start --filepath "%s" --mark %s --debug=%t`, filepath, mark, util.Debug)
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), chmodFileBin), flags)
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), ChmodFileBin), flags)
 }
 
 func (f *FileChmodActionExecutor) stop(filepath string, ctx context.Context) *spec.Response {
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), chmodFileBin),
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), ChmodFileBin),
 		fmt.Sprintf(`--stop --filepath "%s" --debug=%t`, filepath, util.Debug))
 }
 

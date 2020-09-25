@@ -25,6 +25,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
+const StopProcessBin = "chaos_stopprocess"
+
 type StopProcessActionCommandSpec struct {
 	spec.BaseExpActionCommandSpec
 }
@@ -44,12 +46,13 @@ func NewStopProcessActionCommandSpec() spec.ExpActionCommandSpec {
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &StopProcessExecutor{},
-			ActionExample:
-`# Pause the process that contains the "SimpleHTTPServer" keyword
+			ActionExample: `
+# Pause the process that contains the "SimpleHTTPServer" keyword
 blade create process stop --process SimpleHTTPServer
 
 # Pause the Java process
 blade create process stop --process-cmd java`,
+			ActionPrograms: []string{StopProcessBin},
 		},
 	}
 }
@@ -81,8 +84,6 @@ func (spe *StopProcessExecutor) Name() string {
 	return "stop"
 }
 
-var stopProcessBin = "chaos_stopprocess"
-
 func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if spe.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
@@ -109,13 +110,13 @@ func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 func (spe *StopProcessExecutor) stopProcess(flags string, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --debug=%t", util.Debug)
 	flags = fmt.Sprintf("%s %s", args, flags)
-	return spe.channel.Run(ctx, path.Join(spe.channel.GetScriptPath(), stopProcessBin), flags)
+	return spe.channel.Run(ctx, path.Join(spe.channel.GetScriptPath(), StopProcessBin), flags)
 }
 
 func (spe *StopProcessExecutor) recoverProcess(flags string, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--stop --debug=%t", util.Debug)
 	flags = fmt.Sprintf("%s %s", args, flags)
-	return spe.channel.Run(ctx, path.Join(spe.channel.GetScriptPath(), stopProcessBin), flags)
+	return spe.channel.Run(ctx, path.Join(spe.channel.GetScriptPath(), StopProcessBin), flags)
 }
 
 func (spe *StopProcessExecutor) SetChannel(channel spec.Channel) {

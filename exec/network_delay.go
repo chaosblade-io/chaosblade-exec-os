@@ -45,8 +45,8 @@ func NewDelayActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &NetworkDelayExecutor{},
-			ActionExample:
-`# Access to native 8080 and 8081 ports is delayed by 3 seconds, and the delay time fluctuates by 1 second
+			ActionExample: `
+# Access to native 8080 and 8081 ports is delayed by 3 seconds, and the delay time fluctuates by 1 second
 blade create network delay --time 3000 --offset 1000 --interface eth0 --local-port 8080,8081
 
 # Local access to external 14.215.177.39 machine (ping www.baidu.com obtained IP) port 80 delay of 3 seconds
@@ -54,6 +54,7 @@ blade create network delay --time 3000 --interface eth0 --remote-port 80 --desti
 
 # Do a 5 second delay for the entire network card eth0, excluding ports 22 and 8000 to 8080
 blade create network delay --time 5000 --interface eth0 --exclude-port 22,8000-8080`,
+			ActionPrograms: []string{TcNetworkBin},
 		},
 	}
 }
@@ -126,11 +127,11 @@ func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}
-	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), tcNetworkBin), args)
+	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), TcNetworkBin), args)
 }
 
 func (de *NetworkDelayExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), tcNetworkBin),
+	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), TcNetworkBin),
 		fmt.Sprintf("--stop --type delay --interface %s --debug=%t", netInterface, util.Debug))
 }
 

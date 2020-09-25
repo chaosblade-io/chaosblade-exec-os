@@ -57,9 +57,9 @@ func NewReorderActionSpec() spec.ExpActionCommandSpec {
 			},
 			ActionExecutor: &NetworkReorderExecutor{},
 			ActionExample:
-`# Access the specified IP request packet disorder
+			`# Access the specified IP request packet disorder
 blade c network reorder --correlation 80 --percent 50 --gap 2 --time 500 --interface eth0 --destination-ip 180.101.49.12`,
-
+			ActionPrograms: []string{TcNetworkBin},
 		},
 	}
 }
@@ -142,11 +142,11 @@ func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, exc
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), tcNetworkBin), args)
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), TcNetworkBin), args)
 }
 
 func (ce *NetworkReorderExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), tcNetworkBin),
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), TcNetworkBin),
 		fmt.Sprintf("--stop --type reorder --interface %s --debug=%t", netInterface, util.Debug))
 }
 

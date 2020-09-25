@@ -21,11 +21,13 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
+	"path"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"path"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var filepath, content string

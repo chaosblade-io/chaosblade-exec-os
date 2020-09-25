@@ -26,6 +26,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
+const DropNetworkBin = "chaos_dropnetwork"
+
 type DropActionSpec struct {
 	spec.BaseExpActionCommandSpec
 }
@@ -45,9 +47,10 @@ func NewDropActionSpec() spec.ExpActionCommandSpec {
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &NetworkDropExecutor{},
-			ActionExample:
-`# Experimental scenario of network shielding
+			ActionExample: `
+# Experimental scenario of network shielding
 blade create network drop`,
+			ActionPrograms: []string{DropNetworkBin},
 		},
 	}
 }
@@ -79,8 +82,6 @@ func (*NetworkDropExecutor) Name() string {
 	return "drop"
 }
 
-var dropNetworkBin = "chaos_dropnetwork"
-
 func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkNetworkDropExpEnv()
 	if err != nil {
@@ -106,7 +107,7 @@ func (ne *NetworkDropExecutor) start(localPort, remotePort string, ctx context.C
 	if remotePort != "" {
 		args = fmt.Sprintf("%s --remote-port %s", args, remotePort)
 	}
-	return ne.channel.Run(ctx, path.Join(ne.channel.GetScriptPath(), dropNetworkBin), args)
+	return ne.channel.Run(ctx, path.Join(ne.channel.GetScriptPath(), DropNetworkBin), args)
 }
 
 func (ne *NetworkDropExecutor) stop(localPort, remotePort string, ctx context.Context) *spec.Response {
@@ -117,7 +118,7 @@ func (ne *NetworkDropExecutor) stop(localPort, remotePort string, ctx context.Co
 	if remotePort != "" {
 		args = fmt.Sprintf("%s --remote-port %s", args, remotePort)
 	}
-	return ne.channel.Run(ctx, path.Join(ne.channel.GetScriptPath(), dropNetworkBin), args)
+	return ne.channel.Run(ctx, path.Join(ne.channel.GetScriptPath(), DropNetworkBin), args)
 }
 
 func (ne *NetworkDropExecutor) SetChannel(channel spec.Channel) {

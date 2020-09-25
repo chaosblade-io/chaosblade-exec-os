@@ -19,12 +19,15 @@ package exec
 import (
 	"context"
 	"fmt"
+	"path"
+	"strconv"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"path"
-	"strconv"
 )
+
+const AppendFileBin = "chaos_appendfile"
 
 type FileAppendActionSpec struct {
 	spec.BaseExpActionCommandSpec
@@ -45,8 +48,8 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 					Desc: "the number of append count, default 1",
 				},
 				&spec.ExpFlag{
-					Name:   "interval",
-					Desc:   "append interval, default 1s",
+					Name: "interval",
+					Desc: "append interval, default 1s",
 				},
 				&spec.ExpFlag{
 					Name:   "escape",
@@ -60,8 +63,8 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileAppendActionExecutor{},
-			ActionExample:
-`# Appends the content "HELLO WORLD" to the /home/logs/nginx.log file
+			ActionExample: `
+# Appends the content "HELLO WORLD" to the /home/logs/nginx.log file
 blade create file append --filepath=/home/logs/nginx.log --content="HELL WORLD"
 
 # Appends the content "HELLO WORLD" to the /home/logs/nginx.log file, interval 10 seconds
@@ -73,6 +76,7 @@ blade create file append --filepath=/home/logs/nginx.log --content=SEVMTE8gV09ST
 # mock interface timeout exception
 blade create file append --filepath=/home/logs/nginx.log --content="@{DATE:+%Y-%m-%d %H:%M:%S} ERROR invoke getUser timeout [@{RANDOM:100-200}]ms abc  mock exception"
 `,
+			ActionPrograms: []string{AppendFileBin},
 		},
 	}
 }
@@ -100,8 +104,6 @@ type FileAppendActionExecutor struct {
 func (*FileAppendActionExecutor) Name() string {
 	return "append"
 }
-
-var appeneFileBin = "chaos_appendfile"
 
 func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkAppendFileExpEnv()
@@ -160,11 +162,11 @@ func (f *FileAppendActionExecutor) start(filepath string, content string, count 
 	if enableBase64 {
 		flags = fmt.Sprintf("%s --enable-base64=true", flags)
 	}
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), appeneFileBin), flags)
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), AppendFileBin), flags)
 }
 
 func (f *FileAppendActionExecutor) stop(filepath string, ctx context.Context) *spec.Response {
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), appeneFileBin),
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), AppendFileBin),
 		fmt.Sprintf(`--stop --filepath %s --debug=%t`, filepath, util.Debug))
 }
 

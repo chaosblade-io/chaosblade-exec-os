@@ -21,10 +21,6 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -34,6 +30,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var content, filepath string
@@ -83,7 +86,7 @@ func main() {
 }
 
 var cl = channel.NewLocalChannel()
-var appendFileBin = "chaos_appendfile"
+var appendFileBin = exec.AppendFileBin
 
 func startAppendFile(filepath, content string, count int, interval int, escape bool, enableBase64 bool) {
 	// check pid
@@ -178,7 +181,7 @@ func parseRandom(content string) string {
 		if end <= begin {
 			bin.PrintErrAndExit(fmt.Sprintf("run append file %s failed, begin must < end", text[1]))
 		}
-		content = strings.Replace(content, text[0], strconv.Itoa(rand.Intn(end - begin) + begin), 1)
+		content = strings.Replace(content, text[0], strconv.Itoa(rand.Intn(end-begin)+begin), 1)
 	}
 	return content
 }

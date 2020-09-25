@@ -29,6 +29,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
@@ -84,7 +85,7 @@ func Test_runBurnCpu_failed(t *testing.T) {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
 		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found")
 	}
-	burnBin := path.Join(util.GetProgramPath(), "chaos_burncpu")
+	burnBin := path.Join(util.GetProgramPath(), exec.BurnCpuBin)
 	expectedCommands := []string{fmt.Sprintf(`nohup %s --nohup --cpu-count 2 > /dev/null 2>&1 &`, burnBin)}
 
 	runBurnCpu(context.Background(), as.cpuCount, as.pidNeeded, as.processor)

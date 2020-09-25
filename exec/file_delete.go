@@ -19,12 +19,15 @@ package exec
 import (
 	"context"
 	"fmt"
+	"path"
+	"strings"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"path"
-	"strings"
 )
+
+const DeleteFileBin = "chaos_deletefile"
 
 type FileDeleteActionSpec struct {
 	spec.BaseExpActionCommandSpec
@@ -42,13 +45,14 @@ func NewFileDeleteActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileRemoveActionExecutor{},
-			ActionExample:
-`# Delete the file /home/logs/nginx.log
+			ActionExample: `
+# Delete the file /home/logs/nginx.log
 blade create file delete --filepath /home/logs/nginx.log
 
 # Force delete the file /home/logs/nginx.log unrecoverable
 blade create file delete --filepath /home/logs/nginx.log --force
 `,
+			ActionPrograms: []string{DeleteFileBin},
 		},
 	}
 }
@@ -76,8 +80,6 @@ type FileRemoveActionExecutor struct {
 func (*FileRemoveActionExecutor) Name() string {
 	return "remove"
 }
-
-var deleteFileBin = "chaos_deletefile"
 
 func (f *FileRemoveActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkRemoveFileExpEnv()
@@ -109,7 +111,7 @@ func (f *FileRemoveActionExecutor) start(filepath string, force bool, ctx contex
 	if force {
 		flags = fmt.Sprintf(`%s --force=true`, flags)
 	}
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), deleteFileBin), flags)
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), DeleteFileBin), flags)
 }
 
 func (f *FileRemoveActionExecutor) stop(filepath string, force bool, ctx context.Context) *spec.Response {
@@ -119,7 +121,7 @@ func (f *FileRemoveActionExecutor) stop(filepath string, force bool, ctx context
 	if force {
 		flags = fmt.Sprintf(`%s --force=true`, flags)
 	}
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), deleteFileBin), flags)
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), DeleteFileBin), flags)
 }
 
 func (f *FileRemoveActionExecutor) SetChannel(channel spec.Channel) {

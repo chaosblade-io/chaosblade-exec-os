@@ -41,10 +41,9 @@ func NewScriptDelayActionCommand() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &ScriptDelayExecutor{},
-			ActionExample:
-`# Add commands to the script "start0() { sleep 10.000000 ...}"
+			ActionExample: `
+# Add commands to the script "start0() { sleep 10.000000 ...}"
 blade create script delay --time 10000 --file test.sh --function-name start0`,
-
 		},
 	}
 }

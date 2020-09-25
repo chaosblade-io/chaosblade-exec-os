@@ -17,11 +17,9 @@
 package exec
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +28,9 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/version"
+
+	"github.com/howeyc/gopass"
+
 )
 
 const (
@@ -90,9 +91,11 @@ func (e *SSHExecutor) SetChannel(channel spec.Channel) {
 }
 
 func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpModel) *spec.Response {
-	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Please enter password:")
-	password, _ := reader.ReadString('\n')
+	password, err := gopass.GetPasswd()
+	if err != nil {
+		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+	}
 
 	port := DefaultSSHPort
 	portStr := expModel.ActionFlags[SSHPortFlag.Name]
@@ -107,7 +110,7 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 	client := &SSHClient{
 		Host:     expModel.ActionFlags[SSHHostFlag.Name],
 		Username: expModel.ActionFlags[SSHUserFlag.Name],
-		Password: strings.Replace(password, "\n", "", -1),
+		Password: strings.Replace(string(password), "\n", "", -1),
 		Port:     port,
 	}
 

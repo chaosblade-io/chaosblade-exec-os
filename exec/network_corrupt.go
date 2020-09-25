@@ -41,9 +41,10 @@ func NewCorruptActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &NetworkCorruptExecutor{},
-			ActionExample:
-`# Access to the specified IP request packet is corrupted, 80% of the time
+			ActionExample: `
+# Access to the specified IP request packet is corrupted, 80% of the time
 blade create network corrupt --percent 80 --destination-ip 180.101.49.12 --interface eth0`,
+			ActionPrograms: []string{TcNetworkBin},
 		},
 	}
 }
@@ -112,11 +113,11 @@ func (ce *NetworkCorruptExecutor) start(netInterface, localPort, remotePort, exc
 	if err != nil {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
 	}
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), tcNetworkBin), args)
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), TcNetworkBin), args)
 }
 
 func (ce *NetworkCorruptExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), tcNetworkBin),
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), TcNetworkBin),
 		fmt.Sprintf("--stop --type corrupt --interface %s --debug=%t", netInterface, util.Debug))
 }
 

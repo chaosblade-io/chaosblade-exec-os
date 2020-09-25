@@ -25,6 +25,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
+const BurnIOBin = "chaos_burnio"
+
 type BurnActionSpec struct {
 	spec.BaseExpActionCommandSpec
 }
@@ -55,8 +57,8 @@ func NewBurnActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &BurnIOExecutor{},
-			ActionExample:
-`# The data of rkB/s, wkB/s and % Util were mainly observed. Perform disk read IO high-load scenarios
+			ActionExample: `
+# The data of rkB/s, wkB/s and % Util were mainly observed. Perform disk read IO high-load scenarios
 blade create disk burn --read --path /home
 
 # Perform disk write IO high-load scenarios
@@ -64,6 +66,7 @@ blade create disk burn --write --path /home
 
 # Read and write IO load scenarios are performed at the same time. Path is not specified. The default is /
 blade create disk burn --read --write`,
+			ActionPrograms: []string{BurnIOBin},
 		},
 	}
 }
@@ -93,8 +96,6 @@ type BurnIOExecutor struct {
 func (*BurnIOExecutor) Name() string {
 	return "burn"
 }
-
-var burnIOBin = "chaos_burnio"
 
 func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkDiskExpEnv()
@@ -136,12 +137,12 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 }
 
 func (be *BurnIOExecutor) start(ctx context.Context, read, write bool, directory, size string) *spec.Response {
-	return be.channel.Run(ctx, path.Join(be.channel.GetScriptPath(), burnIOBin),
+	return be.channel.Run(ctx, path.Join(be.channel.GetScriptPath(), BurnIOBin),
 		fmt.Sprintf("--read=%t --write=%t --directory %s --size %s --start --debug=%t", read, write, directory, size, util.Debug))
 }
 
 func (be *BurnIOExecutor) stop(ctx context.Context, read, write bool, directory string) *spec.Response {
-	return be.channel.Run(ctx, path.Join(be.channel.GetScriptPath(), burnIOBin),
+	return be.channel.Run(ctx, path.Join(be.channel.GetScriptPath(), BurnIOBin),
 		fmt.Sprintf("--read=%t --write=%t --directory %s --stop --debug=%t", read, write, directory, util.Debug))
 }
 

@@ -19,15 +19,18 @@ package exec
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/version"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"golang.org/x/crypto/ssh"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"golang.org/x/crypto/ssh"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/version"
+
 	"github.com/howeyc/gopass"
+
 )
 
 const (

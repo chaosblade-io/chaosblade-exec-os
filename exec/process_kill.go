@@ -26,6 +26,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
+const KillProcessBin = "chaos_killprocess"
+
 type KillProcessActionCommandSpec struct {
 	spec.BaseExpActionCommandSpec
 }
@@ -70,7 +72,7 @@ blade create process kill --process-cmd java
 
 # Specifies the semaphore and local port to kill the process
 blade c process kill --local-port 8080 --signal 15`,
-
+			ActionPrograms: []string{KillProcessBin},
 		},
 	}
 }
@@ -101,8 +103,6 @@ type KillProcessExecutor struct {
 func (kpe *KillProcessExecutor) Name() string {
 	return "kill"
 }
-
-var killProcessBin = "chaos_killprocess"
 
 func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if kpe.channel == nil {
@@ -141,7 +141,7 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	if excludeProcess != "" {
 		flags = fmt.Sprintf(`%s --exclude-process %s`, flags, excludeProcess)
 	}
-	return kpe.channel.Run(ctx, path.Join(kpe.channel.GetScriptPath(), killProcessBin), flags)
+	return kpe.channel.Run(ctx, path.Join(kpe.channel.GetScriptPath(), KillProcessBin), flags)
 }
 
 func (kpe *KillProcessExecutor) SetChannel(channel spec.Channel) {

@@ -59,8 +59,8 @@ func (*NetworkCommandSpec) LongDesc() string {
 	return "Network experiment"
 }
 
-// tcNetworkBin for network delay, loss, duplicate, reorder and corrupt experiments
-var tcNetworkBin = "chaos_tcnetwork"
+// TcNetworkBin for network delay, loss, duplicate, reorder and corrupt experiments
+const TcNetworkBin = "chaos_tcnetwork"
 
 var commFlags = []spec.ExpFlagSpec{
 	&spec.ExpFlag{

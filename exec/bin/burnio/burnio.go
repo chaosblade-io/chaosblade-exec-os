@@ -27,6 +27,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
@@ -64,7 +65,7 @@ func main() {
 
 var readFile = "chaos_burnio.read"
 var writeFile = "chaos_burnio.write"
-var burnIOBin = "chaos_burnio"
+var burnIOBin = exec.BurnIOBin
 var logFile = util.GetNohupOutput(util.Bin, "chaos_burnio.log")
 
 var cl = channel.NewLocalChannel()

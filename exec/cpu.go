@@ -29,6 +29,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
+const BurnCpuBin = "chaos_burncpu"
+
 type CpuCommandModelSpec struct {
 	spec.BaseExpModelCommandSpec
 }
@@ -42,8 +44,8 @@ func NewCpuCommandModelSpec() spec.ExpModelCommandSpec {
 						ActionMatchers: []spec.ExpFlagSpec{},
 						ActionFlags:    []spec.ExpFlagSpec{},
 						ActionExecutor: &cpuExecutor{},
-						ActionExample:
-`# Create a CPU full load experiment
+						ActionExample: `
+# Create a CPU full load experiment
 blade create cpu load
 
 #Specifies two random kernel's full load
@@ -57,6 +59,7 @@ blade create cpu load --cpu-list 1-3
 
 # Specified percentage load
 blade create cpu load --cpu-percent 60`,
+						ActionPrograms: []string{BurnCpuBin},
 					},
 				},
 			},
@@ -214,19 +217,17 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	return ce.start(ctx, cpuList, cpuCount, cpuPercent, climbTime)
 }
 
-const burnCpuBin = "chaos_burncpu"
-
 // start burn cpu
 func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, cpuPercent int, climbTime int) *spec.Response {
 	args := fmt.Sprintf("--start --climb-time %d --cpu-count %d --cpu-percent %d --debug=%t", climbTime, cpuCount, cpuPercent, util.Debug)
 	if cpuList != "" {
 		args = fmt.Sprintf("%s --cpu-list %s", args, cpuList)
 	}
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnCpuBin), args)
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), BurnCpuBin), args)
 }
 
 // stop burn cpu
 func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
-	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), burnCpuBin),
+	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), BurnCpuBin),
 		fmt.Sprintf("--stop --debug=%t", util.Debug))
 }

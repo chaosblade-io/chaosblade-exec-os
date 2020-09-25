@@ -26,6 +26,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
+const FillDiskBin = "chaos_filldisk"
+
 type FillActionSpec struct {
 	spec.BaseExpActionCommandSpec
 }
@@ -59,8 +61,8 @@ func NewFillActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FillActionExecutor{},
-			ActionExample:
-`# Perform a disk fill of 40G to achieve a full disk (34G available)
+			ActionExample: `
+# Perform a disk fill of 40G to achieve a full disk (34G available)
 blade create disk fill --path /home --size 40000
 
 # Performs populating the disk by percentage, and retains the file handle that populates the disk
@@ -68,6 +70,7 @@ Command: "blade c disk fill --path /home --percent 80 --retain-handle
 
 # Perform a fixed-size experimental scenario
 blade c disk fill --path /home --reserve 1024`,
+			ActionPrograms: []string{FillDiskBin},
 		},
 	}
 }
@@ -98,8 +101,6 @@ type FillActionExecutor struct {
 func (*FillActionExecutor) Name() string {
 	return "fill"
 }
-
-var fillDiskBin = "chaos_filldisk"
 
 func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if fae.channel == nil {
@@ -155,11 +156,11 @@ func (fae *FillActionExecutor) start(directory, size, percent, reserve string, r
 	} else {
 		flags = fmt.Sprintf("%s --size %s", flags, size)
 	}
-	return fae.channel.Run(ctx, path.Join(fae.channel.GetScriptPath(), fillDiskBin), flags)
+	return fae.channel.Run(ctx, path.Join(fae.channel.GetScriptPath(), FillDiskBin), flags)
 }
 
 func (fae *FillActionExecutor) stop(directory string, ctx context.Context) *spec.Response {
-	return fae.channel.Run(ctx, path.Join(fae.channel.GetScriptPath(), fillDiskBin),
+	return fae.channel.Run(ctx, path.Join(fae.channel.GetScriptPath(), FillDiskBin),
 		fmt.Sprintf("--directory %s --stop --debug=%t", directory, util.Debug))
 }
 

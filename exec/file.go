@@ -58,4 +58,3 @@ func (*FileCommandSpec) ShortDesc() string {
 func (*FileCommandSpec) LongDesc() string {
 	return "File experiment contains file content append, permission modification so on"
 }
-

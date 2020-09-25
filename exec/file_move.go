@@ -19,12 +19,15 @@ package exec
 import (
 	"context"
 	"fmt"
+	"path"
+	"strings"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"path"
-	"strings"
 )
+
+const MoveFileBin = "chaos_movefile"
 
 type FileMoveActionSpec struct {
 	spec.BaseExpActionCommandSpec
@@ -52,8 +55,8 @@ func NewFileMoveActionSpec() spec.ExpActionCommandSpec {
 				},
 			},
 			ActionExecutor: &FileMoveActionExecutor{},
-			ActionExample:
-`# Move the file /home/logs/nginx.log to /tmp
+			ActionExample: `
+# Move the file /home/logs/nginx.log to /tmp
 blade create file delete --filepath /home/logs/nginx.log --target /tmp
 
 # Force Move the file /home/logs/nginx.log to /temp
@@ -62,6 +65,7 @@ blade create file delete --filepath /home/logs/nginx.log --target /tmp --force
 # Move the file /home/logs/nginx.log to /temp/ and automatically create directories that don't exist
 blade create file delete --filepath /home/logs/nginx.log --target /temp --auto-create-dir
 `,
+			ActionPrograms: []string{MoveFileBin},
 		},
 	}
 }
@@ -90,8 +94,6 @@ func (*FileMoveActionExecutor) Name() string {
 	return "chmod"
 }
 
-var moveFileBin = "chaos_movefile"
-
 func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkMoveFileExpEnv()
 	if err != nil {
@@ -118,8 +120,8 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	autoCreateDir := model.ActionFlags["auto-create-dir"] == "true"
 
 	if !force {
-		targetFile := path.Join(target, "/" , path.Base(filepath))
-		if util.IsExist(targetFile){
+		targetFile := path.Join(target, "/", path.Base(filepath))
+		if util.IsExist(targetFile) {
 			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
 				fmt.Sprintf("the [%s] target file is exist", targetFile))
 		}
@@ -135,7 +137,7 @@ func (f *FileMoveActionExecutor) start(filepath, target string, force, autoCreat
 	if autoCreateDir {
 		flags = fmt.Sprintf(`%s --auto-create-dir=true`, flags)
 	}
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), moveFileBin), flags)
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), MoveFileBin), flags)
 }
 
 func (f *FileMoveActionExecutor) stop(filepath, target string, ctx context.Context) *spec.Response {
@@ -144,7 +146,7 @@ func (f *FileMoveActionExecutor) stop(filepath, target string, ctx context.Conte
 	target = strings.TrimPrefix(target, "'")
 	target = strings.TrimSuffix(target, "'")
 	flags := fmt.Sprintf(`--stop --filepath "%s" --target "%s" --debug=%t`, filepath, target, util.Debug)
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), moveFileBin), flags)
+	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), MoveFileBin), flags)
 }
 
 func (f *FileMoveActionExecutor) SetChannel(channel spec.Channel) {

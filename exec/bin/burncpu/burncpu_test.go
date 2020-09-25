@@ -27,6 +27,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
@@ -43,7 +44,7 @@ func Test_startBurnCpu(t *testing.T) {
 		{"test1", args{"1,2,3,5", 0, 50}},
 		{"test2", args{"", 3, 50}},
 	}
-	runBurnCpuFunc = func(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string) int {
+	runBurnCpuFunc = func(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climTime int) int {
 		return 25233
 	}
 	bindBurnCpuFunc = func(ctx context.Context, core string, pid int) {}
@@ -64,7 +65,7 @@ func Test_runBurnCpu_failed(t *testing.T) {
 		pidNeeded  bool
 		processor  string
 	}
-	burnBin := path.Join(util.GetProgramPath(), "chaos_burncpu")
+	burnBin := path.Join(util.GetProgramPath(), exec.BurnCpuBin)
 	as := &args{
 		cpuCount:   2,
 		cpuPercent: 50,
@@ -89,7 +90,7 @@ func Test_runBurnCpu_failed(t *testing.T) {
 	}
 	expectedCommands := []string{fmt.Sprintf(`nohup %s --nohup --cpu-count 2 --cpu-percent 50 > /dev/null 2>&1 &`, burnBin)}
 
-	runBurnCpu(context.Background(), as.cpuCount, as.cpuPercent, as.pidNeeded, as.processor)
+	runBurnCpu(context.Background(), as.cpuCount, as.cpuPercent, as.pidNeeded, as.processor, 0)
 	if exitCode != 1 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}

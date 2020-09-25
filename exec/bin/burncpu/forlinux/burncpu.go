@@ -32,6 +32,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
@@ -85,9 +86,9 @@ func burnCpu() {
 	select {} // wait forever
 }
 
-var burnCpuBin = "chaos_burncpu"
+var burnCpuBin = exec.BurnCpuBin
 
-var burnCpuCgroup = "/chaos_burncpu"
+var burnCpuCgroup = "/" + burnCpuBin
 
 const cfsPeriodUs = uint64(200000)
 

@@ -275,12 +275,15 @@ func preHandleTxqueue(netInterface string) *spec.Response {
 			}
 		}
 	}
-	// set to 1000 directly
-	response := cl.Run(context.TODO(), "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
-	if !response.Success {
-		logrus.Warningf("set txqueuelen for %s err, %s", netInterface, response.Err)
+	if cl.IsCommandAvailable("ifconfig") {
+		// set to 1000 directly
+		response := cl.Run(context.TODO(), "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
+		if !response.Success {
+			logrus.Warningf("set txqueuelen for %s err, %s", netInterface, response.Err)
+		}
+		return response
 	}
-	return response
+	return spec.ReturnSuccess("success")
 }
 
 func getIpRules(targetIp string) []string {

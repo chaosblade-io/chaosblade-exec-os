@@ -43,18 +43,8 @@ build_yaml: build/spec.go
 	$(GO) run $< $(OS_YAML_FILE_PATH)
 
 build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile
-ifneq ($(shell command -v upx),)
-	upx -1 $(BUILD_TARGET_BIN)/chaos_*
-else
-	$(warning "The compiled files may be too large because you haven't installed UPX")
-endif
 
 build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile
-ifeq ($(shell command -v upx),)
-	upx -1 $(BUILD_TARGET_BIN)/chaos_*
-else
-	$(warning "The compiled files may be too large because you haven't installed UPX")
-endif
 
 # build burn-cpu chaos tools
 build_burncpu: exec/bin/burncpu/burncpu.go

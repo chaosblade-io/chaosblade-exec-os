@@ -30,13 +30,14 @@ import (
 var stopProcessName string
 var stopProcessInCmd string
 
-var startFakeDeath, stopFakeDeath bool
+var startFakeDeath, stopFakeDeath, ignoreProcessNotFound bool
 
 func main() {
 	flag.StringVar(&stopProcessName, "process", "", "process name")
 	flag.StringVar(&stopProcessInCmd, "process-cmd", "", "process in command")
 	flag.BoolVar(&startFakeDeath, "start", false, "start process fake death")
 	flag.BoolVar(&stopFakeDeath, "stop", false, "recover process fake death")
+	flag.BoolVar(&ignoreProcessNotFound, "ignore-not-found", false, "ignore process that can't be found")
 	bin.ParseFlagAndInitLog()
 
 	if startFakeDeath == stopFakeDeath {
@@ -44,9 +45,9 @@ func main() {
 	}
 
 	if startFakeDeath {
-		doStopProcess(stopProcessName, stopProcessInCmd)
+		doStopProcess(stopProcessName, stopProcessInCmd, ignoreProcessNotFound)
 	} else if stopFakeDeath {
-		doRecoverProcess(stopProcessName, stopProcessInCmd)
+		doRecoverProcess(stopProcessName, stopProcessInCmd, ignoreProcessNotFound)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
@@ -54,7 +55,7 @@ func main() {
 
 var cl = channel.NewLocalChannel()
 
-func doStopProcess(process, processCmd string) {
+func doStopProcess(process, processCmd string, ignoreProcessNotFound bool) {
 	var pids []string
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
@@ -71,8 +72,11 @@ func doStopProcess(process, processCmd string) {
 		}
 		stopProcessName = processCmd
 	}
-
 	if pids == nil || len(pids) == 0 {
+		if ignoreProcessNotFound {
+			bin.PrintOutputAndExit("process not found")
+			return
+		}
 		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", stopProcessName))
 	}
 	args := fmt.Sprintf("-STOP %s", strings.Join(pids, " "))
@@ -83,7 +87,7 @@ func doStopProcess(process, processCmd string) {
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func doRecoverProcess(process, processCmd string) {
+func doRecoverProcess(process, processCmd string, ignoreProcessNotFound bool) {
 	var pids []string
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
@@ -102,6 +106,10 @@ func doRecoverProcess(process, processCmd string) {
 	}
 
 	if pids == nil || len(pids) == 0 {
+		if ignoreProcessNotFound {
+			bin.PrintOutputAndExit("process not found")
+			return
+		}
 		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", stopProcessName))
 	}
 	response := channel.NewLocalChannel().Run(ctx, "kill", fmt.Sprintf("-CONT %s", strings.Join(pids, " ")))

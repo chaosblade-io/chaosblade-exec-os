@@ -51,7 +51,10 @@ func NewStopProcessActionCommandSpec() spec.ExpActionCommandSpec {
 blade create process stop --process SimpleHTTPServer
 
 # Pause the Java process
-blade create process stop --process-cmd java`,
+blade create process stop --process-cmd java
+
+# Return success even if the process not found
+blade create process stop --process demo --ignore-not-found`,
 			ActionPrograms: []string{StopProcessBin},
 		},
 	}
@@ -93,11 +96,15 @@ func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	if process == "" && processCmd == "" {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less process matcher")
 	}
-	flags := ""
+	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
+	flags := fmt.Sprintf("--debug=%t", util.Debug)
 	if process != "" {
-		flags = fmt.Sprintf(`--process "%s"`, process)
+		flags = fmt.Sprintf(`%s --process "%s"`, flags, process)
 	} else if processCmd != "" {
-		flags = fmt.Sprintf(`--process-cmd "%s"`, processCmd)
+		flags = fmt.Sprintf(`%s --process-cmd "%s"`, flags, processCmd)
+	}
+	if ignoreProcessNotFound {
+		flags = fmt.Sprintf(`%s --ignore-not-found=%t`, flags, ignoreProcessNotFound)
 	}
 
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -108,14 +115,12 @@ func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 }
 
 func (spe *StopProcessExecutor) stopProcess(flags string, ctx context.Context) *spec.Response {
-	args := fmt.Sprintf("--start --debug=%t", util.Debug)
-	flags = fmt.Sprintf("%s %s", args, flags)
+	flags = fmt.Sprintf(`--start %s`, flags)
 	return spe.channel.Run(ctx, path.Join(spe.channel.GetScriptPath(), StopProcessBin), flags)
 }
 
 func (spe *StopProcessExecutor) recoverProcess(flags string, ctx context.Context) *spec.Response {
-	args := fmt.Sprintf("--stop --debug=%t", util.Debug)
-	flags = fmt.Sprintf("%s %s", args, flags)
+	flags = fmt.Sprintf(`--stop %s`, flags)
 	return spe.channel.Run(ctx, path.Join(spe.channel.GetScriptPath(), StopProcessBin), flags)
 }
 

@@ -30,6 +30,7 @@ import (
 
 var killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessExcludeProcess string
 var killProcessCount int
+var ignoreProcessNotFound bool
 
 func main() {
 	flag.StringVar(&killProcessName, "process", "", "process name")
@@ -38,14 +39,16 @@ func main() {
 	flag.StringVar(&killProcessLocalPorts, "local-port", "", "local service ports")
 	flag.StringVar(&killProcessSignal, "signal", "9", "kill process signal")
 	flag.StringVar(&killProcessExcludeProcess, "exclude-process", "", "kill process exclude specific process")
+	flag.BoolVar(&ignoreProcessNotFound, "ignore-not-found", false, "ignore process that can't be found")
 	bin.ParseFlagAndInitLog()
 
-	killProcess(killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessExcludeProcess, killProcessCount)
+	killProcess(killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessExcludeProcess,
+		killProcessCount, ignoreProcessNotFound)
 }
 
 var cl = channel.NewLocalChannel()
 
-func killProcess(process, processCmd, localPorts, signal, excludeProcess string, count int) {
+func killProcess(process, processCmd, localPorts, signal, excludeProcess string, count int, ignoreProcessNotFound bool) {
 	var pids []string
 	var err error
 	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
@@ -73,6 +76,10 @@ func killProcess(process, processCmd, localPorts, signal, excludeProcess string,
 		}
 	}
 	if pids == nil || len(pids) == 0 {
+		if ignoreProcessNotFound {
+			bin.PrintOutputAndExit("process not found")
+			return
+		}
 		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", killProcessName))
 		return
 	}

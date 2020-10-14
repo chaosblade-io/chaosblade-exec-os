@@ -27,12 +27,14 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var dropLocalPort, dropRemotePort string
+var dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic string
 var dropNetStart, dropNetStop bool
 
 func main() {
-	flag.StringVar(&dropLocalPort, "local-port", "", "local port")
-	flag.StringVar(&dropRemotePort, "remote-port", "", "remote port")
+	flag.StringVar(&dropSourcePort, "source-port", "", "source port")
+	flag.StringVar(&dropDestinationPort, "destination-port", "", "destination port")
+	flag.StringVar(&dropStringPattern, "string-pattern", "", "string pattern")
+	flag.StringVar(&dropNetworkTraffic, "network-traffic", "", "network traffic")
 	flag.BoolVar(&dropNetStart, "start", false, "start drop")
 	flag.BoolVar(&dropNetStop, "stop", false, "stop drop")
 	bin.ParseFlagAndInitLog()
@@ -41,9 +43,9 @@ func main() {
 		bin.PrintErrAndExit("must add --start or --stop flag")
 	}
 	if dropNetStart {
-		startDropNet(dropLocalPort, dropRemotePort)
+		startDropNet(dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic)
 	} else if dropNetStop {
-		stopDropNet(dropLocalPort, dropRemotePort)
+		stopDropNet(dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
@@ -53,45 +55,50 @@ var cl = channel.NewLocalChannel()
 
 var stopDropNetFunc = stopDropNet
 
-func startDropNet(localPort, remotePort string) {
+func startDropNet(sourcePort, destinationPort, stringPattern, networkTraffic string) {
 	ctx := context.Background()
-	if remotePort == "" && localPort == "" {
-		bin.PrintErrAndExit("must specify port flag")
+	if destinationPort == "" && sourcePort == "" && stringPattern == "" {
+		bin.PrintErrAndExit("must specify port or string flag")
 		return
 	}
-	handleDropSpecifyPort(remotePort, localPort, ctx)
+	handleDropSpecifyPort(destinationPort, sourcePort, stringPattern, networkTraffic, ctx)
 }
 
-func handleDropSpecifyPort(remotePort string, localPort string, ctx context.Context) {
+func handleDropSpecifyPort(destinationPort string, sourcePort string, stringPattern string, networkTraffic string, ctx context.Context) {
 	var response *spec.Response
-	if localPort != "" {
-		response = cl.Run(ctx, "iptables",
-			fmt.Sprintf(`-A INPUT -p tcp --dport %s -j DROP`, localPort))
-		if !response.Success {
-			stopDropNetFunc(localPort, remotePort)
-			bin.PrintErrAndExit(response.Err)
-			return
-		}
-		response = cl.Run(ctx, "iptables",
-			fmt.Sprintf(`-A INPUT -p udp --dport %s -j DROP`, localPort))
-		if !response.Success {
-			stopDropNetFunc(localPort, remotePort)
-			bin.PrintErrAndExit(response.Err)
-			return
-		}
+	netFlows := []string{"INPUT", "OUTPUT"}
+	if networkTraffic == "in" {
+		netFlows = []string{"INPUT"}
 	}
-	if remotePort != "" {
-		response = cl.Run(ctx, "iptables",
-			fmt.Sprintf(`-A OUTPUT -p tcp --dport %s -j DROP`, remotePort))
+	if networkTraffic == "out" {
+		netFlows = []string{"OUTPUT"}
+	}
+	for _, netFlow := range netFlows {
+		tcpArgs := fmt.Sprintf("-A %s -p tcp", netFlow)
+		udpArgs := fmt.Sprintf("-A %s -p udp", netFlow)
+		if sourcePort != "" {
+			tcpArgs = fmt.Sprintf("%s --sport %s", tcpArgs, sourcePort)
+			udpArgs = fmt.Sprintf("%s --sport %s", udpArgs, sourcePort)
+		}
+		if destinationPort != "" {
+			tcpArgs = fmt.Sprintf("%s --dport %s", tcpArgs, destinationPort)
+			udpArgs = fmt.Sprintf("%s --dport %s", udpArgs, destinationPort)
+		}
+		if stringPattern != "" {
+			tcpArgs = fmt.Sprintf("%s -m string --string %s --algo bm", tcpArgs, stringPattern)
+			udpArgs = fmt.Sprintf("%s -m string --string %s --algo bm", udpArgs, stringPattern)
+		}
+		tcpArgs = fmt.Sprintf("%s -j DROP", tcpArgs)
+		udpArgs = fmt.Sprintf("%s -j DROP", udpArgs)
+		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, tcpArgs))
 		if !response.Success {
-			stopDropNetFunc(localPort, remotePort)
+			stopDropNetFunc(sourcePort, destinationPort, stringPattern, networkTraffic)
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
-		response = cl.Run(ctx, "iptables",
-			fmt.Sprintf(`-A OUTPUT -p udp --dport %s -j DROP`, remotePort))
+		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, udpArgs))
 		if !response.Success {
-			stopDropNetFunc(localPort, remotePort)
+			stopDropNetFunc(sourcePort, destinationPort, stringPattern, networkTraffic)
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
@@ -99,14 +106,43 @@ func handleDropSpecifyPort(remotePort string, localPort string, ctx context.Cont
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func stopDropNet(localPort, remotePort string) {
+func stopDropNet(sourcePort, destinationPort, stringPattern, networkTraffic string) {
 	ctx := context.Background()
-	if localPort != "" {
-		cl.Run(ctx, "iptables", fmt.Sprintf(`-D INPUT -p tcp --dport %s -j DROP`, localPort))
-		cl.Run(ctx, "iptables", fmt.Sprintf(`-D INPUT -p udp --dport %s -j DROP`, localPort))
+	var response *spec.Response
+	netFlows := []string{"INPUT", "OUTPUT"}
+	if networkTraffic == "in" {
+		netFlows = []string{"INPUT"}
 	}
-	if remotePort != "" {
-		cl.Run(ctx, "iptables", fmt.Sprintf(`-D OUTPUT -p tcp --dport %s -j DROP`, remotePort))
-		cl.Run(ctx, "iptables", fmt.Sprintf(`-D OUTPUT -p udp --dport %s -j DROP`, remotePort))
+	if networkTraffic == "out" {
+		netFlows = []string{"OUTPUT"}
 	}
+	for _, netFlow := range netFlows {
+		tcpArgs := fmt.Sprintf("-D %s -p tcp", netFlow)
+		udpArgs := fmt.Sprintf("-D %s -p udp", netFlow)
+		if sourcePort != "" {
+			tcpArgs = fmt.Sprintf("%s --sport %s", tcpArgs, sourcePort)
+			udpArgs = fmt.Sprintf("%s --sport %s", udpArgs, sourcePort)
+		}
+		if destinationPort != "" {
+			tcpArgs = fmt.Sprintf("%s --dport %s", tcpArgs, destinationPort)
+			udpArgs = fmt.Sprintf("%s --dport %s", udpArgs, destinationPort)
+		}
+		if stringPattern != "" {
+			tcpArgs = fmt.Sprintf("%s -m string --string %s --algo bm", tcpArgs, stringPattern)
+			udpArgs = fmt.Sprintf("%s -m string --string %s --algo bm", udpArgs, stringPattern)
+		}
+		tcpArgs = fmt.Sprintf("%s -j DROP", tcpArgs)
+		udpArgs = fmt.Sprintf("%s -j DROP", udpArgs)
+		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, tcpArgs))
+		if !response.Success {
+			bin.PrintErrAndExit(response.Err)
+			return
+		}
+		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, udpArgs))
+		if !response.Success {
+			bin.PrintErrAndExit(response.Err)
+			return
+		}
+	}
+	bin.PrintOutputAndExit(response.Result.(string))
 }

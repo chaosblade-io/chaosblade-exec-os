@@ -37,19 +37,40 @@ func NewDropActionSpec() spec.ExpActionCommandSpec {
 		spec.BaseExpActionCommandSpec{
 			ActionMatchers: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
-					Name: "local-port",
-					Desc: "Port for local service",
+					Name: "source-port",
+					Desc: "The source port of packet",
 				},
 				&spec.ExpFlag{
-					Name: "remote-port",
-					Desc: "Port for remote service",
+					Name: "destination-port",
+					Desc: "The destination port of packet",
+				},
+				&spec.ExpFlag{
+					Name: "string-pattern",
+					Desc: "The string that is contained in the packet",
+				},
+				&spec.ExpFlag{
+					Name: "network-traffic",
+					Desc: "The direction of network traffic",
 				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &NetworkDropExecutor{},
 			ActionExample: `
-# Experimental scenario of network shielding
-blade create network drop`,
+# Block incoming connection from the port 80
+blade create network drop --source-port 80 --network-traffic in
+
+# Block incoming connection to the port 80
+blade create network drop --destination-port 80 --network-traffic in
+
+# Block outgoing connection to the port 80
+blade create network drop --destination-port 80 --network-traffic out
+
+# Block outgoing connection to the specific domain
+blade create network drop --string-pattern baidu.com --network-traffic out
+
+# Block outgoing connection to the specific domain on port 80
+blade create network drop --destination-port 80 --string-pattern baidu.com --network-traffic out
+`,
 			ActionPrograms: []string{DropNetworkBin},
 		},
 	}
@@ -90,33 +111,47 @@ func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spe
 	if ne.channel == nil {
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}
-	localPort := model.ActionFlags["local-port"]
-	remotePort := model.ActionFlags["remote-port"]
+	sourcePort := model.ActionFlags["source-port"]
+	destinationPort := model.ActionFlags["destination-port"]
+	stringPattern := model.ActionFlags["string-pattern"]
+	networkTraffic := model.ActionFlags["network-traffic"]
 	if _, ok := spec.IsDestroy(ctx); ok {
-		return ne.stop(localPort, remotePort, ctx)
+		return ne.stop(sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
 	}
 
-	return ne.start(localPort, remotePort, ctx)
+	return ne.start(sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
 }
 
-func (ne *NetworkDropExecutor) start(localPort, remotePort string, ctx context.Context) *spec.Response {
+func (ne *NetworkDropExecutor) start(sourcePort, destinationPort, stringPattern, networkTraffic string, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --debug=%t", util.Debug)
-	if localPort != "" {
-		args = fmt.Sprintf("%s --local-port %s", args, localPort)
+	if sourcePort != "" {
+		args = fmt.Sprintf("%s --source-port %s", args, sourcePort)
 	}
-	if remotePort != "" {
-		args = fmt.Sprintf("%s --remote-port %s", args, remotePort)
+	if destinationPort != "" {
+		args = fmt.Sprintf("%s --destination-port %s", args, destinationPort)
+	}
+	if stringPattern != "" {
+		args = fmt.Sprintf("%s --string-pattern %s", args, stringPattern)
+	}
+	if networkTraffic != "" {
+		args = fmt.Sprintf("%s --network-traffic %s", args, networkTraffic)
 	}
 	return ne.channel.Run(ctx, path.Join(ne.channel.GetScriptPath(), DropNetworkBin), args)
 }
 
-func (ne *NetworkDropExecutor) stop(localPort, remotePort string, ctx context.Context) *spec.Response {
+func (ne *NetworkDropExecutor) stop(sourcePort, destinationPort, stringPattern, networkTraffic string, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--stop --debug=%t", util.Debug)
-	if localPort != "" {
-		args = fmt.Sprintf("%s --local-port %s", args, localPort)
+	if sourcePort != "" {
+		args = fmt.Sprintf("%s --source-port %s", args, sourcePort)
 	}
-	if remotePort != "" {
-		args = fmt.Sprintf("%s --remote-port %s", args, remotePort)
+	if destinationPort != "" {
+		args = fmt.Sprintf("%s --destination-port %s", args, destinationPort)
+	}
+	if stringPattern != "" {
+		args = fmt.Sprintf("%s --string-pattern %s", args, stringPattern)
+	}
+	if networkTraffic != "" {
+		args = fmt.Sprintf("%s --network-traffic %s", args, networkTraffic)
 	}
 	return ne.channel.Run(ctx, path.Join(ne.channel.GetScriptPath(), DropNetworkBin), args)
 }

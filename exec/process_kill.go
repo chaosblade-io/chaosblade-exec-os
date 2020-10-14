@@ -71,7 +71,10 @@ blade create process kill --process SimpleHTTPServer
 blade create process kill --process-cmd java
 
 # Specifies the semaphore and local port to kill the process
-blade c process kill --local-port 8080 --signal 15`,
+blade c process kill --local-port 8080 --signal 15
+
+# Return success even if the process not found
+blade c process kill --process demo --ignore-not-found`,
 			ActionPrograms: []string{KillProcessBin},
 		},
 	}
@@ -117,6 +120,7 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	localPorts := model.ActionFlags["local-port"]
 	signal := model.ActionFlags["signal"]
 	excludeProcess := model.ActionFlags["exclude-process"]
+	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	if process == "" && processCmd == "" && localPorts == "" {
 		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less process matcher")
 	}
@@ -140,6 +144,9 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 	if excludeProcess != "" {
 		flags = fmt.Sprintf(`%s --exclude-process %s`, flags, excludeProcess)
+	}
+	if ignoreProcessNotFound {
+		flags = fmt.Sprintf(`%s --ignore-not-found=%t`, flags, ignoreProcessNotFound)
 	}
 	return kpe.channel.Run(ctx, path.Join(kpe.channel.GetScriptPath(), KillProcessBin), flags)
 }

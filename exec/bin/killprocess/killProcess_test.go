@@ -74,7 +74,7 @@ func Test_killProcess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			killProcess(tt.args.process, tt.args.processCmd, tt.args.localPorts, tt.args.count)
+			killProcess(tt.args.process, tt.args.processCmd, tt.args.localPorts, "9", "", tt.args.count, false)
 			if tt.exitCode != exitCode {
 				t.Errorf("unexpected exitCode %d, expected exitCode: %d", exitCode, tt.exitCode)
 			}

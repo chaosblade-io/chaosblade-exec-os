@@ -27,7 +27,13 @@ type ProcessCommandModelSpec struct {
 func NewProcessCommandModelSpec() spec.ExpModelCommandSpec {
 	return &ProcessCommandModelSpec{
 		spec.BaseExpModelCommandSpec{
-			ExpFlags: []spec.ExpFlagSpec{},
+			ExpFlags: []spec.ExpFlagSpec{
+				&spec.ExpFlag{
+					Name:   "ignore-not-found",
+					Desc:   "Ignore process that cannot be found",
+					NoArgs: true,
+				},
+			},
 			ExpActions: []spec.ExpActionCommandSpec{
 				NewKillProcessActionCommandSpec(),
 				NewStopProcessActionCommandSpec(),

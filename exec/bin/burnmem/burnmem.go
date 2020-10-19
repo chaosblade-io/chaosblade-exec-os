@@ -242,15 +242,16 @@ func calculateMemSize(percent, reserve int) (int64, int64, error) {
 			return 0, 0, err
 		}
 		total = int64(virtualMemory.Total)
-		available = int64(virtualMemory.Available)
-		if burnMemMode == "cache" {
-			available = int64(virtualMemory.Free)
-		} else if burnMemMode == "ram" && !includeBufferCache {
-			available = total - int64(virtualMemory.Used)
+		available = int64(virtualMemory.Free)
+		if burnMemMode == "ram" && !includeBufferCache {
+			available = available + int64(virtualMemory.Buffers + virtualMemory.Cached)
 		}
 	} else {
 		total = int64(memoryStat.Usage.Limit)
-		available = int64(memoryStat.Usage.Limit - memoryStat.Usage.Usage)
+		available = total - int64(memoryStat.Usage.Usage)
+		if burnMemMode == "ram" && !includeBufferCache {
+			available = available + int64(memoryStat.Cache)
+		}
 	}
 	reserved := int64(0)
 	if percent != 0 {

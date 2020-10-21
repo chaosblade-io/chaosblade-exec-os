@@ -65,7 +65,15 @@ func ExtractExecutorFromExpModel(expModel spec.ExpModelCommandSpec) map[string]s
 
 func GetSSHExpFlags() []spec.ExpFlagSpec {
 	flags := []spec.ExpFlagSpec{
-		exec.ChannelFlag, exec.SSHHostFlag, exec.SSHPortFlag, exec.SSHUserFlag, exec.BladeRelease,
+		exec.ChannelFlag,
+		exec.SSHHostFlag,
+		exec.SSHPortFlag,
+		exec.SSHUserFlag,
+		exec.SSHKeyFlag,
+		exec.SSHKeyPassphraseFlag,
+		exec.BladeRelease,
+		exec.OverrideBladeRelease,
+		exec.InstallPath,
 	}
 	return flags
 }

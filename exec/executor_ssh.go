@@ -19,7 +19,11 @@ package exec
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/version"
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"net"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -27,16 +31,14 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/version"
-
 	"github.com/howeyc/gopass"
-
 )
 
 const (
-	BladeBin        = "/opt/chaosblade/blade"
-	DefaultSSHPort  = 22
-	BladeReleaseURL = "https://chaosblade.oss-cn-hangzhou.aliyuncs.com/agent/github/%s/chaosblade-%s-linux-amd64.tar.gz"
+	DefaultInstallPath = "/opt/chaosblade"
+	BladeBin           = "blade"
+	DefaultSSHPort     = 22
+	BladeReleaseURL    = "https://chaosblade.oss-cn-hangzhou.aliyuncs.com/agent/github/%s/chaosblade-%s-linux-amd64.tar.gz"
 )
 
 // support ssh channel flags
@@ -68,9 +70,37 @@ var SSHPortFlag = &spec.ExpFlag{
 	Required: false,
 }
 
+var SSHKeyFlag = &spec.ExpFlag{
+	Name:     "ssh-key",
+	Desc:     "Use this flag when the channel is ssh",
+	NoArgs:   false,
+	Required: false,
+}
+
+var SSHKeyPassphraseFlag = &spec.ExpFlag{
+	Name:     "ssh-key-passphrase",
+	Desc:     "Use this flag when the channel is ssh",
+	NoArgs:   true,
+	Required: false,
+}
+
 var BladeRelease = &spec.ExpFlag{
 	Name:     "blade-release",
 	Desc:     "Blade release package，use this flag when the channel is ssh",
+	NoArgs:   false,
+	Required: false,
+}
+
+var OverrideBladeRelease = &spec.ExpFlag{
+	Name:     "override-blade-release",
+	Desc:     "Override blade release，use this flag when the channel is ssh",
+	NoArgs:   true,
+	Required: false,
+}
+
+var InstallPath = &spec.ExpFlag{
+	Name:     "install-path",
+	Desc:     "install path default /opt/chaosblade，use this flag when the channel is ssh",
 	NoArgs:   false,
 	Required: false,
 }
@@ -91,94 +121,160 @@ func (e *SSHExecutor) SetChannel(channel spec.Channel) {
 }
 
 func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpModel) *spec.Response {
-	fmt.Print("Please enter password:")
-	password, err := gopass.GetPasswd()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
-	}
-
+	key := expModel.ActionFlags[SSHKeyFlag.Name]
 	port := DefaultSSHPort
 	portStr := expModel.ActionFlags[SSHPortFlag.Name]
+	var err error
 	if portStr != "" {
-		var err error
 		port, err = strconv.Atoi(portStr)
 		if err != nil || port < 1 {
 			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "--port value must be a positive integer")
 		}
 	}
 
-	client := &SSHClient{
-		Host:     expModel.ActionFlags[SSHHostFlag.Name],
-		Username: expModel.ActionFlags[SSHUserFlag.Name],
-		Password: strings.Replace(string(password), "\n", "", -1),
-		Port:     port,
+	var client *SSHClient
+	var password []byte
+	var keyPassphrase []byte
+
+	if key == "" {
+		fmt.Print("Please enter password:")
+		password, err = gopass.GetPasswd()
+		if err != nil {
+			return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+		}
+	} else {
+		useKeyPassphrase := expModel.ActionFlags[SSHKeyPassphraseFlag.Name] == "true"
+		if useKeyPassphrase {
+			fmt.Print(fmt.Sprintf("Please Enter passphrase for key '%s':", key))
+			keyPassphrase, err = gopass.GetPasswd()
+			if err != nil {
+				return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+			}
+		}
+	}
+
+	client = &SSHClient{
+		Host:          expModel.ActionFlags[SSHHostFlag.Name],
+		Username:      expModel.ActionFlags[SSHUserFlag.Name],
+		Key:           expModel.ActionFlags[SSHKeyFlag.Name],
+		keyPassphrase: strings.Replace(string(keyPassphrase), "\n", "", -1),
+		Password:      strings.Replace(string(password), "\n", "", -1),
+		Port:          port,
 	}
 
 	matchers := spec.ConvertExpMatchersToString(expModel, func() map[string]spec.Empty {
 		return excludeSSHFlags()
 	})
+	installPath := expModel.ActionFlags[InstallPath.Name]
+	if installPath == "" {
+		installPath = DefaultInstallPath
+	}
+	bladeBin := path.Join(installPath, BladeBin)
 
 	if _, ok := spec.IsDestroy(ctx); ok {
-		str, err := client.Run(fmt.Sprintf("%s destroy %s", BladeBin, uid))
+		output, err := client.RunCommand(fmt.Sprintf("%s destroy %s", bladeBin, uid))
+		return ConvertOutputToResponse(string(output), err, nil)
+	} else {
+		overrideBladeRelease := expModel.ActionFlags[OverrideBladeRelease.Name] == "true"
+		if overrideBladeRelease {
+			buf, err := client.RunCommand(fmt.Sprintf(`rm -rf %s`, installPath))
+			if err != nil {
+				if buf != nil {
+					return spec.ReturnFail(spec.Code[spec.ExecCommandError], string(buf))
+				}
+				return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
+			}
+		}
+
+		buf, err := client.RunCommand(fmt.Sprintf(`if [ ! -d "%s" ]; then mkdir %s; fi;`, installPath, installPath))
 		if err != nil {
+			if buf != nil {
+				return spec.ReturnFail(spec.Code[spec.ExecCommandError], string(buf))
+			}
 			return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
 		}
-		return spec.Decode(str, nil)
-	} else {
+
 		bladeReleaseURL := expModel.ActionFlags[BladeRelease.Name]
 		if bladeReleaseURL == "" {
 			bladeReleaseURL = fmt.Sprintf(BladeReleaseURL, version.BladeVersion, version.BladeVersion)
 		}
-		assembly :=
-			fmt.Sprintf(`if  [ ! -f "/opt/chaosblade/blade" ];then
-														if  [ ! -d "/opt" ];then
-															mkdir /opt
-														fi
-														wget %s
-														tar -zxf $(echo "%s" |awk -F '/' '{print $NF}') -C /opt
-														mv /opt/$(tar tf $(echo "%s" |awk -F '/' '{print $NF}') | head -1 | cut -f1 -d/) /opt/chaosblade
-													fi`, bladeReleaseURL, bladeReleaseURL, bladeReleaseURL)
-		_, err := client.Run(assembly)
+		installCommand :=
+			fmt.Sprintf(`if  [ ! -f "%s" ];then
+														wget %s;
+														if [ $? -ne 0 ]; then exit 1; fi;
+														tar -zxf $(echo "%s" |awk -F '/' '{print $NF}') -C %s --strip-components 1;
+														if [ $? -ne 0 ]; then exit 1; fi;
+														rm -f $(echo "%s" |awk -F '/' '{print $NF}');
+													fi`, bladeBin, bladeReleaseURL, bladeReleaseURL, installPath, bladeReleaseURL)
+		buf, err = client.RunCommand(installCommand)
+		logrus.Debugf("exec command: %s, result: %s, err %s", installCommand, string(buf), err)
 		if err != nil {
+			if buf != nil {
+				return spec.ReturnFail(spec.Code[spec.ExecCommandError], string(buf))
+			}
 			return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
 		}
-
-		execute := fmt.Sprintf("%s create %s %s %s --uid %s -d", BladeBin, expModel.Target, expModel.ActionName, matchers, uid)
-		output, err := client.Run(execute)
-		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
-		}
-		return spec.Decode(output, nil)
+		createCommand := fmt.Sprintf("%s create %s %s %s --uid %s -d", bladeBin, expModel.Target, expModel.ActionName, matchers, uid)
+		output, err := client.RunCommand(createCommand)
+		logrus.Debugf("exec blade create command: %s, result: %s, err %s", createCommand, string(output), err)
+		return ConvertOutputToResponse(string(output), err, nil)
 	}
-
 }
 
 type SSHClient struct {
-	Host       string
-	Username   string
-	Password   string
-	Port       int
-	client     *ssh.Client
-	cipherList []string
+	Host          string
+	Username      string
+	Key           string
+	keyPassphrase string
+	Password      string
+	Port          int
+	client        *ssh.Client
+	cipherList    []string
 }
 
-func (c SSHClient) Run(shell string) (string, error) {
+func (c SSHClient) RunCommand(command string) ([]byte, error) {
 	if c.client == nil {
 		if err := c.connect(); err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 	session, err := c.client.NewSession()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer session.Close()
-	buf, err := session.CombinedOutput(shell)
-	return string(buf), err
+	buf, err := session.CombinedOutput(command)
+	return buf, err
+}
+
+func ConvertOutputToResponse(output string, err error, defaultResponse *spec.Response) *spec.Response {
+	if err != nil {
+		response := spec.Decode(err.Error(), defaultResponse)
+		if response.Success {
+			return response
+		}
+		output = strings.TrimSpace(output)
+		if output != "" {
+			return spec.ReturnFail(spec.Code[spec.ExecCommandError], fmt.Sprintf("result: %s, error: %s", output, err.Error()))
+		}
+		return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
+	}
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return spec.ReturnFail(spec.Code[spec.ExecCommandError],
+			"cannot get result message from remote host, please execute recovery and try again")
+	}
+	response := spec.Decode(output, defaultResponse)
+	if response.Success {
+		return response
+	}
+	if response.Code == spec.Code[spec.DecodeError].Code {
+		return spec.ReturnFail(spec.Code[spec.ExecCommandError], output)
+	}
+	return response
 }
 
 func (c *SSHClient) connect() error {
-
 	var config ssh.Config
 	if len(c.cipherList) == 0 {
 		config = ssh.Config{
@@ -190,10 +286,31 @@ func (c *SSHClient) connect() error {
 		}
 	}
 
+	auth := make([]ssh.AuthMethod, 0)
+	if c.Key == "" {
+		auth = append(auth, ssh.Password(c.Password))
+	} else {
+		pemBytes, err := ioutil.ReadFile(c.Key)
+		if err != nil {
+			return err
+		}
+
+		var signer ssh.Signer
+		if c.keyPassphrase == "" {
+			signer, err = ssh.ParsePrivateKey(pemBytes)
+		} else {
+			signer, err = ssh.ParsePrivateKeyWithPassphrase(pemBytes, []byte(c.keyPassphrase))
+		}
+		if err != nil {
+			return err
+		}
+		auth = append(auth, ssh.PublicKeys(signer))
+	}
+
 	clientConfig := ssh.ClientConfig{
 		User:   c.Username,
 		Config: config,
-		Auth:   []ssh.AuthMethod{ssh.Password(c.Password)},
+		Auth:   auth,
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
@@ -213,6 +330,10 @@ func excludeSSHFlags() map[string]spec.Empty {
 	flags[SSHHostFlag.Name] = spec.Empty{}
 	flags[SSHUserFlag.Name] = spec.Empty{}
 	flags[SSHPortFlag.Name] = spec.Empty{}
+	flags[SSHKeyFlag.Name] = spec.Empty{}
+	flags[SSHKeyPassphraseFlag.Name] = spec.Empty{}
 	flags[BladeRelease.Name] = spec.Empty{}
+	flags[OverrideBladeRelease.Name] = spec.Empty{}
+	flags[InstallPath.Name] = spec.Empty{}
 	return flags
 }

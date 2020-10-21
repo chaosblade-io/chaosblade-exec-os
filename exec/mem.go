@@ -37,7 +37,7 @@ func NewMemCommandModelSpec() spec.ExpModelCommandSpec {
 	return &MemCommandModelSpec{
 		spec.BaseExpModelCommandSpec{
 			ExpActions: []spec.ExpActionCommandSpec{
-				&loadActionCommand{
+				&MemLoadActionCommand{
 					spec.BaseExpActionCommandSpec{
 						ActionMatchers: []spec.ExpFlagSpec{},
 						ActionFlags:    []spec.ExpFlagSpec{},
@@ -108,34 +108,34 @@ func (*MemCommandModelSpec) Example() string {
 	return "mem load"
 }
 
-type loadActionCommand struct {
+type MemLoadActionCommand struct {
 	spec.BaseExpActionCommandSpec
 }
 
-func (*loadActionCommand) Name() string {
+func (*MemLoadActionCommand) Name() string {
 	return "load"
 }
 
-func (*loadActionCommand) Aliases() []string {
+func (*MemLoadActionCommand) Aliases() []string {
 	return []string{}
 }
 
-func (*loadActionCommand) ShortDesc() string {
+func (*MemLoadActionCommand) ShortDesc() string {
 	return "mem load"
 }
 
-func (l *loadActionCommand) LongDesc() string {
+func (l *MemLoadActionCommand) LongDesc() string {
 	if l.ActionLongDesc != "" {
 		return l.ActionLongDesc
 	}
 	return "Create chaos engineering experiments with memory load"
 }
 
-func (*loadActionCommand) Matchers() []spec.ExpFlagSpec {
+func (*MemLoadActionCommand) Matchers() []spec.ExpFlagSpec {
 	return []spec.ExpFlagSpec{}
 }
 
-func (*loadActionCommand) Flags() []spec.ExpFlagSpec {
+func (*MemLoadActionCommand) Flags() []spec.ExpFlagSpec {
 	return []spec.ExpFlagSpec{}
 }
 

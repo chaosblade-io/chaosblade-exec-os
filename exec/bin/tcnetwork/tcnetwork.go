@@ -235,7 +235,6 @@ func buildExcludeFilterToNewBand(netInterface string, excludePort string, exclud
 			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %s 0xffff flowid 1:4 && \,
 			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %s 0xffff flowid 1:4`,
 			args, netInterface, port, netInterface, port)
-		return args
 	}
 	return args
 }

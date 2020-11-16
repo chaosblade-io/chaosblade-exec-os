@@ -21,12 +21,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"path"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
@@ -68,18 +66,7 @@ func main() {
 			bin.PrintErrAndExit(errs)
 		}
 	} else if burnCpuNohup {
-		go burnCpu()
-
-		// Wait for exit signals
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGKILL)
-		for s := range ch {
-			switch s {
-			case syscall.SIGHUP, syscall.SIGTERM, syscall.SIGKILL, os.Interrupt:
-				fmt.Println("caught interrupt, exit")
-				return
-			}
-		}
+		burnCpu()
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
@@ -175,6 +162,7 @@ func burnCpu() {
 			}
 		}()
 	}
+	select {}
 }
 
 var burnCpuBin = exec.BurnCpuBin
@@ -267,7 +255,7 @@ func stopBurnCpu() (success bool, errs string) {
 	if pids == nil || len(pids) == 0 {
 		return true, errs
 	}
-	response := cl.Run(ctx, "kill", fmt.Sprintf(`-HUP %s`, strings.Join(pids, " ")))
+	response := cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 	if !response.Success {
 		return false, response.Err
 	}

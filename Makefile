@@ -42,7 +42,7 @@ pre_build:
 build_yaml: build/spec.go
 	$(GO) run $< $(OS_YAML_FILE_PATH)
 
-build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile
+build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile build_movefile build_kernel_delay build_kernel_error cp_strace
 
 build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile
 
@@ -95,6 +95,15 @@ build_deletefile: exec/bin/file/deletefile/deletefile.go
 
 build_movefile: exec/bin/file/movefile/movefile.go
 	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_movefile $<
+
+build_kernel_delay: exec/bin/kernel/delay/delay.go
+	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_stracedelay $<
+
+build_kernel_error: exec/bin/kernel/error/error.go
+	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_straceerror $<
+
+cp_strace:
+	cp extra/strace $(BUILD_TARGET_BIN)/
 
 # build chaosblade linux version by docker image
 build_linux:

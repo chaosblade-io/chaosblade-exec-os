@@ -38,7 +38,7 @@ const (
 	DefaultInstallPath = "/opt/chaosblade"
 	BladeBin           = "blade"
 	DefaultSSHPort     = 22
-	BladeReleaseURL    = "https://chaosblade.oss-cn-hangzhou.aliyuncs.com/agent/github/%s/chaosblade-%s-linux-amd64.tar.gz"
+	BladeReleaseURL    = "http://nginxfile.dds-sysu.tech:8080/%s/chaosblade-%s.tar.gz"
 )
 
 // support ssh channel flags

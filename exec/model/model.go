@@ -19,7 +19,7 @@ package model
 import (
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
-	"github.com/chenhy97/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 )
 
 // Support for other project about chaosblade

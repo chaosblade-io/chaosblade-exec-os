@@ -74,7 +74,7 @@
 			 ActionExecutor: &StraceDelayActionExecutor{},
 			 ActionExample: `
 # Create a strace 10s delay experiment to the process
-blade create strace delay --pid 1 --syscall-name mmap --time 10s`,
+blade create strace delay --pid 1 --syscall-name mmap --time 10s --delay-loc enter --first=1`,
 			 ActionPrograms: []string{StraceDelayBin},
 		 },
 	 }

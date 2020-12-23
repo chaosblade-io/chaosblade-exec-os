@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/chenhy97/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"os"
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/chenhy97/chaosblade-exec-os/exec/bin"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
 var (

@@ -69,7 +69,7 @@
 			 ActionExecutor: &StraceErrorActionExecutor{},
 			 ActionExample: `
 # Create a strace error experiment to the process
-blade create strace error --pid 1 --syscall-name mmap --return-value XX`,
+blade create strace error --pid 1 --syscall-name mmap --return-value XX --delay-loc enter --first=1`,
 			 ActionPrograms: []string{StraceErrorBin},
 		 },
 	 }
@@ -115,7 +115,7 @@ func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, mode
 	var pidList string
 	var first_flag string
 	var end_flag string
-	var step string 
+	var step string
 
 	pidStr := model.ActionFlags["pid"]
 	if pidStr != ""{

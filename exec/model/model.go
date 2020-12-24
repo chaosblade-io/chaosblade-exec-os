@@ -20,6 +20,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/disk"
 )
 
 // Support for other project about chaosblade
@@ -49,7 +50,7 @@ func GetAllExpModels() []spec.ExpModelCommandSpec {
 		exec.NewMemCommandModelSpec(),
 		exec.NewProcessCommandModelSpec(),
 		exec.NewNetworkCommandSpec(),
-		exec.NewDiskCommandSpec(),
+		disk.NewDiskCommandSpec(),
 		exec.NewScriptCommandModelSpec(),
 		exec.NewFileCommandSpec(),
 		exec.NewKernelInjectCommandSpec(),

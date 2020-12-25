@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package main
+package disk
 
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"path"
 	"strings"
 	"time"
@@ -30,20 +31,19 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/disk"
 )
 
 const count = 100
 
 type DiskBurnExp struct {
-	Path  string
-	Size  string
-	Read  bool
-	Write bool
-	Start bool
-	Stop  bool
-	Nohup bool
-
+	Path  string `json:"path" yaml:"path" name:"path" help:"The path of directory where the disk is burning, default value is /" default:"/"`
+	Size  string `json:"size" yaml:"size" name:"size" help:"Block size, MB, default is 10" default:"10"`
+	Read  bool   `json:"read" yaml:"read" name:"read" help:"Burn io by read, it will create a 600M for reading and delete it when destroy it" default:"false"`
+	Write bool   `json:"write" yaml:"write" name:"write" help:"Burn io by write, it will create a file by value of the size flag, for example the size default value is 10, then it will create a 10M*100=1000M file for writing, and delete it when destroy" default:"false"`
+	Start bool   `json:"start" yaml:"start" name:"start" help:"Start chaos experiment" default:"false"`
+	Stop  bool   `json:"stop" yaml:"stop" name:"stop" help:"Stop chaos experiment" default:"false"`
+	Nohup bool   `json:"nohup" yaml:"nohup" name:"nohup" help:"Use nohup command to execute other command. Don't add this flag manually" default:"false"`
+	// --
 	TempFileForReadName  string
 	TempFileForWriteName string
 	BurnIOBinName        string
@@ -51,7 +51,7 @@ type DiskBurnExp struct {
 	Channel              channel.OsChannel
 }
 
-var expObj = DiskBurnExp{
+var expObj = &DiskBurnExp{
 	TempFileForReadName:  "chaos_burnio.read",
 	TempFileForWriteName: "chaos_burnio.write",
 	BurnIOBinName:        exec.BurnIOBin,
@@ -59,48 +59,45 @@ var expObj = DiskBurnExp{
 	Channel:              channel.NewLocalChannel(),
 }
 
-func main() {
-	flag.CommandLine = flag.NewFlagSet("disk", flag.ContinueOnError)
-	flag.StringVar(&expObj.Path, disk.PathFlag.Name, "/", disk.PathFlag.Desc)
-	flag.StringVar(&expObj.Size, disk.SizeFlag.Name, "10", disk.SizeFlag.Desc)
-	flag.BoolVar(&expObj.Write, disk.WriteFlag.Name, false, disk.WriteFlag.Desc)
-	flag.BoolVar(&expObj.Read, disk.ReadFlag.Name, false, disk.ReadFlag.Desc)
-	flag.BoolVar(&expObj.Start, disk.StartFlag.Name, false, disk.StartFlag.Desc)
-	flag.BoolVar(&expObj.Stop, disk.StopFlag.Name, false, disk.StopFlag.Desc)
-	flag.BoolVar(&expObj.Nohup, disk.NohupFlag.Name, false, disk.NohupFlag.Desc)
-
-	bin.ParseFlagAndInitLog()
-
-	Exec(expObj)
+// init registry provider to model.
+func init() {
+	model.ProvideFn(exec.BurnIOBin, Exec)
 }
 
-func Exec(expObj DiskBurnExp) {
-	if err := validateFlags(expObj); err != nil {
-		bin.PrintAndExitWithErrPrefix(err.Error())
+func Exec(input interface{}) *spec.Response {
+	if nil == input {
+		input = bin.ParseFlagModelAndInitLog(expObj)
 	}
-
-	if expObj.Start {
-		expObj.startBurnIO()
-	} else if expObj.Stop {
-		expObj.stopBurnIO()
-	} else if expObj.Nohup {
-		if expObj.Read {
-			go expObj.burnRead()
+	if expObj, ok := input.(*DiskBurnExp); ok {
+		if err := validateFlags(expObj); err != nil {
+			bin.PrintAndExitWithErrPrefix(err.Error())
 		}
-		if expObj.Write {
-			go expObj.burnWrite()
+		if expObj.Start {
+			expObj.startBurnIO()
+		} else if expObj.Stop {
+			expObj.stopBurnIO()
+		} else if expObj.Nohup {
+			if expObj.Read {
+				go expObj.burnRead()
+			}
+			if expObj.Write {
+				go expObj.burnWrite()
+			}
+			select {}
+		} else {
+			bin.PrintErrAndExit("less --start or --stop flag")
 		}
-		select {}
+		return spec.ReturnSuccess("")
 	} else {
-		bin.PrintErrAndExit("less --start or --stop flag")
+		return spec.ReturnSuccess(spec.Code[spec.ParameterTypeError])
 	}
 }
 
-func validateFlags(expObj DiskBurnExp) error {
+func validateFlags(expObj *DiskBurnExp) error {
 	if expObj.Start == expObj.Stop && !expObj.Nohup {
 		return errors.New("must specify only one flag between start and stop flags")
 	}
-	err := disk.CheckDiskExpEnv()
+	err := CheckDiskExpEnv()
 	if err != nil {
 		return err
 	}

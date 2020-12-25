@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package main
+package disk
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"math"
 	"os"
@@ -44,19 +43,19 @@ var fillDiskStart, fillDiskStop, fillDiskRetainHandle, fillDiskRetainNohup bool
 
 const diskFillErrorMessage = "No space left on device"
 
-func main() {
-	flag.StringVar(&fillDiskDirectory, "directory", "", "the directory where the disk is populated")
-	flag.StringVar(&fillDiskSize, "size", "", "fill size, unit is M")
-	flag.StringVar(&reserveDiskSize, "reserve", "", "reserve size, unit is M")
-	flag.StringVar(&fillDiskPercent, "percent", "", "percentage of disk, positive integer without %")
-	flag.BoolVar(&fillDiskStart, "start", false, "start fill or not")
-	flag.BoolVar(&fillDiskStop, "stop", false, "stop fill or not")
-	flag.BoolVar(&fillDiskRetainHandle, "retain-handle", false, "whether to retain the big file handle")
-	flag.BoolVar(&fillDiskRetainNohup, "retain-nohup", false, "whether to read the big file in the background")
-	bin.ParseFlagAndInitLog()
-
-	startToFill()
-}
+//func main() {
+//	flag.StringVar(&fillDiskDirectory, "directory", "", "the directory where the disk is populated")
+//	flag.StringVar(&fillDiskSize, "size", "", "fill size, unit is M")
+//	flag.StringVar(&reserveDiskSize, "reserve", "", "reserve size, unit is M")
+//	flag.StringVar(&fillDiskPercent, "percent", "", "percentage of disk, positive integer without %")
+//	flag.BoolVar(&fillDiskStart, "start", false, "start fill or not")
+//	flag.BoolVar(&fillDiskStop, "stop", false, "stop fill or not")
+//	flag.BoolVar(&fillDiskRetainHandle, "retain-handle", false, "whether to retain the big file handle")
+//	flag.BoolVar(&fillDiskRetainNohup, "retain-nohup", false, "whether to read the big file in the background")
+//	bin.ParseFlagAndInitLog()
+//
+//	startToFill()
+//}
 
 func startToFill() {
 	if fillDiskStart == fillDiskStop {

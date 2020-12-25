@@ -17,11 +17,67 @@
 package model
 
 import (
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-
+	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/disk"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
+
+var providers = map[string]Runner{}
+
+// Runner executable spi
+type Runner interface {
+	// Exec parse flags
+	Exec(input ...interface{}) *spec.Response
+}
+
+// FnRunner wrap function as Runner
+type FnRunner struct {
+	Fn func(input ...interface{}) *spec.Response
+}
+
+// Runner delegate execute
+func (run *FnRunner) Exec(input ...interface{}) *spec.Response {
+	return run.Fn(input...)
+}
+
+type NopRunner struct {
+	name string
+}
+
+func (run *NopRunner) Exec(input ...interface{}) *spec.Response {
+	return spec.ReturnFail(spec.Code[spec.HandlerNotFound], fmt.Sprintf("Spi provider %s cant not found ", run.name))
+}
+
+// Provide os executor provider with name in init function
+func Provide(name string, provider Runner) {
+	for key, _ := range providers {
+		if key == name {
+			fmt.Println(fmt.Sprintf("Duplicate spi provider %s has be provide, please check and disable anyone ", name))
+			return
+		}
+	}
+	providers[name] = provider
+}
+
+// Provide unmutable parameters function
+func ProvideFn(name string, exec func(input interface{}) *spec.Response) {
+	Provide(name, &FnRunner{Fn: func(input ...interface{}) *spec.Response {
+		if len(input) > 0 {
+			return exec(input[0])
+		} else {
+			return exec(nil)
+		}
+	}})
+}
+
+// Load os executor provider by name
+func Load(name string) Runner {
+	if provider := providers[name]; nil != provider {
+		return provider
+	}
+	return &NopRunner{name: name}
+}
 
 // Support for other project about chaosblade
 func GetAllOsExecutors() map[string]spec.Executor {

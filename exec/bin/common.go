@@ -19,6 +19,7 @@ package bin
 import (
 	"flag"
 	"fmt"
+	"github.com/alecthomas/kong"
 	"os"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
@@ -51,4 +52,13 @@ func ParseFlagAndInitLog() {
 	util.AddDebugFlag()
 	flag.Parse()
 	util.InitLog(util.Bin)
+}
+
+// ParseFlagModelAndInitLog parse flags to model
+// Return the model pointer
+func ParseFlagModelAndInitLog(model interface{}) interface{} {
+	util.AddDebugFlag()
+	kong.Parse(model)
+	util.InitLog(util.Bin)
+	return model
 }

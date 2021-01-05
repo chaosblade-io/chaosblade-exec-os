@@ -89,12 +89,15 @@ func (spe *StopProcessExecutor) Name() string {
 
 func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if spe.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
+			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	process := model.ActionFlags["process"]
 	processCmd := model.ActionFlags["process-cmd"]
 	if process == "" && processCmd == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less process matcher")
+		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd, less process matcher")
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process、process-cmd"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process、process-cmd"))
 	}
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	flags := fmt.Sprintf("--debug=%t", util.Debug)

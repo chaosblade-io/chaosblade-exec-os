@@ -17,9 +17,6 @@
 package exec
 
 import (
-	"fmt"
-
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
@@ -49,14 +46,4 @@ func (*DiskCommandSpec) ShortDesc() string {
 
 func (*DiskCommandSpec) LongDesc() string {
 	return "Disk experiment contains fill disk or burn io"
-}
-
-func checkDiskExpEnv() error {
-	commands := []string{"rm", "dd"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

@@ -72,6 +72,10 @@ func main() {
 		bin.PrintErrAndExit("less --interface flag")
 	}
 
+	if !cl.IsCommandAvailable("tc") {
+		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandTcNotFound].Err)
+	}
+
 	if tcNetStart {
 		var classRule string
 		switch actionType {
@@ -399,11 +403,10 @@ func stopNet(netInterface string) {
 
 // getPeerPorts returns all ports communicating with the port
 func getPeerPorts(port string) ([]string, error) {
-	response := cl.Run(context.TODO(), "command", "-v ss")
-	if !response.Success {
-		return nil, fmt.Errorf("ss command not found")
+	if !cl.IsCommandAvailable("ss") {
+		return nil, fmt.Errorf(spec.ResponseErr[spec.CommandSsNotFound].Err)
 	}
-	response = cl.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
+	response := cl.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
 	if !response.Success {
 		return nil, fmt.Errorf(response.Err)
 	}

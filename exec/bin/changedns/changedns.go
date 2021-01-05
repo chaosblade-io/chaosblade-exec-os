@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
@@ -79,6 +80,11 @@ func recoverDns(domain, ip string) {
 		bin.PrintOutputAndExit("nothing to do")
 		return
 	}
+
+	if !cl.IsCommandAvailable("cat") {
+		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandCatNotFound].Err)
+	}
+
 	response = cl.Run(ctx, "cat", fmt.Sprintf(`%s | grep -v "%s" > %s && cat %s > %s`,
 		hosts, dnsPair, tmpHosts, tmpHosts, hosts))
 	if !response.Success {

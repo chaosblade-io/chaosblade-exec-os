@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
@@ -98,12 +99,13 @@ func (*BurnIOExecutor) Name() string {
 }
 
 func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkDiskExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"rm", "dd"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 	if be.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
+			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	directory := "/"
 	path := model.ActionFlags["path"]
@@ -121,13 +123,15 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 		return be.stop(ctx, readExists, writeExists, directory)
 	}
 	if !util.IsDir(directory) {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("the %s path must be directory", directory))
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: path is illegal, is not a directory", directory))
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "path"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "path"))
 	}
 	readExists := model.ActionFlags["read"] == "true"
 	writeExists := model.ActionFlags["write"] == "true"
 	if !readExists && !writeExists {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less --read or --write flag")
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "read|write"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "read|write"))
 	}
 	size := model.ActionFlags["size"]
 	if size == "" {

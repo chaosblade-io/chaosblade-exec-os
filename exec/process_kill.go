@@ -109,7 +109,8 @@ func (kpe *KillProcessExecutor) Name() string {
 
 func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if kpe.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
+			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return spec.ReturnSuccess(uid)
@@ -122,13 +123,17 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	excludeProcess := model.ActionFlags["exclude-process"]
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	if process == "" && processCmd == "" && localPorts == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less process matcher")
+		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd and local-port, less process matcher")
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process、process-cmd、local-port"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process、process-cmd、local-port"))
 	}
 	flags := fmt.Sprintf("--debug=%t", util.Debug)
 	if countValue != "" {
 		count, err := strconv.Atoi(countValue)
 		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "count")+", err: "+err.Error())
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "count"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "count"))
 		}
 		flags = fmt.Sprintf("%s --count %d", flags, count)
 	}

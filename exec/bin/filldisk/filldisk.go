@@ -198,6 +198,11 @@ func fillDiskByFallocate(ctx context.Context, size string, dataFile string) *spe
 }
 
 func fillDiskByDD(ctx context.Context, dataFile string, directory string, size string) *spec.Response {
+	if !cl.IsCommandAvailable("dd") {
+		return spec.ResponseFailWaitResult(spec.CommandDdNotFound, spec.ResponseErr[spec.CommandDdNotFound].Err,
+			spec.ResponseErr[spec.CommandDdNotFound].ErrInfo)
+	}
+
 	// Because of filling disk slowly using dd, so execute dd with 1b size first to test the command.
 	response := cl.Run(ctx, "dd", fmt.Sprintf(`if=/dev/zero of=%s bs=1b count=1 iflag=fullblock`, dataFile))
 	if !response.Success {

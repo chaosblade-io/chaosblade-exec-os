@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
@@ -101,6 +100,7 @@ var commFlags = []spec.ExpFlagSpec{
 	},
 }
 
+//todo 这里返回不能直接返回error,而是直接返回response
 func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp string,
 	args string, ignorePeerPort, force bool) (string, error) {
 	if localPort != "" {
@@ -137,14 +137,4 @@ func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp st
 		args = fmt.Sprintf("%s --force", args)
 	}
 	return args, nil
-}
-
-func checkNetworkExpEnv() error {
-	commands := []string{"tc", "head"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

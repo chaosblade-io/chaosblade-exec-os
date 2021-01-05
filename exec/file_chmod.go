@@ -79,13 +79,14 @@ func (*FileChmodActionExecutor) Name() string {
 }
 
 func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkChmodFileExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"chmod", "grep", "echo", "rm", "awk"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 
 	if f.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
+			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 
 	filepath := model.ActionFlags["filepath"]
@@ -94,15 +95,16 @@ func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *s
 	}
 
 	if !util.IsExist(filepath) {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("the %s file does not exist", filepath))
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
+		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "filepath"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "filepath"))
 	}
 
 	mark := model.ActionFlags["mark"]
 	match, _ := regexp.MatchString("^([0-7]{3})$", mark)
 	if !match {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("the %s mark is fail", mark))
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "mark"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "mark"))
 	}
 
 	return f.start(filepath, mark, ctx)
@@ -120,14 +122,4 @@ func (f *FileChmodActionExecutor) stop(filepath string, ctx context.Context) *sp
 
 func (f *FileChmodActionExecutor) SetChannel(channel spec.Channel) {
 	f.channel = channel
-}
-
-func checkChmodFileExpEnv() error {
-	commands := []string{"chmod", "grep", "echo", "rm", "awk"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

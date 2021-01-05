@@ -95,13 +95,14 @@ func (*FileMoveActionExecutor) Name() string {
 }
 
 func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkMoveFileExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"mv", "mkdir"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 
 	if f.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
+			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 
 	filepath := model.ActionFlags["filepath"]
@@ -112,8 +113,9 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	}
 
 	if !util.IsExist(filepath) {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("the %s file does not exist", filepath))
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
+		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "filepath"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "filepath"))
 	}
 
 	force := model.ActionFlags["force"] == "true"
@@ -122,8 +124,9 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	if !force {
 		targetFile := path.Join(target, "/", path.Base(filepath))
 		if util.IsExist(targetFile) {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				fmt.Sprintf("the [%s] target file is exist", targetFile))
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: target file does not exist", targetFile))
+			return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "target"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "target"))
 		}
 	}
 	return f.start(filepath, target, force, autoCreateDir, ctx)
@@ -151,14 +154,4 @@ func (f *FileMoveActionExecutor) stop(filepath, target string, ctx context.Conte
 
 func (f *FileMoveActionExecutor) SetChannel(channel spec.Channel) {
 	f.channel = channel
-}
-
-func checkMoveFileExpEnv() error {
-	commands := []string{"mv", "mkdir"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

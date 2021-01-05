@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/process"
@@ -229,6 +230,9 @@ func runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded boo
 
 // bindBurnCpu by taskset command
 func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
+	if !cl.IsCommandAvailable("taskset") {
+		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandTasksetNotFound].Err)
+	}
 	response := cl.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
 	if !response.Success {
 		stopBurnCpuFunc()

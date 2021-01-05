@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
@@ -131,6 +132,10 @@ func stopBurnIO(directory string, read, write bool) {
 
 // write burn
 func burnWrite(directory, size string) {
+	if !cl.IsCommandAvailable("dd") {
+		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandDdNotFound].Err)
+	}
+
 	tmpFileForWrite := path.Join(directory, writeFile)
 	for {
 		args := fmt.Sprintf(`if=/dev/zero of=%s bs=%sM count=%d oflag=dsync`, tmpFileForWrite, size, count)

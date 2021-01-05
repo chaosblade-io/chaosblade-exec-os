@@ -64,7 +64,7 @@ blade create mem load --mode ram --reserve 200 --rate 100`,
 			ExpFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
 					Name:     "mem-percent",
-					Desc:     "percent of burn Memory (0-100)",
+					Desc:     "percent of burn Memory (0-100), must be a positive integer",
 					Required: false,
 				},
 				&spec.ExpFlag{
@@ -152,12 +152,14 @@ func (ce *memExecutor) SetChannel(channel spec.Channel) {
 }
 
 func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkMemoryExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"dd", "mount", "umount"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
+
 	if ce.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
+			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ce.stop(ctx, model.ActionFlags["mode"])
@@ -170,22 +172,27 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	burnMemModeStr := model.ActionFlags["mode"]
 	includeBufferCache := model.ActionFlags["include-buffer-cache"] == "true"
 
+	var err error
 	if memPercentStr != "" {
 		var err error
 		memPercent, err = strconv.Atoi(memPercentStr)
 		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				"--mem-percent value must be a positive integer")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: mem-percent  must be a positive integer", memPercent))
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "mem-percent"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "mem-percent"))
 		}
 		if memPercent > 100 || memPercent < 0 {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				"--mem-percent value must be a positive integer and not bigger than 100")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: mem-percent  must be a positive integer and not bigger than 100", memPercent))
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "mem-percent"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "mem-percent"))
 		}
 	} else if memReserveStr != "" {
 		memReserve, err = strconv.Atoi(memReserveStr)
 		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				"--reserve value must be a positive integer")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: reserve  must be a positive integer", memReserve))
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "reserve"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "reserve"))
+
 		}
 	} else {
 		memPercent = 100
@@ -222,14 +229,4 @@ func (ce *memExecutor) stop(ctx context.Context, burnMemMode string) *spec.Respo
 		args = fmt.Sprintf("%s --mode %s", args, burnMemMode)
 	}
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), BurnMemBin), args)
-}
-
-func checkMemoryExpEnv() error {
-	commands := []string{"dd", "mount", "umount"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

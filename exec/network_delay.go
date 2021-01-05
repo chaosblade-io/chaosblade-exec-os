@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
@@ -87,23 +88,29 @@ func (de *NetworkDelayExecutor) Name() string {
 }
 
 func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkNetworkExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"tc", "head"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
+
 	if de.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
+			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	netInterface := model.ActionFlags["interface"]
 	if netInterface == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less interface parameter")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "interface"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return de.stop(netInterface, ctx)
 	} else {
 		time := model.ActionFlags["time"]
 		if time == "" {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less time flag")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
+			return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "time"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
 		}
 		offset := model.ActionFlags["offset"]
 		if offset == "" {

@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/containerd/cgroups"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
@@ -176,6 +177,10 @@ func runBurnCpu(ctx context.Context, cpuCount int, pidNeeded bool, processor str
 
 // bindBurnCpu by taskset command
 func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
+	if !cl.IsCommandAvailable("taskset") {
+		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandTasksetNotFound].Err)
+	}
+
 	response := cl.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
 	if !response.Success {
 		stopBurnCpuFunc()

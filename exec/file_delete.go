@@ -82,13 +82,14 @@ func (*FileRemoveActionExecutor) Name() string {
 }
 
 func (f *FileRemoveActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkRemoveFileExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"rm", "mv"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 
 	if f.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
+			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 
 	filepath := model.ActionFlags["filepath"]
@@ -99,8 +100,9 @@ func (f *FileRemoveActionExecutor) Exec(uid string, ctx context.Context, model *
 	}
 
 	if !util.IsExist(filepath) {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("the %s file does not exist", filepath))
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
+		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "filepath"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "filepath"))
 	}
 
 	return f.start(filepath, force, ctx)
@@ -126,14 +128,4 @@ func (f *FileRemoveActionExecutor) stop(filepath string, force bool, ctx context
 
 func (f *FileRemoveActionExecutor) SetChannel(channel spec.Channel) {
 	f.channel = channel
-}
-
-func checkRemoveFileExpEnv() error {
-	commands := []string{"rm", "mv"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

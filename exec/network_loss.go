@@ -129,8 +129,7 @@ func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, exclu
 	args := fmt.Sprintf("--start --type loss --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
 	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
 	if err != nil {
-		//todo 这里需要改
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
 	}
 	return nle.channel.Run(ctx, path.Join(nle.channel.GetScriptPath(), TcNetworkBin), args)
 }

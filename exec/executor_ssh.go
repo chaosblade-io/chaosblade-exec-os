@@ -181,7 +181,7 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 
 	if _, ok := spec.IsDestroy(ctx); ok {
 		output, err := client.RunCommand(fmt.Sprintf("%s destroy %s", bladeBin, uid))
-		return ConvertOutputToResponse(string(output), err, nil)
+		return ConvertOutputToResponse(uid, string(output), err, nil)
 	} else {
 		overrideBladeRelease := expModel.ActionFlags[OverrideBladeRelease.Name] == "true"
 		if overrideBladeRelease {
@@ -212,7 +212,7 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 		createCommand := fmt.Sprintf("%s create %s %s %s --uid %s -d", bladeBin, expModel.Target, expModel.ActionName, matchers, uid)
 		output, err := client.RunCommand(createCommand)
 		logrus.Debugf("exec blade create command: %s, result: %s, err %s", createCommand, string(output), err)
-		return ConvertOutputToResponse(string(output), err, nil)
+		return ConvertOutputToResponse(uid, string(output), err, nil)
 	}
 }
 
@@ -256,8 +256,7 @@ func (c SSHClient) RunCommand(command string) ([]byte, error) {
 	return buf, err
 }
 
-func ConvertOutputToResponse(output string, err error, defaultResponse *spec.Response) *spec.Response {
-	// todo : 这里要和 spec-go的spec.Decode一块改
+func ConvertOutputToResponse(uid, output string, err error, defaultResponse *spec.Response) *spec.Response {
 	context.Background()
 	if err != nil {
 		response := spec.Decode(err.Error(), defaultResponse)
@@ -265,23 +264,16 @@ func ConvertOutputToResponse(output string, err error, defaultResponse *spec.Res
 			return response
 		}
 		output = strings.TrimSpace(output)
-		if output != "" {
-			return spec.ReturnFail(spec.Code[spec.ExecCommandError], fmt.Sprintf("result: %s, error: %s", output, err.Error()))
-		}
-		return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].ErrInfo, output, err.Error()))
+		return spec.ResponseFailWaitResult(spec.SshExecFailed, fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].Err, output, err.Error()),
+			fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].ErrInfo, output, err.Error()))
 	}
 	output = strings.TrimSpace(output)
 	if output == "" {
-		return spec.ReturnFail(spec.Code[spec.ExecCommandError],
-			"cannot get result message from remote host, please execute recovery and try again")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.SshExecNothing].ErrInfo)
+		return spec.ResponseFailWaitResult(spec.SshExecNothing, spec.ResponseErr[spec.SshExecNothing].Err, spec.ResponseErr[spec.SshExecNothing].ErrInfo)
 	}
 	response := spec.Decode(output, defaultResponse)
-	if response.Success {
-		return response
-	}
-	if response.Code == spec.Code[spec.DecodeError].Code {
-		return spec.ReturnFail(spec.Code[spec.ExecCommandError], output)
-	}
 	return response
 }
 

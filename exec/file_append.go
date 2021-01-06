@@ -112,6 +112,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 	}
 
 	if f.channel == nil {
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
 		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
 			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
@@ -133,6 +134,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		var err error
 		count, err = strconv.Atoi(countStr)
 		if err != nil || count < 1 {
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` value must be a positive integer", "count"))
 			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "count"),
 				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "count"))
 		}
@@ -141,6 +143,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		var err error
 		interval, err = strconv.Atoi(intervalStr)
 		if err != nil || interval < 1 {
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` value must be a positive integer", "interval"))
 			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "interval"),
 				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "interval"))
 		}

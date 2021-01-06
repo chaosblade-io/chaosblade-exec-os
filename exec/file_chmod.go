@@ -85,6 +85,7 @@ func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *s
 	}
 
 	if f.channel == nil {
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
 		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
 			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
@@ -103,6 +104,7 @@ func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *s
 	mark := model.ActionFlags["mark"]
 	match, _ := regexp.MatchString("^([0-7]{3})$", mark)
 	if !match {
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` mark is illegal", mark))
 		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "mark"),
 			fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "mark"))
 	}

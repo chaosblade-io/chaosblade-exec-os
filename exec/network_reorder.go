@@ -145,7 +145,7 @@ func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, exc
 	}
 	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
 	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
 	}
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), TcNetworkBin), args)
 }

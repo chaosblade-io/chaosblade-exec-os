@@ -124,8 +124,8 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	if process == "" && processCmd == "" && localPorts == "" {
 		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd and local-port, less process matcher")
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process、process-cmd、local-port"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process、process-cmd、local-port"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process&process-cmd&local-port"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process&process-cmd&local-port"))
 	}
 	flags := fmt.Sprintf("--debug=%t", util.Debug)
 	if countValue != "" {

@@ -100,25 +100,24 @@ var commFlags = []spec.ExpFlagSpec{
 	},
 }
 
-//todo 这里返回不能直接返回error,而是直接返回response
 func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp string,
 	args string, ignorePeerPort, force bool) (string, error) {
 	if localPort != "" {
-		localPorts, err := util.ParseIntegerListToStringSlice(localPort)
+		localPorts, err := util.ParseIntegerListToStringSlice("local-port", localPort)
 		if err != nil {
 			return "", err
 		}
 		args = fmt.Sprintf("%s --local-port %s", args, strings.Join(localPorts, ","))
 	}
 	if remotePort != "" {
-		remotePorts, err := util.ParseIntegerListToStringSlice(remotePort)
+		remotePorts, err := util.ParseIntegerListToStringSlice("remote-port", remotePort)
 		if err != nil {
 			return "", err
 		}
 		args = fmt.Sprintf("%s --remote-port %s", args, strings.Join(remotePorts, ","))
 	}
 	if excludePort != "" {
-		excludePorts, err := util.ParseIntegerListToStringSlice(excludePort)
+		excludePorts, err := util.ParseIntegerListToStringSlice("exclude-port", excludePort)
 		if err != nil {
 			return "", err
 		}

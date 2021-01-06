@@ -95,9 +95,9 @@ func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	process := model.ActionFlags["process"]
 	processCmd := model.ActionFlags["process-cmd"]
 	if process == "" && processCmd == "" {
-		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd, less process matcher")
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process、process-cmd"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process、process-cmd"))
+		util.Errorf(uid, util.GetRunFuncName(), "less process&process-cmd, less process matcher")
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process&process-cmd"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process&process-cmd"))
 	}
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	flags := fmt.Sprintf("--debug=%t", util.Debug)

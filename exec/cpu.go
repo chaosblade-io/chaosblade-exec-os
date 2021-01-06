@@ -180,7 +180,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			return spec.ResponseFailWaitResult(spec.CommandTasksetNotFound, spec.ResponseErr[spec.CommandTasksetNotFound].Err,
 				spec.ResponseErr[spec.CommandTasksetNotFound].ErrInfo)
 		}
-		cores, err := util.ParseIntegerListToStringSlice(cpuListStr)
+		cores, err := util.ParseIntegerListToStringSlice("cpu-list", cpuListStr)
 		if err != nil {
 			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-list is illegal", cpuListStr))
 			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "cpu-list"),

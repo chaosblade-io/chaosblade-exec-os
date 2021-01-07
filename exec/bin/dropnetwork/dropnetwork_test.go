@@ -32,16 +32,18 @@ func Test_startDropNet_failed(t *testing.T) {
 		exitCode = code
 	}
 	tests := []struct {
-		sourcePort  string
+		sourceIp        string
+		destinationIp   string
+		sourcePort      string
 		destinationPort string
-		stringPattern string
-		networkTraffic string
+		stringPattern   string
+		networkTraffic  string
 	}{
-		{"", "", "", ""},
+		{"", "", "", "", "", ""},
 	}
 
 	for _, tt := range tests {
-		startDropNet(tt.sourcePort, tt.destinationPort, tt.stringPattern, tt.networkTraffic)
+		startDropNet(tt.sourceIp, tt.destinationIp, tt.sourcePort, tt.destinationPort, tt.stringPattern, tt.networkTraffic)
 		if exitCode != 1 {
 			t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 		}
@@ -50,11 +52,13 @@ func Test_startDropNet_failed(t *testing.T) {
 
 func Test_handleDropSpecifyPort(t *testing.T) {
 	type input struct {
-		sourcePort  string
+		sourceIp        string
+		destinationIp   string
+		sourcePort      string
 		destinationPort string
-		stringPattern string
-		networkTraffic string
-		response   *spec.Response
+		stringPattern   string
+		networkTraffic  string
+		response        *spec.Response
 	}
 	type expect struct {
 		exitCode   int
@@ -65,11 +69,11 @@ func Test_handleDropSpecifyPort(t *testing.T) {
 		input  input
 		expect expect
 	}{
-		{input{"80", "", "", "", spec.ReturnFail(spec.Code[spec.CommandNotFound], "iptables command not found")},
+		{input{"", "", "80", "", "", "", spec.ReturnFail(spec.Code[spec.CommandNotFound], "iptables command not found")},
 			expect{1, 1}},
-		{input{"", "80", "", "", spec.ReturnFail(spec.Code[spec.CommandNotFound], "iptables command not found")},
+		{input{"", "", "", "80", "", "", spec.ReturnFail(spec.Code[spec.CommandNotFound], "iptables command not found")},
 			expect{1, 1}},
-		{input{"80", "", "", "", spec.ReturnSuccess("success")},
+		{input{"", "", "80", "", "", "", spec.ReturnSuccess("success")},
 			expect{0, 0}},
 	}
 
@@ -78,7 +82,7 @@ func Test_handleDropSpecifyPort(t *testing.T) {
 		exitCode = code
 	}
 	var invokeTime int
-	stopDropNetFunc = func(sourcePort, destinationPort, stringPattern, networkTraffic string) {
+	stopDropNetFunc = func(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
 		invokeTime++
 	}
 	for _, tt := range tests {
@@ -87,7 +91,7 @@ func Test_handleDropSpecifyPort(t *testing.T) {
 		mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 			return tt.input.response
 		}
-		handleDropSpecifyPort(tt.input.destinationPort, tt.input.sourcePort, tt.input.stringPattern, tt.input.networkTraffic, context.Background())
+		handleDropSpecifyPort(tt.input.sourceIp, tt.input.destinationIp, tt.input.sourcePort, tt.input.destinationPort, tt.input.stringPattern, tt.input.networkTraffic, context.Background())
 		if exitCode != tt.expect.exitCode {
 			t.Errorf("unexpected result: %d, expected result: %d", exitCode, tt.expect.exitCode)
 		}

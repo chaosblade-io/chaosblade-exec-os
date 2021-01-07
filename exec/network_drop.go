@@ -37,6 +37,14 @@ func NewDropActionSpec() spec.ExpActionCommandSpec {
 		spec.BaseExpActionCommandSpec{
 			ActionMatchers: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
+					Name: "source-ip",
+					Desc: "The source ip address of packet",
+				},
+				&spec.ExpFlag{
+					Name: "destination-ip",
+					Desc: "The destination ip address of packet",
+				},
+				&spec.ExpFlag{
 					Name: "source-port",
 					Desc: "The source port of packet",
 				},
@@ -56,11 +64,17 @@ func NewDropActionSpec() spec.ExpActionCommandSpec {
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &NetworkDropExecutor{},
 			ActionExample: `
+# Block incoming connection from the source ip 10.10.10.10
+blade create network drop --source-ip 10.10.10.10 --network-traffic in
+
+# Block incoming connection to the destination ip 10.10.10.10
+blade create network drop --destination-ip 10.10.10.10 --network-traffic in
+
 # Block incoming connection from the port 80
 blade create network drop --source-port 80 --network-traffic in
 
-# Block incoming connection to the port 80
-blade create network drop --destination-port 80 --network-traffic in
+# Block incoming connection to the port 80 and 81
+blade create network drop --destination-port 80,81 --network-traffic in
 
 # Block outgoing connection to the port 80
 blade create network drop --destination-port 80 --network-traffic out
@@ -112,19 +126,27 @@ func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spe
 		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, suid),
 			spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
+	sourceIp := model.ActionFlags["source-ip"]
+	destinationIp := model.ActionFlags["destination-ip"]
 	sourcePort := model.ActionFlags["source-port"]
 	destinationPort := model.ActionFlags["destination-port"]
 	stringPattern := model.ActionFlags["string-pattern"]
 	networkTraffic := model.ActionFlags["network-traffic"]
 	if _, ok := spec.IsDestroy(ctx); ok {
-		return ne.stop(sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
+		return ne.stop(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
 	}
 
-	return ne.start(sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
+	return ne.start(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
 }
 
-func (ne *NetworkDropExecutor) start(sourcePort, destinationPort, stringPattern, networkTraffic string, ctx context.Context) *spec.Response {
+func (ne *NetworkDropExecutor) start(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --debug=%t", util.Debug)
+	if sourceIp != "" {
+		args = fmt.Sprintf("%s --source-ip %s", args, sourceIp)
+	}
+	if destinationIp != "" {
+		args = fmt.Sprintf("%s --destination-ip %s", args, destinationIp)
+	}
 	if sourcePort != "" {
 		args = fmt.Sprintf("%s --source-port %s", args, sourcePort)
 	}
@@ -140,8 +162,14 @@ func (ne *NetworkDropExecutor) start(sourcePort, destinationPort, stringPattern,
 	return ne.channel.Run(ctx, path.Join(ne.channel.GetScriptPath(), DropNetworkBin), args)
 }
 
-func (ne *NetworkDropExecutor) stop(sourcePort, destinationPort, stringPattern, networkTraffic string, ctx context.Context) *spec.Response {
+func (ne *NetworkDropExecutor) stop(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--stop --debug=%t", util.Debug)
+	if sourceIp != "" {
+		args = fmt.Sprintf("%s --source-ip %s", args, sourceIp)
+	}
+	if destinationIp != "" {
+		args = fmt.Sprintf("%s --destination-ip %s", args, destinationIp)
+	}
 	if sourcePort != "" {
 		args = fmt.Sprintf("%s --source-port %s", args, sourcePort)
 	}

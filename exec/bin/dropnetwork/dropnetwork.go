@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -27,10 +28,12 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic string
+var dropSourceIp, dropDestinationIp, dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic string
 var dropNetStart, dropNetStop bool
 
 func main() {
+	flag.StringVar(&dropSourceIp, "source-ip", "", "source ip")
+	flag.StringVar(&dropDestinationIp, "destination-ip", "", "destination ip")
 	flag.StringVar(&dropSourcePort, "source-port", "", "source port")
 	flag.StringVar(&dropDestinationPort, "destination-port", "", "destination port")
 	flag.StringVar(&dropStringPattern, "string-pattern", "", "string pattern")
@@ -43,9 +46,9 @@ func main() {
 		bin.PrintErrAndExit("must add --start or --stop flag")
 	}
 	if dropNetStart {
-		startDropNet(dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic)
+		startDropNet(dropSourceIp, dropDestinationIp, dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic)
 	} else if dropNetStop {
-		stopDropNet(dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic)
+		stopDropNet(dropSourceIp, dropDestinationIp, dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
@@ -55,16 +58,16 @@ var cl = channel.NewLocalChannel()
 
 var stopDropNetFunc = stopDropNet
 
-func startDropNet(sourcePort, destinationPort, stringPattern, networkTraffic string) {
+func startDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
 	ctx := context.Background()
-	if destinationPort == "" && sourcePort == "" && stringPattern == "" {
-		bin.PrintErrAndExit("must specify port or string flag")
+	if destinationIp == "" && sourceIp == "" && destinationPort == "" && sourcePort == "" && stringPattern == "" {
+		bin.PrintErrAndExit("must specify ip or port or string flag")
 		return
 	}
-	handleDropSpecifyPort(destinationPort, sourcePort, stringPattern, networkTraffic, ctx)
+	handleDropSpecifyPort(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
 }
 
-func handleDropSpecifyPort(destinationPort string, sourcePort string, stringPattern string, networkTraffic string, ctx context.Context) {
+func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort string, destinationPort string, stringPattern string, networkTraffic string, ctx context.Context) {
 	if !cl.IsCommandAvailable("iptables") {
 		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandIptablesNotFound].Err)
 	}
@@ -80,13 +83,31 @@ func handleDropSpecifyPort(destinationPort string, sourcePort string, stringPatt
 	for _, netFlow := range netFlows {
 		tcpArgs := fmt.Sprintf("-A %s -p tcp", netFlow)
 		udpArgs := fmt.Sprintf("-A %s -p udp", netFlow)
+		if sourceIp != "" {
+			tcpArgs = fmt.Sprintf("%s -s %s", tcpArgs, sourceIp)
+			udpArgs = fmt.Sprintf("%s -s %s", udpArgs, sourceIp)
+		}
+		if destinationIp != "" {
+			tcpArgs = fmt.Sprintf("%s -d %s", tcpArgs, destinationIp)
+			udpArgs = fmt.Sprintf("%s -d %s", udpArgs, destinationIp)
+		}
 		if sourcePort != "" {
-			tcpArgs = fmt.Sprintf("%s --sport %s", tcpArgs, sourcePort)
-			udpArgs = fmt.Sprintf("%s --sport %s", udpArgs, sourcePort)
+			if strings.Contains(sourcePort, ",") {
+				tcpArgs = fmt.Sprintf("%s -m multiport --sports %s", tcpArgs, sourcePort)
+				udpArgs = fmt.Sprintf("%s -m multiport --sports %s", udpArgs, sourcePort)
+			} else {
+				tcpArgs = fmt.Sprintf("%s --sport %s", tcpArgs, sourcePort)
+				udpArgs = fmt.Sprintf("%s --sport %s", udpArgs, sourcePort)
+			}
 		}
 		if destinationPort != "" {
-			tcpArgs = fmt.Sprintf("%s --dport %s", tcpArgs, destinationPort)
-			udpArgs = fmt.Sprintf("%s --dport %s", udpArgs, destinationPort)
+			if strings.Contains(destinationPort, ",") {
+				tcpArgs = fmt.Sprintf("%s -m multiport --dports %s", tcpArgs, destinationPort)
+				udpArgs = fmt.Sprintf("%s -m multiport --dports %s", udpArgs, destinationPort)
+			} else {
+				tcpArgs = fmt.Sprintf("%s --dport %s", tcpArgs, destinationPort)
+				udpArgs = fmt.Sprintf("%s --dport %s", udpArgs, destinationPort)
+			}
 		}
 		if stringPattern != "" {
 			tcpArgs = fmt.Sprintf("%s -m string --string %s --algo bm", tcpArgs, stringPattern)
@@ -96,13 +117,13 @@ func handleDropSpecifyPort(destinationPort string, sourcePort string, stringPatt
 		udpArgs = fmt.Sprintf("%s -j DROP", udpArgs)
 		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, tcpArgs))
 		if !response.Success {
-			stopDropNetFunc(sourcePort, destinationPort, stringPattern, networkTraffic)
+			stopDropNetFunc(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic)
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
 		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, udpArgs))
 		if !response.Success {
-			stopDropNetFunc(sourcePort, destinationPort, stringPattern, networkTraffic)
+			stopDropNetFunc(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic)
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
@@ -110,7 +131,7 @@ func handleDropSpecifyPort(destinationPort string, sourcePort string, stringPatt
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func stopDropNet(sourcePort, destinationPort, stringPattern, networkTraffic string) {
+func stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
 	if !cl.IsCommandAvailable("iptables") {
 		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandIptablesNotFound].Err)
 	}
@@ -127,13 +148,31 @@ func stopDropNet(sourcePort, destinationPort, stringPattern, networkTraffic stri
 	for _, netFlow := range netFlows {
 		tcpArgs := fmt.Sprintf("-D %s -p tcp", netFlow)
 		udpArgs := fmt.Sprintf("-D %s -p udp", netFlow)
+		if sourceIp != "" {
+			tcpArgs = fmt.Sprintf("%s -s %s", tcpArgs, sourceIp)
+			udpArgs = fmt.Sprintf("%s -s %s", udpArgs, sourceIp)
+		}
+		if destinationIp != "" {
+			tcpArgs = fmt.Sprintf("%s -d %s", tcpArgs, destinationIp)
+			udpArgs = fmt.Sprintf("%s -d %s", udpArgs, destinationIp)
+		}
 		if sourcePort != "" {
-			tcpArgs = fmt.Sprintf("%s --sport %s", tcpArgs, sourcePort)
-			udpArgs = fmt.Sprintf("%s --sport %s", udpArgs, sourcePort)
+			if strings.Contains(sourcePort, ",") {
+				tcpArgs = fmt.Sprintf("%s -m multiport --sports %s", tcpArgs, sourcePort)
+				udpArgs = fmt.Sprintf("%s -m multiport --sports %s", udpArgs, sourcePort)
+			} else {
+				tcpArgs = fmt.Sprintf("%s --sport %s", tcpArgs, sourcePort)
+				udpArgs = fmt.Sprintf("%s --sport %s", udpArgs, sourcePort)
+			}
 		}
 		if destinationPort != "" {
-			tcpArgs = fmt.Sprintf("%s --dport %s", tcpArgs, destinationPort)
-			udpArgs = fmt.Sprintf("%s --dport %s", udpArgs, destinationPort)
+			if strings.Contains(destinationPort, ",") {
+				tcpArgs = fmt.Sprintf("%s -m multiport --dports %s", tcpArgs, destinationPort)
+				udpArgs = fmt.Sprintf("%s -m multiport --dports %s", udpArgs, destinationPort)
+			} else {
+				tcpArgs = fmt.Sprintf("%s --dport %s", tcpArgs, destinationPort)
+				udpArgs = fmt.Sprintf("%s --dport %s", udpArgs, destinationPort)
+			}
 		}
 		if stringPattern != "" {
 			tcpArgs = fmt.Sprintf("%s -m string --string %s --algo bm", tcpArgs, stringPattern)

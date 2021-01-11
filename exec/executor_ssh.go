@@ -232,11 +232,9 @@ func (c SSHClient) RunCommandWithResponse(uid, cmd, functionName string) (*spec.
 	if err != nil {
 		util.Errorf(uid, functionName, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, err.Error()))
 		if buf != nil {
-			return spec.ResponseFailWaitResult(spec.OsCmdExecFailed, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].Err, uid),
-				fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, buf)), false
+			return spec.ResponseFail(spec.OsCmdExecFailed, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, buf)), false
 		}
-		return spec.ResponseFailWaitResult(spec.OsCmdExecFailed, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].Err, uid),
-			fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, err.Error())), false
+		return spec.ResponseFail(spec.OsCmdExecFailed, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, err.Error())), false
 	}
 	return nil, true
 }

@@ -113,8 +113,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 
 	if f.channel == nil {
 		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
-			spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 
 	filepath := model.ActionFlags["filepath"]

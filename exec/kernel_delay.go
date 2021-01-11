@@ -123,25 +123,30 @@ func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, mode
 	var step string
 	pidStr := model.ActionFlags["pid"]
 	if pidStr != "" {
-		pids, err := util.ParseIntegerListToStringSlice(pidStr)
+		pids, err := util.ParseIntegerListToStringSlice("pid", pidStr)
 		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				fmt.Sprintf("parse %s flag err, %v", "pid", err))
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
 		}
 		pidList = strings.Join(pids, ",")
 	}
 	time := model.ActionFlags["time"]
 	if time == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --time flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "time"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
 	}
 	syscallName := model.ActionFlags["syscall-name"]
 	if syscallName == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --syscall-name flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "syscall-name"))
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "syscall-name"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "syscall-name"))
 	}
 
 	delay_loc_flag = model.ActionFlags["delay-loc"]
 	if delay_loc_flag == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --delay-loc flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "delay-loc"))
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "delay-loc"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "delay-loc"))
 	}
 	first_flag = model.ActionFlags["first"]
 	end_flag = model.ActionFlags["end"]

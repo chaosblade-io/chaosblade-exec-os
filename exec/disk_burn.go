@@ -104,8 +104,8 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 		return response
 	}
 	if be.channel == nil {
-		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
-			spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	directory := "/"
 	path := model.ActionFlags["path"]

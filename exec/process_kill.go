@@ -22,6 +22,7 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
@@ -109,8 +110,8 @@ func (kpe *KillProcessExecutor) Name() string {
 
 func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if kpe.channel == nil {
-		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
-			spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return spec.ReturnSuccess(uid)
@@ -126,6 +127,12 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd and local-port, less process matcher")
 		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process&process-cmd&local-port"),
 			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process&process-cmd&local-port"))
+	}
+
+	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
+	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
+	if response := checkProcessInvalid(uid, process, processCmd, localPorts, ctx); response != nil {
+		return response
 	}
 	flags := fmt.Sprintf("--debug=%t", util.Debug)
 	if countValue != "" {

@@ -108,7 +108,8 @@ func (*StraceErrorActionExecutor) Name() string {
 
 func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if dae.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 
 	var pidList string
@@ -118,20 +119,23 @@ func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, mode
 
 	pidStr := model.ActionFlags["pid"]
 	if pidStr != "" {
-		pids, err := util.ParseIntegerListToStringSlice(pidStr)
+		pids, err := util.ParseIntegerListToStringSlice("pid", pidStr)
 		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				fmt.Sprintf("parse %s flag err, %v", "pid", err))
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
 		}
 		pidList = strings.Join(pids, ",")
 	}
 	return_value := model.ActionFlags["return-value"]
 	if return_value == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --return-value flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "return-value"))
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "return-value"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "return-value"))
 	}
 	syscallName := model.ActionFlags["syscall-name"]
 	if syscallName == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --syscall-name flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "syscall-name"))
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "syscall-name"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "syscall-name"))
 	}
 
 	first_flag = model.ActionFlags["first"]

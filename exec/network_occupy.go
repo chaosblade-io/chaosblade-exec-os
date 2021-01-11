@@ -90,8 +90,8 @@ func (*OccupyActionExecutor) Name() string {
 
 func (oae *OccupyActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if oae.channel == nil {
-		return spec.ResponseFailWaitResult(spec.ChannelNil, fmt.Sprintf(spec.ResponseErr[spec.ChannelNil].Err, uid),
-			spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	// check reboot permission
 	if osutil.Geteuid() != 0 {

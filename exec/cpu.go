@@ -48,13 +48,13 @@ func NewCpuCommandModelSpec() spec.ExpModelCommandSpec {
 # Create a CPU full load experiment
 blade create cpu load
 
-#Specifies two random kernel's full load
+#Specifies two random core's full load
 blade create cpu load --cpu-percent 60 --cpu-count 2
 
-# Specifies that the kernel is full load with index 0, 3, and that the kernel's index starts at 0
+# Specifies that the core is full load with index 0, 3, and that the core's index starts at 0
 blade create cpu load --cpu-list 0,3
 
-# Specify the kernel full load of indexes 1-3
+# Specify the core full load of indexes 1-3
 blade create cpu load --cpu-list 1-3
 
 # Specified percentage load

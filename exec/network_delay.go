@@ -23,6 +23,8 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type DelayActionSpec struct {
@@ -54,7 +56,8 @@ blade create network delay --time 3000 --interface eth0 --remote-port 80 --desti
 
 # Do a 5 second delay for the entire network card eth0, excluding ports 22 and 8000 to 8080
 blade create network delay --time 5000 --interface eth0 --exclude-port 22,8000-8080`,
-			ActionPrograms: []string{TcNetworkBin},
+			ActionPrograms:   []string{TcNetworkBin},
+			ActionCategories: []string{category.SystemNetwork},
 		},
 	}
 }

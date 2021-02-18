@@ -25,6 +25,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const AppendFileBin = "chaos_appendfile"
@@ -76,7 +78,8 @@ blade create file append --filepath=/home/logs/nginx.log --content=SEVMTE8gV09ST
 # mock interface timeout exception
 blade create file append --filepath=/home/logs/nginx.log --content="@{DATE:+%Y-%m-%d %H:%M:%S} ERROR invoke getUser timeout [@{RANDOM:100-200}]ms abc  mock exception"
 `,
-			ActionPrograms: []string{AppendFileBin},
+			ActionPrograms:   []string{AppendFileBin},
+			ActionCategories: []string{category.SystemFile},
 		},
 	}
 }

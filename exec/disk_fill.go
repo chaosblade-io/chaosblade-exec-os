@@ -24,6 +24,8 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const FillDiskBin = "chaos_filldisk"
@@ -70,7 +72,8 @@ Command: "blade c disk fill --path /home --percent 80 --retain-handle
 
 # Perform a fixed-size experimental scenario
 blade c disk fill --path /home --reserve 1024`,
-			ActionPrograms: []string{FillDiskBin},
+			ActionPrograms:   []string{FillDiskBin},
+			ActionCategories: []string{category.SystemDisk},
 		},
 	}
 }

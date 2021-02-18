@@ -23,6 +23,8 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type ScriptDelayActionCommand struct {
@@ -44,6 +46,7 @@ func NewScriptDelayActionCommand() spec.ExpActionCommandSpec {
 			ActionExample: `
 # Add commands to the script "start0() { sleep 10.000000 ...}"
 blade create script delay --time 10000 --file test.sh --function-name start0`,
+			ActionCategories: []string{category.SystemScript},
 		},
 	}
 }

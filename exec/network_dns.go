@@ -24,6 +24,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type DnsActionSpec struct {
@@ -52,7 +54,8 @@ func NewDnsActionSpec() spec.ExpActionCommandSpec {
 			ActionExample: `
 # The domain name www.baidu.com is not accessible
 blade create network dns --domain www.baidu.com --ip 10.0.0.0`,
-			ActionPrograms: []string{TcNetworkBin},
+			ActionPrograms:   []string{TcNetworkBin},
+			ActionCategories: []string{category.SystemNetwork},
 		},
 	}
 }

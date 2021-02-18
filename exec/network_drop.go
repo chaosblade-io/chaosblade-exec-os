@@ -24,6 +24,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const DropNetworkBin = "chaos_dropnetwork"
@@ -85,7 +87,8 @@ blade create network drop --string-pattern baidu.com --network-traffic out
 # Block outgoing connection to the specific domain on port 80
 blade create network drop --destination-port 80 --string-pattern baidu.com --network-traffic out
 `,
-			ActionPrograms: []string{DropNetworkBin},
+			ActionPrograms:   []string{DropNetworkBin},
+			ActionCategories: []string{category.SystemNetwork},
 		},
 	}
 }
@@ -126,7 +129,7 @@ func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spe
 		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}
 	sourceIp := model.ActionFlags["source-ip"]
-	destinationIp:= model.ActionFlags["destination-ip"]
+	destinationIp := model.ActionFlags["destination-ip"]
 	sourcePort := model.ActionFlags["source-port"]
 	destinationPort := model.ActionFlags["destination-port"]
 	stringPattern := model.ActionFlags["string-pattern"]

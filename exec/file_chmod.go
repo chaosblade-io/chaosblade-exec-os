@@ -25,6 +25,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const ChmodFileBin = "chaos_chmodfile"
@@ -49,7 +51,8 @@ func NewFileChmodActionSpec() spec.ExpActionCommandSpec {
 # Modify /home/logs/nginx.log file permissions to 777
 blade create file chmod --filepath /home/logs/nginx.log --mark=777
 `,
-			ActionPrograms: []string{ChmodFileBin},
+			ActionPrograms:   []string{ChmodFileBin},
+			ActionCategories: []string{category.SystemFile},
 		},
 	}
 }

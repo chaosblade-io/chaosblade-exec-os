@@ -14,73 +14,76 @@
  * limitations under the License.
  */
 
- package exec
+package exec
 
- import (
-	 "context"
-	 "fmt"
-	 "path"
-	 "strings"
+import (
+	"context"
+	"fmt"
+	"path"
+	"strings"
 
-	 "github.com/chaosblade-io/chaosblade-spec-go/spec"
-	 "github.com/chaosblade-io/chaosblade-spec-go/util"
- )
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
- const StraceDelayBin = "chaos_stracedelay"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+)
 
- type StraceDelayActionSpec struct {
-	 spec.BaseExpActionCommandSpec
- }
+const StraceDelayBin = "chaos_stracedelay"
 
- func NewStraceDelayActionSpec() spec.ExpActionCommandSpec {
-	 return &StraceDelayActionSpec{
-		 spec.BaseExpActionCommandSpec{
-			 ActionMatchers: []spec.ExpFlagSpec{
+type StraceDelayActionSpec struct {
+	spec.BaseExpActionCommandSpec
+}
+
+func NewStraceDelayActionSpec() spec.ExpActionCommandSpec {
+	return &StraceDelayActionSpec{
+		spec.BaseExpActionCommandSpec{
+			ActionMatchers: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
-					Name: "pid",
-					Desc: "The Pid of the target process",
+					Name:     "pid",
+					Desc:     "The Pid of the target process",
 					Required: true,
 				},
-			 },
-			 ActionFlags: []spec.ExpFlagSpec{
-				 &spec.ExpFlag{
-					Name: "syscall-name",
-					Desc: "The target syscall which will be injected",
-					Required: true,
-				 },
-				 &spec.ExpFlag{
-					Name: "time",
-					Desc: "sleep time, the unit of time can be specified: s,ms,us,ns",
-					Required: true,
-				 },
-				 &spec.ExpFlag{
-					Name: "delay-loc",
-					Desc: "if the flag is enter, the fault will be injected before the syscall is executed. if the flag is exit, the fault will be injected after the syscall is executed",
+			},
+			ActionFlags: []spec.ExpFlagSpec{
+				&spec.ExpFlag{
+					Name:     "syscall-name",
+					Desc:     "The target syscall which will be injected",
 					Required: true,
 				},
-				 &spec.ExpFlag{
+				&spec.ExpFlag{
+					Name:     "time",
+					Desc:     "sleep time, the unit of time can be specified: s,ms,us,ns",
+					Required: true,
+				},
+				&spec.ExpFlag{
+					Name:     "delay-loc",
+					Desc:     "if the flag is enter, the fault will be injected before the syscall is executed. if the flag is exit, the fault will be injected after the syscall is executed",
+					Required: true,
+				},
+				&spec.ExpFlag{
 					Name: "first",
 					Desc: "if the flag is set, the fault will be injected to the first met syscall",
-				 },
-				 &spec.ExpFlag{
+				},
+				&spec.ExpFlag{
 					Name: "end",
 					Desc: "if the flag is set, the fault will be injected to the last met syscall",
-				 },
-				 &spec.ExpFlag{
+				},
+				&spec.ExpFlag{
 					Name: "step",
 					Desc: "the fault will be injected intervally",
-				 },
-			 },
-			 ActionExecutor: &StraceDelayActionExecutor{},
-			 ActionExample: `
+				},
+			},
+			ActionExecutor: &StraceDelayActionExecutor{},
+			ActionExample: `
 # Create a strace 10s delay experiment to the process
 blade create strace delay --pid 1 --syscall-name mmap --time 10s --delay-loc enter --first=1`,
-			 ActionPrograms: []string{StraceDelayBin},
-		 },
-	 }
- }
+			ActionPrograms:   []string{StraceDelayBin},
+			ActionCategories: []string{category.SystemKernel},
+		},
+	}
+}
 
- func (*StraceDelayActionSpec) Name() string {
+func (*StraceDelayActionSpec) Name() string {
 	return "delay"
 }
 
@@ -103,7 +106,6 @@ type StraceDelayActionExecutor struct {
 	channel spec.Channel
 }
 
-
 func (dae *StraceDelayActionExecutor) SetChannel(channel spec.Channel) {
 	dae.channel = channel
 }
@@ -112,9 +114,9 @@ func (*StraceDelayActionExecutor) Name() string {
 	return "delay"
 }
 
-func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response{
+func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if dae.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError],"channel is nil")
+		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
 	}
 
 	var pidList string
@@ -123,11 +125,11 @@ func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, mode
 	var end_flag string
 	var step string
 	pidStr := model.ActionFlags["pid"]
-	if pidStr != ""{
+	if pidStr != "" {
 		pids, err := util.ParseIntegerListToStringSlice(pidStr)
 		if err != nil {
 			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				fmt.Sprintf("parse %s flag err, %v", "pid",err))
+				fmt.Sprintf("parse %s flag err, %v", "pid", err))
 		}
 		pidList = strings.Join(pids, ",")
 	}
@@ -147,29 +149,29 @@ func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, mode
 	first_flag = model.ActionFlags["first"]
 	end_flag = model.ActionFlags["end"]
 	step = model.ActionFlags["step"]
-	if _, ok := spec.IsDestroy(ctx); ok{
+	if _, ok := spec.IsDestroy(ctx); ok {
 		return dae.stop(ctx, pidList, syscallName)
 	}
-	return dae.start(ctx, pidList, time, syscallName,delay_loc_flag,first_flag,end_flag,step)
+	return dae.start(ctx, pidList, time, syscallName, delay_loc_flag, first_flag, end_flag, step)
 }
 
 //start strace delay
-func (dae *StraceDelayActionExecutor) start(ctx context.Context, pidList string,time string, syscallName string, delay_loc_flag string, first_flag string, end_flag string, step string) *spec.Response{
-	args := fmt.Sprintf("--start --pid %s --time %s --syscall-name %s --delay-loc %s",pidList, time, syscallName, delay_loc_flag)
-	if first_flag != ""{
+func (dae *StraceDelayActionExecutor) start(ctx context.Context, pidList string, time string, syscallName string, delay_loc_flag string, first_flag string, end_flag string, step string) *spec.Response {
+	args := fmt.Sprintf("--start --pid %s --time %s --syscall-name %s --delay-loc %s", pidList, time, syscallName, delay_loc_flag)
+	if first_flag != "" {
 		args = fmt.Sprintf("%s --first %s", args, first_flag)
 	}
-	if end_flag != ""{
-		args = fmt.Sprintf("%s --end %s",args,end_flag)
+	if end_flag != "" {
+		args = fmt.Sprintf("%s --end %s", args, end_flag)
 	}
-	if step != ""{
-		args = fmt.Sprintf("%s --step %s",args,step)
+	if step != "" {
+		args = fmt.Sprintf("%s --step %s", args, step)
 	}
 	// fmt.Println(args)
-	return dae.channel.Run(ctx,path.Join(dae.channel.GetScriptPath(), StraceDelayBin), args)
+	return dae.channel.Run(ctx, path.Join(dae.channel.GetScriptPath(), StraceDelayBin), args)
 }
 
-func (dae *StraceDelayActionExecutor) stop(ctx context.Context, pidList string,  syscallName string) *spec.Response{
-	args := fmt.Sprintf("--stop --pid %s --syscall-name %s",pidList,syscallName)
-	return dae.channel.Run(ctx, path.Join(dae.channel.GetScriptPath(), StraceDelayBin),args)
+func (dae *StraceDelayActionExecutor) stop(ctx context.Context, pidList string, syscallName string) *spec.Response {
+	args := fmt.Sprintf("--stop --pid %s --syscall-name %s", pidList, syscallName)
+	return dae.channel.Run(ctx, path.Join(dae.channel.GetScriptPath(), StraceDelayBin), args)
 }

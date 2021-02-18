@@ -23,6 +23,8 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const StopProcessBin = "chaos_stopprocess"
@@ -55,7 +57,8 @@ blade create process stop --process-cmd java
 
 # Return success even if the process not found
 blade create process stop --process demo --ignore-not-found`,
-			ActionPrograms: []string{StopProcessBin},
+			ActionPrograms:   []string{StopProcessBin},
+			ActionCategories: []string{category.SystemProcess},
 		},
 	}
 }

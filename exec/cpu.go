@@ -27,6 +27,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const BurnCpuBin = "chaos_burncpu"
@@ -59,7 +61,8 @@ blade create cpu load --cpu-list 1-3
 
 # Specified percentage load
 blade create cpu load --cpu-percent 60`,
-						ActionPrograms: []string{BurnCpuBin},
+						ActionPrograms:   []string{BurnCpuBin},
+						ActionCategories: []string{category.SystemCpu},
 					},
 				},
 			},

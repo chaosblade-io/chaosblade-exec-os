@@ -20,11 +20,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/containerd/cgroups"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/process"
-	"go.uber.org/atomic"
-	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
@@ -36,6 +31,11 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/containerd/cgroups"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/process"
+	"go.uber.org/atomic"
+	"io/ioutil"
 
 	_ "go.uber.org/automaxprocs"
 )
@@ -49,23 +49,19 @@ var (
 	maxprocs                                int
 )
 
-func init() {
-	maxprocs = runtime.GOMAXPROCS(-1)
-}
-
 func main() {
 	flag.BoolVar(&burnCpuStart, "start", false, "start burn cpu")
 	flag.BoolVar(&burnCpuStop, "stop", false, "stop burn cpu")
 	flag.StringVar(&cpuList, "cpu-list", "", "CPUs in which to allow burning (1,3)")
 	flag.BoolVar(&burnCpuNohup, "nohup", false, "nohup to run burn cpu")
 	flag.IntVar(&climbTime, "climb-time", 0, "durations(s) to climb")
-	flag.IntVar(&cpuCount, "cpu-count", maxprocs, "number of logic cpus")
+	flag.IntVar(&cpuCount, "cpu-count", runtime.NumCPU(), "number of cpus")
 	flag.IntVar(&cpuPercent, "cpu-percent", 100, "percent of burn-cpu")
 	flag.StringVar(&cpuProcessor, "cpu-processor", "0", "only used for identifying process of cpu burn")
 	bin.ParseFlagAndInitLog()
 
-	if cpuCount <= 0 || cpuCount > maxprocs {
-		cpuCount = maxprocs
+	if cpuCount <= 0 || cpuCount > runtime.NumCPU() {
+		cpuCount = runtime.NumCPU()
 	}
 
 	if burnCpuStart {
@@ -362,7 +358,7 @@ func runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded boo
 
 // bindBurnCpu by taskset command
 func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
-	response := cl.Run(ctx, "taskset", fmt.Sprintf("-cp %s %d", core, pid))
+	response := cl.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
 	if !response.Success {
 		stopBurnCpuFunc()
 		bin.PrintErrAndExit(response.Err)

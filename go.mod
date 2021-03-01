@@ -12,5 +12,6 @@ require (
 	github.com/shirou/gopsutil v2.20.5+incompatible
 	github.com/sirupsen/logrus v1.5.0
 	go.uber.org/atomic v1.7.0
+	go.uber.org/automaxprocs v1.4.0
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 )

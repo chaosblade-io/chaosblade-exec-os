@@ -46,7 +46,6 @@ var (
 	slopePercent                            float64
 	cpuList                                 string
 	cpuProcessor                            string
-	maxprocs                                int
 )
 
 func main() {
@@ -269,7 +268,6 @@ func burnCpuForDocker() {
 			idle := int64(0)
 			all := int64(10000000)
 			ds := time.Duration(0)
-			// 1s分成100等分
 			for i := 0; ; i = (i + 1) % 100 {
 				startTime := time.Now().UnixNano()
 				if i == 0 {

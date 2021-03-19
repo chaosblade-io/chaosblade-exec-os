@@ -34,6 +34,8 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
+
+	_ "go.uber.org/automaxprocs/maxprocs"
 )
 
 var (

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
@@ -83,27 +84,33 @@ func (*ScriptExitExecutor) Name() string {
 }
 
 func (see *ScriptExitExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkScriptExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"cat", "rm", "sed", "awk", "rm"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 	if see.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	scriptFile := model.ActionFlags["file"]
 	if scriptFile == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --file flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "file"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "file"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "file"))
 	}
 	if !util.IsExist(scriptFile) {
-		return spec.ReturnFail(spec.Code[spec.FileNotFound],
-			fmt.Sprintf("%s file not found", scriptFile))
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`, file is invalid. it not found", scriptFile))
+		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "file"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "file"))
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return see.stop(ctx, scriptFile)
 	}
 	functionName := model.ActionFlags["function-name"]
 	if functionName == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --function-name flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "function-name"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "function-name"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "function-name"))
 	}
 	exitMessage := model.ActionFlags["exit-message"]
 	exitCode := model.ActionFlags["exit-code"]

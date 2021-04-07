@@ -115,6 +115,9 @@ func stopChmodFile(filepath string) {
 }
 
 func clearTempFile(filepath string, response *spec.Response, ctx context.Context) (*spec.Response, bool) {
+	if !cl.IsCommandAvailable("cat") {
+		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandCatNotFound].Err)
+	}
 
 	response = cl.Run(ctx, "cat", fmt.Sprintf(`"%s"| grep -v %s:`, tmpFileChmod, filepath))
 	if !response.Success {

@@ -68,6 +68,10 @@ func startDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPa
 }
 
 func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort string, destinationPort string, stringPattern string, networkTraffic string, ctx context.Context) {
+	if !cl.IsCommandAvailable("iptables") {
+		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandIptablesNotFound].Err)
+	}
+
 	var response *spec.Response
 	netFlows := []string{"INPUT", "OUTPUT"}
 	if networkTraffic == "in" {
@@ -88,7 +92,7 @@ func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort str
 			udpArgs = fmt.Sprintf("%s -d %s", udpArgs, destinationIp)
 		}
 		if sourcePort != "" {
-			if strings.Contains(sourcePort, ","){
+			if strings.Contains(sourcePort, ",") {
 				tcpArgs = fmt.Sprintf("%s -m multiport --sports %s", tcpArgs, sourcePort)
 				udpArgs = fmt.Sprintf("%s -m multiport --sports %s", udpArgs, sourcePort)
 			} else {
@@ -97,10 +101,10 @@ func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort str
 			}
 		}
 		if destinationPort != "" {
-			if strings.Contains(destinationPort, ","){
+			if strings.Contains(destinationPort, ",") {
 				tcpArgs = fmt.Sprintf("%s -m multiport --dports %s", tcpArgs, destinationPort)
 				udpArgs = fmt.Sprintf("%s -m multiport --dports %s", udpArgs, destinationPort)
-			}else{
+			} else {
 				tcpArgs = fmt.Sprintf("%s --dport %s", tcpArgs, destinationPort)
 				udpArgs = fmt.Sprintf("%s --dport %s", udpArgs, destinationPort)
 			}
@@ -128,6 +132,10 @@ func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort str
 }
 
 func stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
+	if !cl.IsCommandAvailable("iptables") {
+		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandIptablesNotFound].Err)
+	}
+
 	ctx := context.Background()
 	var response *spec.Response
 	netFlows := []string{"INPUT", "OUTPUT"}
@@ -149,7 +157,7 @@ func stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPat
 			udpArgs = fmt.Sprintf("%s -d %s", udpArgs, destinationIp)
 		}
 		if sourcePort != "" {
-			if strings.Contains(sourcePort, ","){
+			if strings.Contains(sourcePort, ",") {
 				tcpArgs = fmt.Sprintf("%s -m multiport --sports %s", tcpArgs, sourcePort)
 				udpArgs = fmt.Sprintf("%s -m multiport --sports %s", udpArgs, sourcePort)
 			} else {
@@ -158,10 +166,10 @@ func stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPat
 			}
 		}
 		if destinationPort != "" {
-			if strings.Contains(destinationPort, ","){
+			if strings.Contains(destinationPort, ",") {
 				tcpArgs = fmt.Sprintf("%s -m multiport --dports %s", tcpArgs, destinationPort)
 				udpArgs = fmt.Sprintf("%s -m multiport --dports %s", udpArgs, destinationPort)
-			}else{
+			} else {
 				tcpArgs = fmt.Sprintf("%s --dport %s", tcpArgs, destinationPort)
 				udpArgs = fmt.Sprintf("%s --dport %s", udpArgs, destinationPort)
 			}

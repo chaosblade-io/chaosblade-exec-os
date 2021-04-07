@@ -47,11 +47,11 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 				},
 				&spec.ExpFlag{
 					Name: "count",
-					Desc: "the number of append count, default 1",
+					Desc: "the number of append count, must be a positive integer, default 1",
 				},
 				&spec.ExpFlag{
 					Name: "interval",
-					Desc: "append interval, default 1s",
+					Desc: "append interval, must be a positive integer, default 1s",
 				},
 				&spec.ExpFlag{
 					Name:   "escape",
@@ -109,13 +109,14 @@ func (*FileAppendActionExecutor) Name() string {
 }
 
 func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkAppendFileExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"echo", "kill"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 
 	if f.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 
 	filepath := model.ActionFlags["filepath"]
@@ -135,14 +136,18 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		var err error
 		count, err = strconv.Atoi(countStr)
 		if err != nil || count < 1 {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "--count value must be a positive integer")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` value must be a positive integer", "count"))
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "count"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "count"))
 		}
 	}
 	if intervalStr != "" {
 		var err error
 		interval, err = strconv.Atoi(intervalStr)
 		if err != nil || interval < 1 {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "--interval value must be a positive integer")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` value must be a positive integer", "interval"))
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "interval"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "interval"))
 		}
 	}
 
@@ -150,8 +155,9 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 	enableBase64 := model.ActionFlags["enable-base64"] == "true"
 
 	if !util.IsExist(filepath) {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("the %s file does not exist", filepath))
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
+		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "filepath"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "filepath"))
 	}
 
 	return f.start(filepath, content, count, interval, escape, enableBase64, ctx)
@@ -175,14 +181,4 @@ func (f *FileAppendActionExecutor) stop(filepath string, ctx context.Context) *s
 
 func (f *FileAppendActionExecutor) SetChannel(channel spec.Channel) {
 	f.channel = channel
-}
-
-func checkAppendFileExpEnv() error {
-	commands := []string{"echo", "kill"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

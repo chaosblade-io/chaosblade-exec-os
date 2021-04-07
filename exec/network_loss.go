@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
@@ -89,17 +90,21 @@ func (*NetworkLossExecutor) Name() string {
 }
 
 func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkNetworkExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"tc", "head"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
+
 	if nle.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	var dev = ""
 	if netInterface, ok := model.ActionFlags["interface"]; ok {
 		if netInterface == "" {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less interface flag")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
+			return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "interface"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
 		}
 		dev = netInterface
 	}
@@ -108,7 +113,9 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 	percent := model.ActionFlags["percent"]
 	if percent == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less percent flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "percent"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "percent"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "percent"))
 	}
 	localPort := model.ActionFlags["local-port"]
 	remotePort := model.ActionFlags["remote-port"]
@@ -125,7 +132,7 @@ func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, exclu
 	args := fmt.Sprintf("--start --type loss --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
 	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
 	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
 	}
 	return nle.channel.Run(ctx, path.Join(nle.channel.GetScriptPath(), TcNetworkBin), args)
 }

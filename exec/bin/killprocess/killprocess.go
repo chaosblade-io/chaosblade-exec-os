@@ -66,7 +66,7 @@ func killProcess(process, processCmd, localPorts, signal, excludeProcess string,
 		}
 		killProcessName = processCmd
 	} else if localPorts != "" {
-		ports, err := util.ParseIntegerListToStringSlice(localPorts)
+		ports, err := util.ParseIntegerListToStringSlice("local-port", localPorts)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}

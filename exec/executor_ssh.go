@@ -19,14 +19,17 @@ package exec
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/version"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net"
 	"path"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/sirupsen/logrus"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/version"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"golang.org/x/crypto/ssh"
@@ -128,7 +131,8 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 	if portStr != "" {
 		port, err = strconv.Atoi(portStr)
 		if err != nil || port < 1 {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "--port value must be a positive integer")
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "port"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "port"))
 		}
 	}
 
@@ -140,7 +144,9 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 		fmt.Print("Please enter password:")
 		password, err = gopass.GetPasswd()
 		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("password is illegal, err: %s", err.Error()))
+			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "password"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "password"))
 		}
 	} else {
 		useKeyPassphrase := expModel.ActionFlags[SSHKeyPassphraseFlag.Name] == "true"
@@ -148,7 +154,9 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 			fmt.Print(fmt.Sprintf("Please Enter passphrase for key '%s':", key))
 			keyPassphrase, err = gopass.GetPasswd()
 			if err != nil {
-				return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+				util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: get passphrase failed, err: %s", key, err.Error()))
+				return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "passphrase"),
+					fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "passphrase"))
 			}
 		}
 	}
@@ -173,25 +181,17 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 
 	if _, ok := spec.IsDestroy(ctx); ok {
 		output, err := client.RunCommand(fmt.Sprintf("%s destroy %s", bladeBin, uid))
-		return ConvertOutputToResponse(string(output), err, nil)
+		return ConvertOutputToResponse(uid, string(output), err, nil)
 	} else {
 		overrideBladeRelease := expModel.ActionFlags[OverrideBladeRelease.Name] == "true"
 		if overrideBladeRelease {
-			buf, err := client.RunCommand(fmt.Sprintf(`rm -rf %s`, installPath))
-			if err != nil {
-				if buf != nil {
-					return spec.ReturnFail(spec.Code[spec.ExecCommandError], string(buf))
-				}
-				return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
+			if resp, ok := client.RunCommandWithResponse(uid, fmt.Sprintf(`rm -rf %s`, installPath), util.GetRunFuncName()); !ok {
+				return resp
 			}
 		}
 
-		buf, err := client.RunCommand(fmt.Sprintf(`if [ ! -d "%s" ]; then mkdir %s; fi;`, installPath, installPath))
-		if err != nil {
-			if buf != nil {
-				return spec.ReturnFail(spec.Code[spec.ExecCommandError], string(buf))
-			}
-			return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
+		if resp, ok := client.RunCommandWithResponse(uid, fmt.Sprintf(`if [ ! -d "%s" ]; then mkdir %s; fi;`, installPath, installPath), util.GetRunFuncName()); !ok {
+			return resp
 		}
 
 		bladeReleaseURL := expModel.ActionFlags[BladeRelease.Name]
@@ -206,18 +206,13 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 														if [ $? -ne 0 ]; then exit 1; fi;
 														rm -f $(echo "%s" |awk -F '/' '{print $NF}');
 													fi`, bladeBin, bladeReleaseURL, bladeReleaseURL, installPath, bladeReleaseURL)
-		buf, err = client.RunCommand(installCommand)
-		logrus.Debugf("exec command: %s, result: %s, err %s", installCommand, string(buf), err)
-		if err != nil {
-			if buf != nil {
-				return spec.ReturnFail(spec.Code[spec.ExecCommandError], string(buf))
-			}
-			return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
+		if resp, ok := client.RunCommandWithResponse(uid, installCommand, util.GetRunFuncName()); !ok {
+			return resp
 		}
 		createCommand := fmt.Sprintf("%s create %s %s %s --uid %s -d", bladeBin, expModel.Target, expModel.ActionName, matchers, uid)
 		output, err := client.RunCommand(createCommand)
 		logrus.Debugf("exec blade create command: %s, result: %s, err %s", createCommand, string(output), err)
-		return ConvertOutputToResponse(string(output), err, nil)
+		return ConvertOutputToResponse(uid, string(output), err, nil)
 	}
 }
 
@@ -230,6 +225,18 @@ type SSHClient struct {
 	Port          int
 	client        *ssh.Client
 	cipherList    []string
+}
+
+func (c SSHClient) RunCommandWithResponse(uid, cmd, functionName string) (*spec.Response, bool) {
+	buf, err := c.RunCommand(cmd)
+	if err != nil {
+		util.Errorf(uid, functionName, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, err.Error()))
+		if buf != nil {
+			return spec.ResponseFail(spec.OsCmdExecFailed, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, buf)), false
+		}
+		return spec.ResponseFail(spec.OsCmdExecFailed, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, err.Error())), false
+	}
+	return nil, true
 }
 
 func (c SSHClient) RunCommand(command string) ([]byte, error) {
@@ -247,30 +254,24 @@ func (c SSHClient) RunCommand(command string) ([]byte, error) {
 	return buf, err
 }
 
-func ConvertOutputToResponse(output string, err error, defaultResponse *spec.Response) *spec.Response {
+func ConvertOutputToResponse(uid, output string, err error, defaultResponse *spec.Response) *spec.Response {
+	context.Background()
 	if err != nil {
 		response := spec.Decode(err.Error(), defaultResponse)
 		if response.Success {
 			return response
 		}
 		output = strings.TrimSpace(output)
-		if output != "" {
-			return spec.ReturnFail(spec.Code[spec.ExecCommandError], fmt.Sprintf("result: %s, error: %s", output, err.Error()))
-		}
-		return spec.ReturnFail(spec.Code[spec.ExecCommandError], err.Error())
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].ErrInfo, output, err.Error()))
+		return spec.ResponseFailWaitResult(spec.SshExecFailed, fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].Err, output, err.Error()),
+			fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].ErrInfo, output, err.Error()))
 	}
 	output = strings.TrimSpace(output)
 	if output == "" {
-		return spec.ReturnFail(spec.Code[spec.ExecCommandError],
-			"cannot get result message from remote host, please execute recovery and try again")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.SshExecNothing].ErrInfo)
+		return spec.ResponseFailWaitResult(spec.SshExecNothing, spec.ResponseErr[spec.SshExecNothing].Err, spec.ResponseErr[spec.SshExecNothing].ErrInfo)
 	}
 	response := spec.Decode(output, defaultResponse)
-	if response.Success {
-		return response
-	}
-	if response.Code == spec.Code[spec.DecodeError].Code {
-		return spec.ReturnFail(spec.Code[spec.ExecCommandError], output)
-	}
 	return response
 }
 

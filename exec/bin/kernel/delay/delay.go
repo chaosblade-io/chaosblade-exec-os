@@ -18,12 +18,12 @@ import (
 
 var (
 	straceDelayStart, straceDelayStop, straceDelayNohup bool
-	debug bool
-	pidList string
-	time string
-	syscallName string
-	delayLoc string
-	first, end, step string
+	debug                                               bool
+	pidList                                             string
+	time                                                string
+	syscallName                                         string
+	delayLoc                                            string
+	first, end, step                                    string
 )
 
 var straceDelayBin = exec.StraceDelayBin
@@ -108,7 +108,7 @@ func startDelay() {
 		path.Join(util.GetProgramPath(), straceDelayBin), pidList, time, syscallName, delayLoc)
 
 	if first != "" {
-		 args = fmt.Sprintf("%s --first %s", args, first)
+		args = fmt.Sprintf("%s --first %s", args, first)
 	}
 	if end != "" {
 		args = fmt.Sprintf("%s --end %s", args, end)

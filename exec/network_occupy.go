@@ -93,16 +93,19 @@ func (*OccupyActionExecutor) Name() string {
 
 func (oae *OccupyActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if oae.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	// check reboot permission
 	if osutil.Geteuid() != 0 {
 		// not root
-		return spec.ReturnFail(spec.Code[spec.Forbidden], "must be root")
+		return spec.ResponseFailWaitResult(spec.Forbidden, spec.ResponseErr[spec.Forbidden].Err, spec.ResponseErr[spec.Forbidden].ErrInfo)
 	}
 	port := model.ActionFlags["port"]
 	if port == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less --port flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "port"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "port"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "port"))
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return oae.stop(port, ctx)

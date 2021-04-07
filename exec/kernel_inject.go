@@ -23,8 +23,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
-
-type KernelInjectCommandSpec struct{
+type KernelInjectCommandSpec struct {
 	spec.BaseExpModelCommandSpec
 }
 
@@ -51,14 +50,12 @@ func (*KernelInjectCommandSpec) LongDesc() string {
 	return "strace experiment contains syscall delay or syscall error"
 }
 
-
 func checkKernelInjectExpEnv() error {
 	commands := []string{"strace"}
-	for _, command := range commands{
+	for _, command := range commands {
 		if !channel.NewLocalChannel().IsCommandAvailable(command) {
 			return fmt.Errorf("%s command not found", command)
 		}
 	}
 	return nil
 }
-

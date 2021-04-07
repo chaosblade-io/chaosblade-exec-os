@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
@@ -90,23 +91,29 @@ func (de *NetworkDelayExecutor) Name() string {
 }
 
 func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkNetworkExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"tc", "head"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
+
 	if de.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	netInterface := model.ActionFlags["interface"]
 	if netInterface == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less interface parameter")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "interface"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return de.stop(netInterface, ctx)
 	} else {
 		time := model.ActionFlags["time"]
 		if time == "" {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less time flag")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
+			return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "time"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
 		}
 		offset := model.ActionFlags["offset"]
 		if offset == "" {
@@ -128,7 +135,7 @@ func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp
 	args := fmt.Sprintf("--start --type delay --interface %s --time %s --offset %s --debug=%t", netInterface, time, offset, util.Debug)
 	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
 	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
 	}
 	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), TcNetworkBin), args)
 }

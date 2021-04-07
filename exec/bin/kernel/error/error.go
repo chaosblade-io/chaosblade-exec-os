@@ -17,10 +17,10 @@ import (
 
 var (
 	straceErrorStart, straceErrorStop, straceErrorNohup bool
-	pidList string
-	syscallName string
-	returnValue string
-	first, end, step string
+	pidList                                             string
+	syscallName                                         string
+	returnValue                                         string
+	first, end, step                                    string
 )
 
 var straceErrorBin = exec.StraceErrorBin
@@ -127,4 +127,3 @@ func errorNohup() {
 		return
 	}
 }
-

@@ -32,12 +32,12 @@ func Test_startDropNet_failed(t *testing.T) {
 		exitCode = code
 	}
 	tests := []struct {
-		sourceIp  string
-		destinationIp string
-		sourcePort  string
+		sourceIp        string
+		destinationIp   string
+		sourcePort      string
 		destinationPort string
-		stringPattern string
-		networkTraffic string
+		stringPattern   string
+		networkTraffic  string
 	}{
 		{"", "", "", "", "", ""},
 	}
@@ -52,13 +52,13 @@ func Test_startDropNet_failed(t *testing.T) {
 
 func Test_handleDropSpecifyPort(t *testing.T) {
 	type input struct {
-		sourceIp  string
-		destinationIp string
-		sourcePort  string
+		sourceIp        string
+		destinationIp   string
+		sourcePort      string
 		destinationPort string
-		stringPattern string
-		networkTraffic string
-		response   *spec.Response
+		stringPattern   string
+		networkTraffic  string
+		response        *spec.Response
 	}
 	type expect struct {
 		exitCode   int

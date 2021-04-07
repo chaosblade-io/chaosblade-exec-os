@@ -160,6 +160,10 @@ var runBurnMemFunc = runBurnMem
 func startBurnMem() {
 	ctx := context.Background()
 	if burnMemMode == "cache" {
+		if !cl.IsCommandAvailable("mount") {
+			bin.PrintErrAndExit(spec.ResponseErr[spec.CommandMountNotFound].Err)
+		}
+
 		flPath := path.Join(util.GetProgramPath(), dirName)
 		if _, err := os.Stat(flPath); err != nil {
 			err = os.Mkdir(flPath, os.ModePerm)
@@ -213,6 +217,10 @@ func stopBurnMem() (success bool, errs string) {
 	if burnMemMode == "cache" {
 		dirPath := path.Join(util.GetProgramPath(), dirName)
 		if _, err := os.Stat(dirPath); err == nil {
+			if !cl.IsCommandAvailable("umount") {
+				bin.PrintErrAndExit(spec.ResponseErr[spec.CommandUmountNotFound].Err)
+			}
+
 			response = cl.Run(ctx, "umount", dirPath)
 			if !response.Success {
 				if !strings.Contains(response.Err, "not mounted") {
@@ -244,7 +252,7 @@ func calculateMemSize(percent, reserve int) (int64, int64, error) {
 		total = int64(virtualMemory.Total)
 		available = int64(virtualMemory.Free)
 		if burnMemMode == "ram" && !includeBufferCache {
-			available = available + int64(virtualMemory.Buffers + virtualMemory.Cached)
+			available = available + int64(virtualMemory.Buffers+virtualMemory.Cached)
 		}
 	} else {
 		total = int64(memoryStat.Usage.Limit)

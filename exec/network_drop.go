@@ -121,12 +121,13 @@ func (*NetworkDropExecutor) Name() string {
 }
 
 func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkNetworkDropExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"iptables"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 	if ne.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(suid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	sourceIp := model.ActionFlags["source-ip"]
 	destinationIp := model.ActionFlags["destination-ip"]
@@ -189,14 +190,4 @@ func (ne *NetworkDropExecutor) stop(sourceIp, destinationIp, sourcePort, destina
 
 func (ne *NetworkDropExecutor) SetChannel(channel spec.Channel) {
 	ne.channel = channel
-}
-
-func checkNetworkDropExpEnv() error {
-	commands := []string{"iptables"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

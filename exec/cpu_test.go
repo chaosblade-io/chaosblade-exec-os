@@ -32,7 +32,7 @@ func TestParseCpuList(t *testing.T) {
 		{"0-2,4,6-7", []string{"0", "1", "2", "4", "6", "7"}},
 	}
 	for _, tt := range tests {
-		got, err := util.ParseIntegerListToStringSlice(tt.input)
+		got, err := util.ParseIntegerListToStringSlice("input", tt.input)
 		if err != nil {
 			t.Errorf("input is illegal")
 		}

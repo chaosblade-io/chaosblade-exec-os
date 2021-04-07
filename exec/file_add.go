@@ -104,13 +104,14 @@ func (*FileAddActionExecutor) Name() string {
 }
 
 func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkAddFileExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"touch", "mkdir", "echo", "rm"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 
 	if f.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 
 	filepath := model.ActionFlags["filepath"]
@@ -119,8 +120,9 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 
 	if util.IsExist(filepath) {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("the %s file is exist", filepath))
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: filepath is exist", filepath))
+		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "filepath"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "filepath"))
 	}
 
 	directory := model.ActionFlags["directory"] == "true"
@@ -152,14 +154,4 @@ func (f *FileAddActionExecutor) stop(filepath string, ctx context.Context) *spec
 
 func (f *FileAddActionExecutor) SetChannel(channel spec.Channel) {
 	f.channel = channel
-}
-
-func checkAddFileExpEnv() error {
-	commands := []string{"touch", "mkdir", "echo", "rm"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

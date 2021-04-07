@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
@@ -79,41 +80,51 @@ func (*ScriptDelayExecutor) Name() string {
 }
 
 func (sde *ScriptDelayExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkScriptExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"cat", "rm", "sed", "awk", "rm"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 	if sde.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	scriptFile := model.ActionFlags["file"]
 	if scriptFile == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --file flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "file"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "file"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "file"))
 	}
 	if !util.IsExist(scriptFile) {
-		return spec.ReturnFail(spec.Code[spec.FileNotFound],
-			fmt.Sprintf("%s file not found", scriptFile))
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`, file is invalid. it not found", scriptFile))
+		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "file"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "file"))
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return sde.stop(ctx, scriptFile)
 	}
 	functionName := model.ActionFlags["function-name"]
 	if functionName == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --function-name flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "function-name"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "function-name"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "function-name"))
 	}
 	time := model.ActionFlags["time"]
 	if time == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "must specify --time flag")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "time"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
 	}
-	return sde.start(ctx, scriptFile, functionName, time)
-}
-
-func (sde *ScriptDelayExecutor) start(ctx context.Context, scriptFile, functionName, time string) *spec.Response {
 	t, err := strconv.Atoi(time)
 	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "time must be positive integer")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "time")+", it must be positive integer")
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "time"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "time"))
 	}
-	timeInSecond := float32(t) / 1000.0
+	return sde.start(ctx, scriptFile, functionName, t)
+}
+
+func (sde *ScriptDelayExecutor) start(ctx context.Context, scriptFile, functionName string, timt int) *spec.Response {
+	timeInSecond := float32(timt) / 1000.0
 	// backup file
 	response := backScript(sde.channel, scriptFile)
 	if !response.Success {

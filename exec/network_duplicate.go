@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
@@ -80,23 +81,29 @@ func (de *NetworkDuplicateExecutor) Name() string {
 }
 
 func (de *NetworkDuplicateExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkNetworkExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"tc", "head"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
+
 	if de.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	netInterface := model.ActionFlags["interface"]
 	if netInterface == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less interface parameter")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "interface"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return de.stop(netInterface, ctx)
 	} else {
 		percent := model.ActionFlags["percent"]
 		if percent == "" {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters], "less percent flag")
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "percent"))
+			return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "percent"),
+				fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "percent"))
 		}
 		localPort := model.ActionFlags["local-port"]
 		remotePort := model.ActionFlags["remote-port"]
@@ -114,7 +121,7 @@ func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, e
 	args := fmt.Sprintf("--start --type duplicate --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
 	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
 	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters], err.Error())
+		return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
 	}
 	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), TcNetworkBin), args)
 }

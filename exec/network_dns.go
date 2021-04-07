@@ -90,18 +90,20 @@ func (*NetworkDnsExecutor) Name() string {
 var changeDnsBin = "chaos_changedns"
 
 func (ns *NetworkDnsExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	err := checkNetworkDnsExpEnv()
-	if err != nil {
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], err.Error())
+	commands := []string{"grep", "cat", "rm", "echo"}
+	if response, ok := channel.NewLocalChannel().IsAllCommandsAvailable(commands); !ok {
+		return response
 	}
 	if ns.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
 	}
 	domain := model.ActionFlags["domain"]
 	ip := model.ActionFlags["ip"]
 	if domain == "" || ip == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			"less domain or ip arg for dns injection")
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "domain|ip"))
+		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "domain|ip"),
+			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "domain|ip"))
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ns.stop(ctx, domain, ip)
@@ -122,14 +124,4 @@ func (ns *NetworkDnsExecutor) stop(ctx context.Context, domain, ip string) *spec
 
 func (ns *NetworkDnsExecutor) SetChannel(channel spec.Channel) {
 	ns.channel = channel
-}
-
-func checkNetworkDnsExpEnv() error {
-	commands := []string{"grep", "cat", "rm", "echo"}
-	for _, command := range commands {
-		if !channel.NewLocalChannel().IsCommandAvailable(command) {
-			return fmt.Errorf("%s command not found", command)
-		}
-	}
-	return nil
 }

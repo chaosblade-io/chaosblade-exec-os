@@ -24,6 +24,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type CorruptActionSpec struct {
@@ -45,7 +47,8 @@ func NewCorruptActionSpec() spec.ExpActionCommandSpec {
 			ActionExample: `
 # Access to the specified IP request packet is corrupted, 80% of the time
 blade create network corrupt --percent 80 --destination-ip 180.101.49.12 --interface eth0`,
-			ActionPrograms: []string{TcNetworkBin},
+			ActionPrograms:   []string{TcNetworkBin},
+			ActionCategories: []string{category.SystemNetwork},
 		},
 	}
 }

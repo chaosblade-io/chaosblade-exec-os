@@ -23,6 +23,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type ScriptExitActionCommand struct {
@@ -49,6 +51,7 @@ func NewScriptExitActionCommand() spec.ExpActionCommandSpec {
 			ActionExample: `
 # Add commands to the script "start0() { echo this-is-error-message; exit 1; ... }"
 blade create script exit --exit-code 1 --exit-message this-is-error-message --file test.sh --function-name start0`,
+			ActionCategories: []string{category.SystemScript},
 		},
 	}
 }

@@ -25,6 +25,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const BurnMemBin = "chaos_burnmem"
@@ -57,7 +59,8 @@ blade create mem load --mode ram --mem-percent 50 --timeout 200
 
 # 200M memory is reserved
 blade create mem load --mode ram --reserve 200 --rate 100`,
-						ActionPrograms: []string{BurnMemBin},
+						ActionPrograms:   []string{BurnMemBin},
+						ActionCategories: []string{category.SystemMem},
 					},
 				},
 			},

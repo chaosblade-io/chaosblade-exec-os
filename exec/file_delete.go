@@ -25,6 +25,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const DeleteFileBin = "chaos_deletefile"
@@ -52,7 +54,8 @@ blade create file delete --filepath /home/logs/nginx.log
 # Force delete the file /home/logs/nginx.log unrecoverable
 blade create file delete --filepath /home/logs/nginx.log --force
 `,
-			ActionPrograms: []string{DeleteFileBin},
+			ActionPrograms:   []string{DeleteFileBin},
+			ActionCategories: []string{category.SystemFile},
 		},
 	}
 }

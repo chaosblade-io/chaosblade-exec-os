@@ -24,6 +24,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type DuplicateActionSpec struct {
@@ -45,7 +47,8 @@ func NewDuplicateActionSpec() spec.ExpActionCommandSpec {
 			ActionExample: `
 # Specify the network card eth0 and repeat the packet by 10%
 blade create network duplicate --percent=10 --interface=eth0`,
-			ActionPrograms: []string{TcNetworkBin},
+			ActionPrograms:   []string{TcNetworkBin},
+			ActionCategories: []string{category.SystemNetwork},
 		},
 	}
 }

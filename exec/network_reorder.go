@@ -24,6 +24,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type ReorderActionSpec struct {
@@ -59,7 +61,8 @@ func NewReorderActionSpec() spec.ExpActionCommandSpec {
 			ActionExecutor: &NetworkReorderExecutor{},
 			ActionExample: `# Access the specified IP request packet disorder
 blade c network reorder --correlation 80 --percent 50 --gap 2 --time 500 --interface eth0 --destination-ip 180.101.49.12`,
-			ActionPrograms: []string{TcNetworkBin},
+			ActionPrograms:   []string{TcNetworkBin},
+			ActionCategories: []string{category.SystemNetwork},
 		},
 	}
 }

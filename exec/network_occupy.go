@@ -25,6 +25,8 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type OccupyActionSpec struct {
@@ -56,7 +58,8 @@ blade c network occupy --port 8080 --force
 
 # The machine accesses external 14.215.177.39 machine (ping www.baidu.com) 80 port packet loss rate 100%
 blade create network loss --percent 100 --interface eth0 --remote-port 80 --destination-ip 14.215.177.39`,
-			ActionPrograms: []string{TcNetworkBin},
+			ActionPrograms:   []string{TcNetworkBin},
+			ActionCategories: []string{category.SystemNetwork},
 		},
 	}
 }

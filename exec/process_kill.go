@@ -25,6 +25,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const KillProcessBin = "chaos_killprocess"
@@ -76,7 +78,8 @@ blade c process kill --local-port 8080 --signal 15
 
 # Return success even if the process not found
 blade c process kill --process demo --ignore-not-found`,
-			ActionPrograms: []string{KillProcessBin},
+			ActionPrograms:   []string{KillProcessBin},
+			ActionCategories: []string{category.SystemProcess},
 		},
 	}
 }
@@ -98,6 +101,10 @@ func (k *KillProcessActionCommandSpec) LongDesc() string {
 		return k.ActionLongDesc
 	}
 	return "Kill process by process id or process name"
+}
+
+func (*KillProcessActionCommandSpec) Categories() []string {
+	return []string{category.SystemProcess}
 }
 
 type KillProcessExecutor struct {

@@ -24,6 +24,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const AddFileBin = "chaos_addfile"
@@ -71,7 +73,8 @@ blade create file add --filepath /temp/nginx.log --auto-create-dir
 # Create a directory named /nginx in the /temp directory and automatically create directories that don't exist
 blade create file add --directory --filepath /temp/nginx --auto-create-dir
 `,
-			ActionPrograms: []string{AddFileBin},
+			ActionPrograms:   []string{AddFileBin},
+			ActionCategories: []string{category.SystemFile},
 		},
 	}
 }

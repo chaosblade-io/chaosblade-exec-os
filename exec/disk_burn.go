@@ -24,6 +24,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const BurnIOBin = "chaos_burnio"
@@ -67,7 +69,8 @@ blade create disk burn --write --path /home
 
 # Read and write IO load scenarios are performed at the same time. Path is not specified. The default is /
 blade create disk burn --read --write`,
-			ActionPrograms: []string{BurnIOBin},
+			ActionPrograms:   []string{BurnIOBin},
+			ActionCategories: []string{category.SystemDisk},
 		},
 	}
 }

@@ -24,6 +24,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const StraceErrorBin = "chaos_straceerror"
@@ -70,7 +71,8 @@ func NewStraceErrorActionSpec() spec.ExpActionCommandSpec {
 			ActionExample: `
 # Create a strace error experiment to the process
 blade create strace error --pid 1 --syscall-name mmap --return-value XX --delay-loc enter --first=1`,
-			ActionPrograms: []string{StraceErrorBin},
+			ActionPrograms:   []string{StraceErrorBin},
+			ActionCategories: []string{category.SystemKernel},
 		},
 	}
 }

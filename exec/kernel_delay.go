@@ -24,6 +24,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+  "github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const StraceDelayBin = "chaos_stracedelay"
@@ -75,7 +76,8 @@ func NewStraceDelayActionSpec() spec.ExpActionCommandSpec {
 			ActionExample: `
 # Create a strace 10s delay experiment to the process
 blade create strace delay --pid 1 --syscall-name mmap --time 10s --delay-loc enter --first=1`,
-			ActionPrograms: []string{StraceDelayBin},
+			ActionPrograms:   []string{StraceDelayBin},
+			ActionCategories: []string{category.SystemKernel},
 		},
 	}
 }

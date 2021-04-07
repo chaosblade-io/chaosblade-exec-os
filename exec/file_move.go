@@ -25,6 +25,8 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const MoveFileBin = "chaos_movefile"
@@ -65,7 +67,8 @@ blade create file move --filepath /home/logs/nginx.log --target /tmp --force
 # Move the file /home/logs/nginx.log to /temp/ and automatically create directories that don't exist
 blade create file move --filepath /home/logs/nginx.log --target /temp --auto-create-dir
 `,
-			ActionPrograms: []string{MoveFileBin},
+			ActionPrograms:   []string{MoveFileBin},
+			ActionCategories: []string{category.SystemFile},
 		},
 	}
 }

@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package main
+package tcnetwork
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 	"strconv"
 	"strings"
 
@@ -31,14 +32,79 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var tcNetInterface, tcLocalPort, tcRemotePort, tcExcludePort string
-var tcDestinationIp, tcExcludeIp string
-var netPercent, delayNetTime, delayNetOffset string
-var tcNetStart, tcNetStop, tcForce bool
-var tcIgnorePeerPorts bool
-var actionType string
-var reorderGap string
-var correlation string
+// init registry provider to model.
+func init() {
+	model.Provide(new(TCNetwork))
+}
+
+type TCNetwork struct {
+	TcNetInterface    string `name:"interface" json:"interface" yaml:"interface" default:"" help:"network interface"`
+	DelayNetTime      string `name:"time" json:"time" yaml:"time" default:"" help:"delay time"`
+	DelayNetOffset    string `name:"offset" json:"offset" yaml:"offset" default:"" help:"delay offset"`
+	NetPercent        string `name:"percent" json:"percent" yaml:"percent" default:"" help:"loss percent"`
+	TcLocalPort       string `name:"local-port" json:"local-port" yaml:"local-port" default:"" help:"local ports, for example: 80,8080,8081"`
+	TcRemotePort      string `name:"remote-port" json:"remote-port" yaml:"remote-port" default:"" help:"remote ports, for example: 80,8080,8081"`
+	TcExcludePort     string `name:"exclude-port" json:"exclude-port" yaml:"exclude-port" default:"" help:"exclude ports, for example: 22,23"`
+	TcDestinationIp   string `name:"destination-ip" json:"destination-ip" yaml:"destination-ip" default:"" help:"destination ip"`
+	TcExcludeIp       string `name:"exclude-ip" json:"exclude-ip" yaml:"exclude-ip" default:"" help:"exclude ip"`
+	TcNetStart        bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start delay"`
+	TcNetStop         bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop delay"`
+	TcIgnorePeerPorts bool   `name:"ignore-peer-port" json:"ignore-peer-port" yaml:"ignore-peer-port" default:"false" help:"ignore excluding all ports communicating with this port, generally used when the ss command does not exist"`
+	ActionType        string `name:"type" json:"type" yaml:"type" default:"" help:"network experiment type, value is delay|loss|duplicate|corrupt|reorder, required"`
+	ReorderGap        string `name:"gap" json:"gap" yaml:"gap" default:"" help:"packets gap"`
+	Correlation       string `name:"correlation" json:"correlation" yaml:"correlation" default:"0" help:"correlation on previous packet"`
+	TcForce           bool   `name:"force" json:"force" yaml:"force" default:"false" help:"forcibly overwrites the original rules"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+	StopNet func(netInterface string) `kong:"-"`
+}
+
+func (that *TCNetwork) Assign() model.Worker {
+	worker := &TCNetwork{Channel: channel.NewLocalChannel()}
+	worker.StopNet = func(netInterface string) {
+		worker.stopNet(netInterface)
+	}
+	return worker
+}
+
+func (that *TCNetwork) Name() string {
+	return exec.TcNetworkBin
+}
+
+func (that *TCNetwork) Exec() *spec.Response {
+	if that.TcNetInterface == "" {
+		bin.PrintErrAndExit("less --interface flag")
+	}
+
+	if that.TcNetStart {
+		var classRule string
+		switch that.ActionType {
+		case Delay:
+			classRule = fmt.Sprintf("netem delay %sms %sms", that.DelayNetTime, that.DelayNetOffset)
+		case Loss:
+			classRule = fmt.Sprintf("netem loss %s%%", that.NetPercent)
+		case Duplicate:
+			classRule = fmt.Sprintf("netem duplicate %s%%", that.NetPercent)
+		case Corrupt:
+			classRule = fmt.Sprintf("netem corrupt %s%%", that.NetPercent)
+		case Reorder:
+			classRule = fmt.Sprintf("netem reorder %s%% %s%%", that.NetPercent, that.Correlation)
+			if that.ReorderGap != "" {
+				classRule = fmt.Sprintf("%s gap %s", classRule, that.ReorderGap)
+			}
+			classRule = fmt.Sprintf("%s delay %sms", classRule, that.DelayNetTime)
+		default:
+			bin.PrintErrAndExit("unsupported type for network experiments")
+		}
+		that.startNet(that.TcNetInterface, classRule, that.TcLocalPort, that.TcRemotePort, that.TcExcludePort, that.TcDestinationIp, that.TcExcludeIp, that.TcForce)
+	} else if that.TcNetStop {
+		that.stopNet(that.TcNetInterface)
+	} else {
+		bin.PrintErrAndExit("less --start or --stop flag")
+	}
+	return spec.ReturnSuccess("")
+}
 
 const delimiter = ","
 const (
@@ -49,62 +115,9 @@ const (
 	Reorder   = "reorder"
 )
 
-func main() {
-	flag.StringVar(&tcNetInterface, "interface", "", "network interface")
-	flag.StringVar(&delayNetTime, "time", "", "delay time")
-	flag.StringVar(&delayNetOffset, "offset", "", "delay offset")
-	flag.StringVar(&netPercent, "percent", "", "loss percent")
-	flag.StringVar(&tcLocalPort, "local-port", "", "local ports, for example: 80,8080,8081")
-	flag.StringVar(&tcRemotePort, "remote-port", "", "remote ports, for example: 80,8080,8081")
-	flag.StringVar(&tcExcludePort, "exclude-port", "", "exclude ports, for example: 22,23")
-	flag.StringVar(&tcDestinationIp, "destination-ip", "", "destination ip")
-	flag.StringVar(&tcExcludeIp, "exclude-ip", "", "exclude ip")
-	flag.BoolVar(&tcNetStart, "start", false, "start delay")
-	flag.BoolVar(&tcNetStop, "stop", false, "stop delay")
-	flag.BoolVar(&tcIgnorePeerPorts, "ignore-peer-port", false, "ignore excluding all ports communicating with this port, generally used when the ss command does not exist")
-	flag.StringVar(&actionType, "type", "", "network experiment type, value is delay|loss|duplicate|corrupt|reorder, required")
-	flag.StringVar(&reorderGap, "gap", "", "packets gap")
-	flag.StringVar(&correlation, "correlation", "0", "correlation on previous packet")
-	flag.BoolVar(&tcForce, "force", false, "forcibly overwrites the original rules")
-	bin.ParseFlagAndInitLog()
-
-	if tcNetInterface == "" {
-		bin.PrintErrAndExit("less --interface flag")
-	}
-
-	if tcNetStart {
-		var classRule string
-		switch actionType {
-		case Delay:
-			classRule = fmt.Sprintf("netem delay %sms %sms", delayNetTime, delayNetOffset)
-		case Loss:
-			classRule = fmt.Sprintf("netem loss %s%%", netPercent)
-		case Duplicate:
-			classRule = fmt.Sprintf("netem duplicate %s%%", netPercent)
-		case Corrupt:
-			classRule = fmt.Sprintf("netem corrupt %s%%", netPercent)
-		case Reorder:
-			classRule = fmt.Sprintf("netem reorder %s%% %s%%", netPercent, correlation)
-			if reorderGap != "" {
-				classRule = fmt.Sprintf("%s gap %s", classRule, reorderGap)
-			}
-			classRule = fmt.Sprintf("%s delay %sms", classRule, delayNetTime)
-		default:
-			bin.PrintErrAndExit("unsupported type for network experiments")
-		}
-		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp, tcForce)
-	} else if tcNetStop {
-		stopNet(tcNetInterface)
-	} else {
-		bin.PrintErrAndExit("less --start or --stop flag")
-	}
-}
-
-var cl = channel.NewLocalChannel()
-
-func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string, force bool) {
+func (that *TCNetwork) startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string, force bool) {
 	// check device txqueuelen size, if the size is zero, then set the value to 1000
-	response := preHandleTxqueue(netInterface)
+	response := that.preHandleTxqueue(netInterface)
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 	}
@@ -118,25 +131,25 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 		}
 	}
 	if force {
-		stopNet(netInterface)
+		that.stopNet(netInterface)
 	}
 	ctx := context.Background()
 	// Only interface flag
 	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" {
-		response := cl.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
+		response := that.Channel.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 		}
 		bin.PrintOutputAndExit(response.Result.(string))
 		return
 	}
-	response = addQdiscForDL(cl, ctx, netInterface)
+	response = addQdiscForDL(that.Channel, ctx, netInterface)
 
 	var excludePorts []string
 	if excludePort != "" {
-		excludePorts, err = getExcludePorts(excludePort)
+		excludePorts, err = that.getExcludePorts(excludePort)
 		if err != nil {
-			stopDLNetFunc(netInterface)
+			that.StopNet(netInterface)
 			bin.PrintErrAndExit(response.Err)
 		}
 	}
@@ -145,24 +158,24 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	if localPort == "" && remotePort == "" && destIp == "" {
 		// Add class rule to 1,2,3 band, exclude port and exclude ip are added to 4 band
 		args := buildNetemToDefaultBandsArgs(netInterface, classRule)
-		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts, excludeIp)
-		response := cl.Run(ctx, "tc", args+excludeFilters)
+		excludeFilters := that.buildExcludeFilterToNewBand(netInterface, excludePorts, excludeIp)
+		response := that.Channel.Run(ctx, "tc", args+excludeFilters)
 		if !response.Success {
-			stopDLNetFunc(netInterface)
+			that.StopNet(netInterface)
 			bin.PrintErrAndExit(response.Err)
 		}
 		bin.PrintOutputAndExit(response.Result.(string))
 		return
 	}
-	destIpRules := getIpRules(destIp)
-	excludeIpRules := getIpRules(excludeIp)
+	destIpRules := that.getIpRules(destIp)
+	excludeIpRules := that.getIpRules(excludeIp)
 	// local port or remote port
-	response = executeTargetPortAndIpWithExclude(ctx, cl, netInterface, classRule, localPort, remotePort, destIpRules,
+	response = that.executeTargetPortAndIpWithExclude(ctx, that.Channel, netInterface, classRule, localPort, remotePort, destIpRules,
 		excludePorts, excludeIpRules)
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func getExcludePorts(excludePort string) ([]string, error) {
+func (that *TCNetwork) getExcludePorts(excludePort string) ([]string, error) {
 	ports := strings.Split(excludePort, delimiter)
 
 	// add peer ports
@@ -171,8 +184,8 @@ func getExcludePorts(excludePort string) ([]string, error) {
 		if _, ok := portSet[p]; !ok {
 			portSet[p] = struct{}{}
 		}
-		if !tcIgnorePeerPorts {
-			peerPorts, err := getPeerPorts(p)
+		if !that.TcIgnorePeerPorts {
+			peerPorts, err := that.getPeerPorts(p)
 			if err != nil {
 				logrus.Warningf("get peer ports for %s err, %v", p, err)
 				errMsg := fmt.Sprintf("get peer ports for %s err, %v, please solve the problem or skip to exclude peer ports by --ignore-peer-port flag", p, err)
@@ -194,9 +207,9 @@ func getExcludePorts(excludePort string) ([]string, error) {
 	return excludePorts, nil
 }
 
-func buildExcludeFilterToNewBand(netInterface string, excludePorts []string, excludeIp string) string {
+func (that *TCNetwork) buildExcludeFilterToNewBand(netInterface string, excludePorts []string, excludeIp string) string {
 	var args string
-	excludeIpRules := getIpRules(excludeIp)
+	excludeIpRules := that.getIpRules(excludeIp)
 	for _, rule := range excludeIpRules {
 		args = fmt.Sprintf(
 			`%s && \
@@ -233,12 +246,12 @@ func readServerIps() ([]string, error) {
 	return ips, nil
 }
 
-func preHandleTxqueue(netInterface string) *spec.Response {
+func (that *TCNetwork) preHandleTxqueue(netInterface string) *spec.Response {
 	txFile := fmt.Sprintf("/sys/class/net/%s/tx_queue_len", netInterface)
 	isExist := util.IsExist(txFile)
 	if isExist {
 		// check the value
-		response := cl.Run(context.TODO(), "head", fmt.Sprintf("-1 %s", txFile))
+		response := that.Channel.Run(context.TODO(), "head", fmt.Sprintf("-1 %s", txFile))
 		if response.Success {
 			txlen := strings.TrimSpace(response.Result.(string))
 			len, err := strconv.Atoi(txlen)
@@ -253,9 +266,9 @@ func preHandleTxqueue(netInterface string) *spec.Response {
 			}
 		}
 	}
-	if cl.IsCommandAvailable("ifconfig") {
+	if that.Channel.IsCommandAvailable("ifconfig") {
 		// set to 1000 directly
-		response := cl.Run(context.TODO(), "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
+		response := that.Channel.Run(context.TODO(), "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
 		if !response.Success {
 			logrus.Warningf("set txqueuelen for %s err, %s", netInterface, response.Err)
 		}
@@ -264,7 +277,7 @@ func preHandleTxqueue(netInterface string) *spec.Response {
 	return spec.ReturnSuccess("success")
 }
 
-func getIpRules(targetIp string) []string {
+func (that *TCNetwork) getIpRules(targetIp string) []string {
 	if targetIp == "" {
 		return []string{}
 	}
@@ -280,16 +293,15 @@ func getIpRules(targetIp string) []string {
 	return ipRules
 }
 
-var stopDLNetFunc = stopNet
 
 // executeTargetPortAndIpWithExclude creates class rule in 1:4 queue and add filter to the queue
-func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel,
+func (that *TCNetwork) executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel,
 	netInterface, classRule, localPort, remotePort string, destIpRules, excludePorts, excludeIpRules []string) *spec.Response {
 	args := fmt.Sprintf(`qdisc add dev %s parent 1:4 handle 40: %s`, netInterface, classRule)
 	args = buildTargetFilterPortAndIp(localPort, remotePort, destIpRules, excludePorts, excludeIpRules, args, netInterface)
 	response := channel.Run(ctx, "tc", args)
 	if !response.Success {
-		stopDLNetFunc(netInterface)
+		that.StopNet(netInterface)
 		bin.PrintErrAndExit(response.Err)
 	}
 	return response
@@ -373,19 +385,19 @@ func addQdiscForDL(channel spec.Channel, ctx context.Context, netInterface strin
 }
 
 // stopNet, no need to add os.Exit
-func stopNet(netInterface string) {
+func (that *TCNetwork) stopNet(netInterface string) {
 	ctx := context.Background()
-	cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
-	cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
+	that.Channel.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+	that.Channel.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
 }
 
 // getPeerPorts returns all ports communicating with the port
-func getPeerPorts(port string) ([]string, error) {
-	response := cl.Run(context.TODO(), "command", "-v ss")
+func (that *TCNetwork) getPeerPorts(port string) ([]string, error) {
+	response := that.Channel.Run(context.TODO(), "command", "-v ss")
 	if !response.Success {
 		return nil, fmt.Errorf("ss command not found")
 	}
-	response = cl.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
+	response = that.Channel.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
 	if !response.Success {
 		return nil, fmt.Errorf(response.Err)
 	}

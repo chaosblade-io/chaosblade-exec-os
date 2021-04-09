@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package burnio
 
 import (
 	"context"
@@ -50,9 +50,12 @@ func Test_startBurnIO_startFailed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	stopBurnIOFunc = func(directory string, read, write bool) {}
-	cl = channel.NewMockLocalChannel()
-	mockChannel := cl.(*channel.MockLocalChannel)
+
+	burnIO := &BurnIO{}
+	burnIO.Assign()
+	burnIO.Channel = channel.NewMockLocalChannel()
+	burnIO.StopBurnIO = func(directory string, read, write bool) {}
+	mockChannel := burnIO.Channel.(*channel.MockLocalChannel)
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
@@ -60,7 +63,7 @@ func Test_startBurnIO_startFailed(t *testing.T) {
 	}
 	expectedCommands := []string{fmt.Sprintf(`nohup %s --directory /home/admin --size 1024 --read=true --write=true --nohup=true > %s 2>&1 &`, burnBin, logFile)}
 
-	startBurnIO(as.directory, as.size, as.read, as.write)
+	burnIO.StartBurnIO(as.directory, as.size, as.read, as.write)
 	if exitCode != 1 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
@@ -83,10 +86,12 @@ func Test_stopBurnIO(t *testing.T) {
 			write:     true,
 		},
 	}
-	cl = channel.NewMockLocalChannel()
+	burnIO := &BurnIO{}
+	burnIO.Assign()
+	burnIO.Channel = channel.NewMockLocalChannel()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stopBurnIO(tt.directory, tt.read, tt.write)
+			burnIO.StopBurnIO(tt.directory, tt.read, tt.write)
 		})
 	}
 }

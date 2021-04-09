@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package burncpu
 
 import (
 	"context"
@@ -44,17 +44,21 @@ func Test_startBurnCpu(t *testing.T) {
 		{"test1", args{"1,2,3,5", 0, 50}},
 		{"test2", args{"", 3, 50}},
 	}
-	runBurnCpuFunc = func(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climTime int) int {
+
+	burnCPU := &BurnCPU{}
+	burnCPU.Assign()
+	burnCPU.Channel = channel.NewMockLocalChannel()
+	burnCPU.RunBurnCpu = func(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climTime int) int {
 		return 25233
 	}
-	bindBurnCpuFunc = func(ctx context.Context, core string, pid int) {}
-	checkBurnCpuFunc = func(ctx context.Context) {}
+	burnCPU.BindBurnCpuByTaskSet = func(ctx context.Context, core string, pid int) {}
+	burnCPU.CheckBurnCpu = func(ctx context.Context) {}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cpuList = tt.args.cpuList
-			cpuCount = tt.args.cpuCount
-			cpuPercent = tt.args.cpuPercent
-			startBurnCpu()
+			burnCPU.CpuList = tt.args.cpuList
+			burnCPU.CpuCount = tt.args.cpuCount
+			burnCPU.CpuPercent = tt.args.cpuPercent
+			burnCPU.startBurnCpu()
 		})
 	}
 }
@@ -77,12 +81,15 @@ func Test_runBurnCpu_failed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	stopBurnCpuFunc = func() (bool, string) {
+
+	burnCPU := &BurnCPU{}
+	burnCPU.Assign()
+	burnCPU.Channel = channel.NewMockLocalChannel()
+	burnCPU.StopBurnCpu = func() (bool, string) {
 		return true, ""
 	}
 
-	cl = channel.NewMockLocalChannel()
-	mockChannel := cl.(*channel.MockLocalChannel)
+	mockChannel := burnCPU.Channel.(*channel.MockLocalChannel)
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
@@ -90,7 +97,7 @@ func Test_runBurnCpu_failed(t *testing.T) {
 	}
 	expectedCommands := []string{fmt.Sprintf(`nohup %s --nohup --cpu-count 2 --cpu-percent 50 > /dev/null 2>&1 &`, burnBin)}
 
-	runBurnCpu(context.Background(), as.cpuCount, as.cpuPercent, as.pidNeeded, as.processor, 0)
+	burnCPU.RunBurnCpu(context.Background(), as.cpuCount, as.cpuPercent, as.pidNeeded, as.processor, 0)
 	if exitCode != 1 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
@@ -113,9 +120,12 @@ func Test_bindBurnCpu(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	stopBurnCpuFunc = func() (bool, string) { return true, "" }
-	cl = channel.NewMockLocalChannel()
-	mockChannel := cl.(*channel.MockLocalChannel)
+
+	burnCPU := &BurnCPU{}
+	burnCPU.Assign()
+	burnCPU.Channel = channel.NewMockLocalChannel()
+	burnCPU.StopBurnCpu = func() (bool, string) { return true, "" }
+	mockChannel := burnCPU.Channel.(*channel.MockLocalChannel)
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
@@ -123,7 +133,7 @@ func Test_bindBurnCpu(t *testing.T) {
 	}
 	expectedCommands := []string{fmt.Sprintf(`taskset -a -cp 0 25233`)}
 
-	bindBurnCpuByTaskset(context.Background(), as.core, as.pid)
+	burnCPU.BindBurnCpuByTaskSet(context.Background(), as.core, as.pid)
 	if exitCode != 1 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
@@ -136,7 +146,11 @@ func Test_checkBurnCpu(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	checkBurnCpu(context.Background())
+
+	burnCPU := &BurnCPU{}
+	burnCPU.Assign()
+	burnCPU.Channel = channel.NewMockLocalChannel()
+	burnCPU.CheckBurnCpu(context.Background())
 	if exitCode != 1 {
 		t.Errorf("unexpected result %d, expected result: %d", exitCode, 1)
 	}
@@ -148,9 +162,13 @@ func Test_stopBurnCpu(t *testing.T) {
 	}{
 		{"stop"},
 	}
+
+	burnCPU := &BurnCPU{}
+	burnCPU.Assign()
+	burnCPU.Channel = channel.NewMockLocalChannel()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stopBurnCpu()
+			burnCPU.StopBurnCpu()
 		})
 	}
 }

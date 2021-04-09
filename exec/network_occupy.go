@@ -132,7 +132,7 @@ func (oae *OccupyActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	return oae.start(port, ctx)
 }
 
-var OccupyNetworkBin = "chaos_occupynetwork"
+const OccupyNetworkBin = "chaos_occupynetwork"
 
 func (oae *OccupyActionExecutor) start(port string, ctx context.Context) *spec.Response {
 	return oae.channel.Run(ctx, path.Join(oae.channel.GetScriptPath(), OccupyNetworkBin),

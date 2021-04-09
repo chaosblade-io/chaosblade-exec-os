@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package main
+package occupynetwork
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"net/http"
 	"path"
 	"strings"
@@ -33,44 +34,57 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var occupiedPort string
-var occupiedStart, occupiedStop, occupiedNohup bool
+// init registry provider to model.
+func init() {
+	model.Provide(new(OccupyNetwork))
+}
 
-const DefaultPort = ""
+type OccupyNetwork struct {
+	OccupiedPort  string `name:"port" json:"port" yaml:"port" default:"" help:"the port occupied"`
+	OccupiedStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start operation"`
+	OccupiedStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop operation"`
+	OccupiedNohup bool   `name:"nohup" json:"nohup" yaml:"nohup" default:"false" help:"nohup operation"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-func main() {
-	flag.StringVar(&occupiedPort, "port", "", "the port occupied")
-	flag.BoolVar(&occupiedStart, "start", false, "start operation")
-	flag.BoolVar(&occupiedStop, "stop", false, "stop operation")
-	flag.BoolVar(&occupiedNohup, "nohup", false, "nohup operation")
-	bin.ParseFlagAndInitLog()
+func (that *OccupyNetwork) Assign() model.Worker {
+	return &OccupyNetwork{Channel: channel.NewLocalChannel()}
+}
 
-	if occupiedPort == DefaultPort {
+func (that *OccupyNetwork) Name() string {
+	return exec.OccupyNetworkBin
+}
+
+func (that *OccupyNetwork) Exec() *spec.Response {
+	if that.OccupiedPort == DefaultPort {
 		bin.PrintAndExitWithErrPrefix("illegal port value")
 	}
-	if occupiedStart {
-		startOccupy(occupiedPort)
-	} else if occupiedStop {
-		stopOccupy(occupiedPort)
+	if that.OccupiedStart {
+		that.startOccupy(that.OccupiedPort)
+	} else if that.OccupiedStop {
+		that.stopOccupy(that.OccupiedPort)
 	} else {
 		bin.PrintAndExitWithErrPrefix("less --start or --stop flag")
 	}
-
+	return spec.ReturnSuccess("")
 }
+
+const DefaultPort = ""
 
 var occupyLogFile = util.GetNohupOutput(util.Bin, "chaos_occupynetwork.log")
 
-func startOccupy(port string) {
-	if occupiedNohup {
+func (that *OccupyNetwork) startOccupy(port string) {
+	if that.OccupiedNohup {
 		err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 		if err != nil {
 			bin.PrintAndExitWithErrPrefix(err.Error())
 		}
 	} else {
 		// start the program
-		channel := channel.NewLocalChannel()
 		ctx := context.Background()
-		response := channel.Run(ctx, "nohup",
+		response := that.Channel.Run(ctx, "nohup",
 			fmt.Sprintf(`%s --start --port %s --nohup=true > %s 2>&1 &`,
 				path.Join(util.GetProgramPath(), exec.OccupyNetworkBin), port, occupyLogFile))
 		if !response.Success {
@@ -78,7 +92,7 @@ func startOccupy(port string) {
 		}
 		// check
 		time.Sleep(time.Second)
-		response = channel.Run(ctx, "grep", fmt.Sprintf("%s %s", bin.ErrPrefix, occupyLogFile))
+		response = that.Channel.Run(ctx, "grep", fmt.Sprintf("%s %s", bin.ErrPrefix, occupyLogFile))
 		if response.Success {
 			errMsg := strings.TrimSpace(response.Result.(string))
 			if errMsg != "" {
@@ -88,15 +102,14 @@ func startOccupy(port string) {
 	}
 }
 
-func stopOccupy(port string) {
-	chl := channel.NewLocalChannel()
+func (that *OccupyNetwork) stopOccupy(port string) {
 	ctx := context.WithValue(context.Background(), channel.ProcessKey, exec.OccupyNetworkBin)
-	pids, err := chl.GetPidsByProcessName(fmt.Sprintf(`port %s --nohup`, port), ctx)
+	pids, err := that.Channel.GetPidsByProcessName(fmt.Sprintf(`port %s --nohup`, port), ctx)
 	if err != nil {
 		logrus.Warnf("get %s pid failed, %v", exec.OccupyNetworkBin, err)
 	}
 	if pids != nil || len(pids) >= 0 {
-		chl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+		that.Channel.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 	}
-	chl.Run(ctx, "rm", fmt.Sprintf("-rf %s*", occupyLogFile))
+	that.Channel.Run(ctx, "rm", fmt.Sprintf("-rf %s*", occupyLogFile))
 }

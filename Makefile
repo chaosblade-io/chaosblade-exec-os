@@ -6,6 +6,7 @@ GO_ENV=CGO_ENABLED=1
 GO_MODULE=GO111MODULE=on
 GO=env $(GO_ENV) $(GO_MODULE) go
 GO_FLAGS=-ldflags="-s -w"
+GO_BUILD=run build/build/main.go
 
 UNAME := $(shell uname)
 
@@ -49,59 +50,59 @@ build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_chan
 
 # build burn-cpu chaos tools
 build_burncpu: exec/bin/burncpu/burncpu.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_burncpu $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_burncpu $<
 
 # build burn-mem chaos tools
 build_burnmem: exec/bin/burnmem/burnmem.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_burnmem $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_burnmem $<
 
 # build burn-io chaos tools
 build_burnio: exec/disk/bin/burnio.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_burnio $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_burnio $<
 
 # build kill-process chaos tools
 build_killprocess: exec/bin/killprocess/killprocess.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_killprocess $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_killprocess $<
 
 # build stop-process chaos tools
 build_stopprocess: exec/bin/stopprocess/stopprocess.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_stopprocess $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_stopprocess $<
 
 build_changedns: exec/bin/changedns/changedns.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_changedns $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_changedns $<
 
 build_tcnetwork: exec/bin/tcnetwork/tcnetwork.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_tcnetwork $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_tcnetwork $<
 
 build_dropnetwork: exec/bin/dropnetwork/dropnetwork.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_dropnetwork $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_dropnetwork $<
 
 build_filldisk: exec/bin/filldisk/filldisk.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_filldisk $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_filldisk $<
 
 build_occupynetwork: exec/bin/occupynetwork/occupynetwork.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_occupynetwork $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_occupynetwork $<
 
 build_appendfile: exec/bin/file/appendfile/appendfile.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_appendfile $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_appendfile $<
 
 build_chmodfile: exec/bin/file/chmodfile/chmodfile.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_chmodfile $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_chmodfile $<
 
 build_addfile: exec/bin/file/addfile/addfile.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_addfile $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_addfile $<
 
 build_deletefile: exec/bin/file/deletefile/deletefile.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_deletefile $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_deletefile $<
 
 build_movefile: exec/bin/file/movefile/movefile.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_movefile $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_movefile $<
 
 build_kernel_delay: exec/bin/kernel/delay/delay.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_stracedelay $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_stracedelay $<
 
 build_kernel_error: exec/bin/kernel/error/error.go
-	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_straceerror $<
+	$(GO) $(GO_BUILD) $(GO_FLAGS) -o=$(BUILD_TARGET_BIN)/chaos_straceerror $<
 
 cp_strace:
 	cp extra/strace $(BUILD_TARGET_BIN)/

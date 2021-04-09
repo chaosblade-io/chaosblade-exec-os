@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package changedns
 
 import (
 	"context"
@@ -64,8 +64,10 @@ func Test_startChangeDns_failed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	cl = channel.NewMockLocalChannel()
-	mockChannel := cl.(*channel.MockLocalChannel)
+	changeDNS := &ChangeDNS{}
+	changeDNS.Assign()
+	changeDNS.Channel = channel.NewMockLocalChannel()
+	mockChannel := changeDNS.Channel.(*channel.MockLocalChannel)
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
@@ -73,7 +75,7 @@ func Test_startChangeDns_failed(t *testing.T) {
 	}
 	expectedCommands := []string{fmt.Sprintf(`grep -q "208.80.152.2 abc.com #chaosblade" /etc/hosts`)}
 
-	startChangeDns(as.domain, as.ip)
+	changeDNS.startChangeDns(as.domain, as.ip)
 	if exitCode != 1 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
@@ -97,15 +99,17 @@ func Test_recoverDns_failed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	cl = channel.NewMockLocalChannel()
-	mockChannel := cl.(*channel.MockLocalChannel)
+	changeDNS := &ChangeDNS{}
+	changeDNS.Assign()
+	changeDNS.Channel = channel.NewMockLocalChannel()
+	mockChannel := changeDNS.Channel.(*channel.MockLocalChannel)
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
 		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "grep command not found")
 	}
 	expectedCommands := []string{fmt.Sprintf(`grep -q "208.80.152.2 abc.com #chaosblade" /etc/hosts`)}
-	recoverDns(as.domain, as.ip)
+	changeDNS.recoverDns(as.domain, as.ip)
 	if exitCode != 0 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}

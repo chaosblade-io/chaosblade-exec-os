@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package main
+package burncpu
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"path"
 	"runtime"
 	"strconv"
@@ -36,45 +37,77 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var (
-	burnCpuStart, burnCpuStop, burnCpuNohup bool
-	cpuCount                                int
-	cpuList                                 string
-	cpuPercent                              int
-	cpuProcessor                            string
-)
+// init registry provider to model.
+func init() {
+	model.Provide(new(BurnCPU))
+}
 
-func main() {
-	flag.BoolVar(&burnCpuStart, "start", false, "start burn cpu")
-	flag.BoolVar(&burnCpuStop, "stop", false, "stop burn cpu")
-	flag.StringVar(&cpuList, "cpu-list", "", "CPUs in which to allow burning (1,3)")
-	flag.BoolVar(&burnCpuNohup, "nohup", false, "nohup to run burn cpu")
-	flag.IntVar(&cpuCount, "cpu-count", runtime.NumCPU(), "number of cpus")
-	flag.IntVar(&cpuPercent, "cpu-percent", 100, "percent of burn-cpu")
-	flag.StringVar(&cpuProcessor, "cpu-processor", "0", "only used for identifying process of cpu burn")
-	flag.Parse()
+type BurnCPU struct {
+	BurnCpuStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start burn cpu"`
+	BurnCpuStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop burn cpu"`
+	CpuList      string `name:"cpu-list" json:"cpu-list" yaml:"cpu-list" default:"" help:"CPUs in which to allow burning (1,3)"`
+	BurnCpuNohup bool   `name:"nohup" json:"nohup" yaml:"nohup" default:"false" help:"nohup to run burn cpu"`
+	ClimbTime    int    `name:"climb-time" json:"climb-time" yaml:"climb-time" default:"0" help:"durations(s) to climb"`
+	CpuCount     int    `name:"cpu-count" json:"cpu-count" yaml:"cpu-count" default:"${runtime.NumCPU()}" help:"number of cpus"`
+	CpuPercent   int    `name:"cpu-percent" json:"cpu-percent" yaml:"cpu-percent" default:"100" help:"percent of burn-cpu"`
+	CpuProcessor int    `name:"cpu-processor" json:"cpu-processor" yaml:"cpu-processor" default:"0" help:"only used for identifying process of cpu burn"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+	RunBurnCpu          func(ctx context.Context, cpuCount int, pidNeeded bool, processor string) int `kong:"-"`
+	CheckBurnCpu        func(ctx context.Context)                                                     `kong:"-"`
+	BindBurnCpuByCpuSet func(cgctrl cgroups.Cgroup, cpuList string)                                   `kong:"-"`
+	StopBurnCpu         func() (success bool, errs string)                                            `kong:"-"`
+	CGroupNew           func(cores int, percent int) cgroups.Cgroup                                   `kong:"-"`
+}
 
-	if cpuCount <= 0 || cpuCount > runtime.NumCPU() {
-		cpuCount = runtime.NumCPU()
+func (that *BurnCPU) Assign() model.Worker {
+	worker := &BurnCPU{Channel: channel.NewLocalChannel()}
+	worker.RunBurnCpu = func(ctx context.Context, cpuCount int, pidNeeded bool, processor string) int {
+		return worker.runBurnCpu(ctx, cpuCount, pidNeeded, processor)
+	}
+	worker.CheckBurnCpu = func(ctx context.Context) {
+		worker.checkBurnCpu(ctx)
+	}
+	worker.BindBurnCpuByCpuSet = func(cgctrl cgroups.Cgroup, cpuList string) {
+		worker.bindBurnCpuByCpuset(cgctrl, cpuList)
+	}
+	worker.StopBurnCpu = func() (success bool, errs string) {
+		return worker.stopBurnCpu()
+	}
+	worker.CGroupNew = func(cores int, percent int) cgroups.Cgroup {
+		return that.cgroupNew(cores, percent)
+	}
+	return worker
+}
+
+func (that *BurnCPU) Name() string {
+	return exec.BurnCpuBin
+}
+
+func (that *BurnCPU) Exec() *spec.Response {
+	if that.CpuCount <= 0 || that.CpuCount > runtime.NumCPU() {
+		that.CpuCount = runtime.NumCPU()
 	}
 
-	if burnCpuStart {
-		startBurnCpu()
-	} else if burnCpuStop {
-		if success, errs := stopBurnCpuFunc(); !success {
+	if that.BurnCpuStart {
+		that.startBurnCpu()
+	} else if that.BurnCpuStop {
+		if success, errs := that.StopBurnCpu(); !success {
 			bin.PrintErrAndExit(errs)
 		}
-	} else if burnCpuNohup {
-		burnCpu()
+	} else if that.BurnCpuNohup {
+		that.burnCpu()
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
-func burnCpu() {
-	runtime.GOMAXPROCS(cpuCount)
+func (that *BurnCPU) burnCpu() {
+	runtime.GOMAXPROCS(that.CpuCount)
 
-	for i := 0; i < cpuCount; i++ {
+	for i := 0; i < that.CpuCount; i++ {
 		go func() {
 			for {
 				for i := 0; i < 2147483647; i++ {
@@ -86,86 +119,75 @@ func burnCpu() {
 	select {} // wait forever
 }
 
-var burnCpuBin = exec.BurnCpuBin
-
-var burnCpuCgroup = "/" + burnCpuBin
+func (that *BurnCPU) BurnCpuCGroup() string {
+	return "/" + that.Name()
+}
 
 const cfsPeriodUs = uint64(200000)
 
 const cfsQuotaUs = int64(2000)
 
-var cl = channel.NewLocalChannel()
-
-var stopBurnCpuFunc = stopBurnCpu
-
-var runBurnCpuFunc = runBurnCpu
-
-var bindBurnCpuFunc = bindBurnCpuByCpuset
-
-var checkBurnCpuFunc = checkBurnCpu
-
-var cgroupNewFunc = cgroupNew
 
 // startBurnCpu by invoke burnCpuBin with --nohup flag
-func startBurnCpu() {
+func (that *BurnCPU) startBurnCpu() {
 	ctx := context.Background()
-	if cpuPercent <= 0 || cpuPercent > 100 {
-		cpuPercent = 100
+	if that.CpuPercent <= 0 || that.CpuPercent > 100 {
+		that.CpuPercent = 100
 	}
-	if cpuList != "" {
-		cpuCount = 1
-		cores := strings.Split(cpuList, ",")
+	if that.CpuList != "" {
+		that.CpuCount = 1
+		cores := strings.Split(that.CpuList, ",")
 		realCores := len(cores)
 		if realCores > runtime.NumCPU() {
 			realCores = runtime.NumCPU()
 		}
-		control := cgroupNewFunc(realCores, cpuPercent)
+		control := that.CGroupNew(realCores, that.CpuPercent)
 		for _, core := range cores {
-			pid := runBurnCpuFunc(ctx, cpuCount, true, core)
+			pid := that.RunBurnCpu(ctx, that.CpuCount, true, core)
 			if err := control.Add(cgroups.Process{Pid: pid}); err != nil {
-				stopBurnCpuFunc()
+				that.StopBurnCpu()
 				bin.PrintErrAndExit(fmt.Sprintf("Add pid to cgroup error, %v", err))
 			}
 		}
-		bindBurnCpuFunc(control, cpuList)
+		that.BindBurnCpuByCpuSet(control, that.CpuList)
 	} else {
-		pid := runBurnCpuFunc(ctx, cpuCount, true, "0")
-		control := cgroupNewFunc(cpuCount, cpuPercent)
+		pid := that.RunBurnCpu(ctx, that.CpuCount, true, "0")
+		control := that.CGroupNew(that.CpuCount, that.CpuPercent)
 		if err := control.Add(cgroups.Process{Pid: pid}); err != nil {
-			stopBurnCpuFunc()
+			that.StopBurnCpu()
 			bin.PrintErrAndExit(fmt.Sprintf("Add pid to cgroup error, %v", err))
 		}
 	}
-	checkBurnCpuFunc(ctx)
+	that.CheckBurnCpu(ctx)
 }
 
 // runBurnCpu
-func runBurnCpu(ctx context.Context, cpuCount int, pidNeeded bool, processor string) int {
+func (that *BurnCPU) runBurnCpu(ctx context.Context, cpuCount int, pidNeeded bool, processor string) int {
 	args := fmt.Sprintf(`%s --nohup --cpu-count %d`,
-		path.Join(util.GetProgramPath(), burnCpuBin), cpuCount)
+		path.Join(util.GetProgramPath(), that.Name()), cpuCount)
 
 	if pidNeeded {
 		args = fmt.Sprintf("%s --cpu-processor %s", args, processor)
 	}
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
-	response := cl.Run(ctx, "nohup", args)
+	response := that.Channel.Run(ctx, "nohup", args)
 	if !response.Success {
-		stopBurnCpuFunc()
+		that.StopBurnCpu()
 		bin.PrintErrAndExit(response.Err)
 	}
 	if pidNeeded {
 		// parse pid
 		newCtx := context.WithValue(context.Background(), channel.ProcessKey, fmt.Sprintf("cpu-processor %s", processor))
-		pids, err := cl.GetPidsByProcessName(burnCpuBin, newCtx)
+		pids, err := that.Channel.GetPidsByProcessName(that.Name(), newCtx)
 		if err != nil {
-			stopBurnCpuFunc()
+			that.StopBurnCpu()
 			bin.PrintErrAndExit(fmt.Sprintf("bind cpu core failed, cannot get the burning program pid, %v", err))
 		}
 		if len(pids) > 0 {
 			// return the first one
 			pid, err := strconv.Atoi(pids[0])
 			if err != nil {
-				stopBurnCpuFunc()
+				that.StopBurnCpu()
 				bin.PrintErrAndExit(fmt.Sprintf("bind cpu core failed, get pid failed, pids: %v, err: %v", pids, err))
 			}
 			return pid
@@ -175,48 +197,48 @@ func runBurnCpu(ctx context.Context, cpuCount int, pidNeeded bool, processor str
 }
 
 // bindBurnCpu by taskset command
-func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
-	response := cl.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
+func (that *BurnCPU) bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
+	response := that.Channel.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
 	if !response.Success {
-		stopBurnCpuFunc()
+		that.StopBurnCpu()
 		bin.PrintErrAndExit(response.Err)
 	}
 }
 
 // bindBurnCpu by cpuset
-func bindBurnCpuByCpuset(cgctrl cgroups.Cgroup, cpuList string) {
+func (that *BurnCPU) bindBurnCpuByCpuset(cgctrl cgroups.Cgroup, cpuList string) {
 	if err := cgctrl.Update(&specs.LinuxResources{CPU: &specs.LinuxCPU{Cpus: cpuList}}); err != nil {
-		stopBurnCpuFunc()
+		that.StopBurnCpu()
 		bin.PrintErrAndExit(fmt.Sprintf("Bind core-list to cgroup error, %v", err))
 	}
 }
 
 // checkBurnCpu
-func checkBurnCpu(ctx context.Context) {
+func (that *BurnCPU) checkBurnCpu(ctx context.Context) {
 	time.Sleep(time.Second)
 	// query process
 	ctx = context.WithValue(ctx, channel.ProcessKey, "nohup")
-	pids, _ := cl.GetPidsByProcessName(burnCpuBin, ctx)
+	pids, _ := that.Channel.GetPidsByProcessName(that.Name(), ctx)
 	if pids == nil || len(pids) == 0 {
-		bin.PrintErrAndExit(fmt.Sprintf("%s pid not found", burnCpuBin))
+		bin.PrintErrAndExit(fmt.Sprintf("%s pid not found", that.Name()))
 	}
 }
 
 // stopBurnCpu
-func stopBurnCpu() (success bool, errs string) {
+func (that *BurnCPU) stopBurnCpu() (success bool, errs string) {
 	// add grep nohup
 	ctx := context.WithValue(context.Background(), channel.ProcessKey, "nohup")
-	pids, _ := cl.GetPidsByProcessName(burnCpuBin, ctx)
+	pids, _ := that.Channel.GetPidsByProcessName(that.Name(), ctx)
 	if pids == nil || len(pids) == 0 {
 		return true, errs
 	}
-	response := cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
+	response := that.Channel.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 	if !response.Success {
 		return false, response.Err
 	}
 
 	//delete burnCpuCgroup
-	control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(burnCpuCgroup))
+	control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(that.BurnCpuCGroup()))
 	if err == nil {
 		control.Delete()
 	}
@@ -224,17 +246,17 @@ func stopBurnCpu() (success bool, errs string) {
 }
 
 //add a cgroup
-func cgroupNew(cores int, percent int) cgroups.Cgroup {
+func (that *BurnCPU) cgroupNew(cores int, percent int) cgroups.Cgroup {
 	period := cfsPeriodUs
 	quota := cfsQuotaUs * int64(cores) * int64(percent)
-	control, err := cgroups.New(cgroups.V1, cgroups.StaticPath(burnCpuCgroup), &specs.LinuxResources{
+	control, err := cgroups.New(cgroups.V1, cgroups.StaticPath(that.BurnCpuCGroup()), &specs.LinuxResources{
 		CPU: &specs.LinuxCPU{
 			Period: &period,
 			Quota:  &quota,
 		},
 	})
 	if err != nil {
-		stopBurnCpuFunc()
+		that.StopBurnCpu()
 		bin.PrintErrAndExit(fmt.Sprintf("create cgroup error, %v", err))
 	}
 	return control

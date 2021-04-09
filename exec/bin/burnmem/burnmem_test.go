@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package burnmem
 
 import (
 	"context"
@@ -37,17 +37,20 @@ func Test_startBurnMem(t *testing.T) {
 		exitCode = code
 	}
 
-	runBurnMemFunc = func(context.Context, int, int, int, string) {
+	burnMem :=&BurnMem{}
+	burnMem.Assign()
+	burnMem.Channel = channel.NewMockLocalChannel()
+	burnMem.RunBurnMem = func(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) {
+
 	}
 
-	stopBurnMemFunc = func() (bool, string) {
+	burnMem.StopBurnMem = func() (bool, string) {
 		return true, ""
 	}
 
 	flPath := path.Join(util.GetProgramPath(), dirName)
 
-	cl = channel.NewMockLocalChannel()
-	mockChannel := cl.(*channel.MockLocalChannel)
+	mockChannel := burnMem.Channel.(*channel.MockLocalChannel)
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
@@ -55,7 +58,7 @@ func Test_startBurnMem(t *testing.T) {
 	}
 	expectedCommands := []string{fmt.Sprintf("mount -t tmpfs tmpfs %s -o size=", flPath) + "100%"}
 
-	startBurnMem()
+	burnMem.startBurnMem()
 	if exitCode != 0 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 0)
 	}
@@ -80,19 +83,23 @@ func Test_runBurnMem_failed(t *testing.T) {
 	bin.ExitFunc = func(code int) {
 		exitCode = code
 	}
-	cl = channel.NewMockLocalChannel()
-	mockChannel := cl.(*channel.MockLocalChannel)
+
+	burnMem :=&BurnMem{}
+	burnMem.Assign()
+	burnMem.Channel = channel.NewMockLocalChannel()
+
+	mockChannel := burnMem.Channel.(*channel.MockLocalChannel)
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
 		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found")
 	}
 	expectedCommands := []string{fmt.Sprintf(`nohup %s --nohup --mem-percent 50 > /dev/null 2>&1 &`, burnBin)}
-	stopBurnMemFunc = func() (bool, string) {
+	burnMem.StopBurnMem = func() (bool, string) {
 		return true, ""
 	}
 
-	runBurnMem(context.Background(), as.memPercent, as.memReserve, as.memRate, as.burnMemMode)
+	burnMem.RunBurnMem(context.Background(), as.memPercent, as.memReserve, as.memRate, as.burnMemMode, false)
 	if exitCode != 1 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}
@@ -107,10 +114,12 @@ func Test_stopBurnMem(t *testing.T) {
 	}{
 		{"stop"},
 	}
-	cl = channel.NewLocalChannel()
+	burnMem :=&BurnMem{}
+	burnMem.Assign()
+	burnMem.Channel = channel.NewLocalChannel()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stopBurnMem()
+			burnMem.StopBurnMem()
 		})
 	}
 }

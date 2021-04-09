@@ -14,63 +14,82 @@
  * limitations under the License.
  */
 
-package main
+package killprocess
 
 import (
 	"context"
-	"flag"
 	"fmt"
-	"strings"
-
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"strings"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessExcludeProcess string
-var killProcessCount int
-var ignoreProcessNotFound bool
-
-func main() {
-	flag.StringVar(&killProcessName, "process", "", "process name")
-	flag.StringVar(&killProcessInCmd, "process-cmd", "", "process in command")
-	flag.IntVar(&killProcessCount, "count", 0, "limit count")
-	flag.StringVar(&killProcessLocalPorts, "local-port", "", "local service ports")
-	flag.StringVar(&killProcessSignal, "signal", "9", "kill process signal")
-	flag.StringVar(&killProcessExcludeProcess, "exclude-process", "", "kill process exclude specific process")
-	flag.BoolVar(&ignoreProcessNotFound, "ignore-not-found", false, "ignore process that can't be found")
-	bin.ParseFlagAndInitLog()
-
-	killProcess(killProcessName, killProcessInCmd, killProcessLocalPorts, killProcessSignal, killProcessExcludeProcess,
-		killProcessCount, ignoreProcessNotFound)
+// init registry provider to model.
+func init() {
+	model.Provide(new(KillProcess))
 }
 
-var cl = channel.NewLocalChannel()
+type KillProcess struct {
+	KillProcessName           string `name:"process" json:"process" yaml:"process" default:"" help:"process name"`
+	KillProcessInCmd          string `name:"process-cmd" json:"process-cmd" yaml:"process-cmd" default:"" help:"process in command"`
+	KillProcessCount          int    `name:"count" json:"count" yaml:"count" default:"0" help:"limit count"`
+	KillProcessLocalPorts     string `name:"local-port" json:"local-port" yaml:"local-port" default:"" help:"local service ports"`
+	KillProcessSignal         string `name:"signal" json:"signal" yaml:"signal" default:"9" help:"kill process signal"`
+	KillProcessExcludeProcess string `name:"exclude-process" json:"exclude-process" yaml:"exclude-process" default:"" help:"kill process exclude specific process"`
+	IgnoreProcessNotFound     bool   `name:"ignore-not-found" json:"ignore-not-found" yaml:"ignore-not-found" default:"false" help:"ignore process that can't be found"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-func killProcess(process, processCmd, localPorts, signal, excludeProcess string, count int, ignoreProcessNotFound bool) {
+func (that *KillProcess) Assign() model.Worker {
+	return &KillProcess{Channel: channel.NewLocalChannel()}
+}
+
+func (that *KillProcess) Name() string {
+	return exec.KillProcessBin
+}
+
+func (that *KillProcess) Exec() *spec.Response {
+	that.killProcess(
+		that.KillProcessName,
+		that.KillProcessInCmd,
+		that.KillProcessLocalPorts,
+		that.KillProcessSignal,
+		that.KillProcessExcludeProcess,
+		that.KillProcessCount,
+		that.IgnoreProcessNotFound)
+	return spec.ReturnSuccess("")
+}
+
+func (that *KillProcess) killProcess(process, processCmd, localPorts, signal, excludeProcess string, count int, ignoreProcessNotFound bool) {
 	var pids []string
 	var err error
 	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, excludeProcessValue)
 	if process != "" {
-		pids, err = cl.GetPidsByProcessName(process, ctx)
+		pids, err = that.Channel.GetPidsByProcessName(process, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
-		killProcessName = process
+		that.KillProcessName = process
 	} else if processCmd != "" {
-		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
+		pids, err = that.Channel.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
-		killProcessName = processCmd
+		that.KillProcessName = processCmd
 	} else if localPorts != "" {
 		ports, err := util.ParseIntegerListToStringSlice(localPorts)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
-		pids, err = cl.GetPidsByLocalPorts(ports)
+		pids, err = that.Channel.GetPidsByLocalPorts(ports)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
@@ -80,7 +99,7 @@ func killProcess(process, processCmd, localPorts, signal, excludeProcess string,
 			bin.PrintOutputAndExit("process not found")
 			return
 		}
-		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", killProcessName))
+		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", that.KillProcessName))
 		return
 	}
 	// remove duplicates
@@ -88,7 +107,7 @@ func killProcess(process, processCmd, localPorts, signal, excludeProcess string,
 	if count > 0 && len(pids) > count {
 		pids = pids[:count]
 	}
-	response := cl.Run(ctx, "kill", fmt.Sprintf("-%s %s", signal, strings.Join(pids, " ")))
+	response := that.Channel.Run(ctx, "kill", fmt.Sprintf("-%s %s", signal, strings.Join(pids, " ")))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return

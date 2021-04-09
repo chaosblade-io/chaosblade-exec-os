@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package main
+package addfile
 
 import (
 	"context"
 	"encoding/base64"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
@@ -30,46 +31,59 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var filepath, content string
-var appendFileStart, appendFileStop, directory, enableBase64, autoCreateDir bool
+// init registry provider to model.
+func init() {
+	model.Provide(new(AddFile))
+}
 
-func main() {
-	flag.StringVar(&filepath, "filepath", "", "filepath")
-	flag.StringVar(&content, "content", "", "content")
-	flag.BoolVar(&directory, "directory", false, "is dir")
-	flag.BoolVar(&enableBase64, "enable-base64", false, "content support base64 encoding")
-	flag.BoolVar(&autoCreateDir, "auto-create-dir", false, "automatically creates a directory that does not exist")
-	flag.BoolVar(&appendFileStart, "start", false, "start append file")
-	flag.BoolVar(&appendFileStop, "stop", false, "stop append file")
-	bin.ParseFlagAndInitLog()
+type AddFile struct {
+	Filepath        string `name:"filepath" json:"filepath" yaml:"filepath" default:"" help:"filepath"`
+	Content         string `name:"content" json:"content" yaml:"content" default:"" help:"content"`
+	Directory       bool   `name:"directory" json:"directory" yaml:"directory" default:"false" help:"is dir"`
+	EnableBase64    bool   `name:"enable-base64" json:"enable-base64" yaml:"enable-base64" default:"false" help:"content support base64 encoding"`
+	AutoCreateDir   bool   `name:"auto-create-dir" json:"auto-create-dir" yaml:"auto-create-dir" default:"false" help:"automatically creates a directory that does not exist"`
+	AppendFileStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start add file"`
+	AppendFileStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop add file"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-	if appendFileStart {
-		if filepath == "" {
+func (that *AddFile) Assign() model.Worker {
+	return &AddFile{Channel: channel.NewLocalChannel()}
+}
+
+func (that *AddFile) Name() string {
+	return exec.AddFileBin
+}
+
+func (that *AddFile) Exec() *spec.Response {
+	if that.AppendFileStart {
+		if that.Filepath == "" {
 			bin.PrintErrAndExit("less --filepath flag")
 		}
-		startAddFile(filepath, content, directory, enableBase64, autoCreateDir)
-	} else if appendFileStop {
-		stopAddFile(filepath)
+		that.startAddFile(that.Filepath, that.Content, that.Directory, that.EnableBase64, that.AutoCreateDir)
+	} else if that.AppendFileStop {
+		that.stopAddFile(that.Filepath)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
-var cl = channel.NewLocalChannel()
-
-func startAddFile(filepath, content string, directory, enableBase64, autoCreateDir bool) {
+func (that *AddFile) startAddFile(filepath, content string, directory, enableBase64, autoCreateDir bool) {
 	ctx := context.Background()
 
 	var response *spec.Response
 	dir := path.Dir(filepath)
 	if autoCreateDir && !util.IsExist(dir) {
-		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, dir))
+		response = that.Channel.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, dir))
 	}
 	if directory {
-		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`%s`, filepath))
+		response = that.Channel.Run(ctx, "mkdir", fmt.Sprintf(`%s`, filepath))
 	} else {
 		if content == "" {
-			response = cl.Run(ctx, "touch", fmt.Sprintf(`%s`, filepath))
+			response = that.Channel.Run(ctx, "touch", fmt.Sprintf(`%s`, filepath))
 		} else {
 			if enableBase64 {
 				decodeBytes, err := base64.StdEncoding.DecodeString(content)
@@ -79,7 +93,7 @@ func startAddFile(filepath, content string, directory, enableBase64, autoCreateD
 				}
 				content = string(decodeBytes)
 			}
-			response = cl.Run(ctx, "echo", fmt.Sprintf(`"%s" >> "%s"`, content, filepath))
+			response = that.Channel.Run(ctx, "echo", fmt.Sprintf(`"%s" >> "%s"`, content, filepath))
 		}
 	}
 	if !response.Success {
@@ -89,11 +103,11 @@ func startAddFile(filepath, content string, directory, enableBase64, autoCreateD
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func stopAddFile(filepath string) {
+func (that *AddFile) stopAddFile(filepath string) {
 
 	ctx := context.Background()
 	// get origin mark
-	response := cl.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, filepath))
+	response := that.Channel.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, filepath))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return

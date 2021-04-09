@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package main
+package movefile
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
@@ -29,47 +30,60 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var target, filepath string
-var appendFileStart, appendFileStop, force, autoCreateDir bool
+// init registry provider to model.
+func init() {
+	model.Provide(new(MoveFile))
+}
 
-func main() {
-	flag.StringVar(&target, "target", "", "content")
-	flag.StringVar(&filepath, "filepath", "", "filepath")
-	flag.BoolVar(&force, "force", false, "overwrite target file")
-	flag.BoolVar(&autoCreateDir, "auto-create-dir", false, "automatically creates a directory that does not exist")
-	flag.BoolVar(&appendFileStart, "start", false, "start append file")
-	flag.BoolVar(&appendFileStop, "stop", false, "stop append file")
-	bin.ParseFlagAndInitLog()
+type MoveFile struct {
+	Target          string `name:"target" json:"target" yaml:"target" default:"" help:"content"`
+	Filepath        string `name:"filepath" json:"filepath" yaml:"filepath" default:"" help:"filepath"`
+	Force           bool   `name:"force" json:"force" yaml:"force" default:"false" help:"overwrite target file"`
+	AutoCreateDir   bool   `name:"auto-create-dir" json:"auto-create-dir" yaml:"auto-create-dir" default:"false" help:"automatically creates a directory that does not exist"`
+	AppendFileStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start move file"`
+	AppendFileStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop move file"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-	if appendFileStart {
-		if target == "" || filepath == "" {
+func (that *MoveFile) Assign() model.Worker {
+	return &MoveFile{Channel: channel.NewLocalChannel()}
+}
+
+func (that *MoveFile) Name() string {
+	return exec.MoveFileBin
+}
+
+func (that *MoveFile) Exec() *spec.Response {
+	if that.AppendFileStart {
+		if that.Target == "" || that.Filepath == "" {
 			bin.PrintErrAndExit("less --target or --filepath flag")
 		}
-		startMoveFile(filepath, target, force, autoCreateDir)
-	} else if appendFileStop {
-		stopMoveFile(filepath, target)
+		that.startMoveFile(that.Filepath, that.Target, that.Force, that.AutoCreateDir)
+	} else if that.AppendFileStop {
+		that.stopMoveFile(that.Filepath, that.Target)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
-var cl = channel.NewLocalChannel()
-
-func startMoveFile(filepath, target string, force, autoCreateDir bool) {
+func (that *MoveFile) startMoveFile(filepath, target string, force, autoCreateDir bool) {
 	ctx := context.Background()
 	var response *spec.Response
 
 	if autoCreateDir && !util.IsExist(target) {
-		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, target))
+		response = that.Channel.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, target))
 	}
 	if !util.IsDir(target) {
 		bin.PrintErrAndExit(fmt.Sprintf("the [%s] target file is not exists", target))
 		return
 	}
 	if force {
-		response = cl.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, filepath, target))
+		response = that.Channel.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, filepath, target))
 	} else {
-		response = cl.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))
+		response = that.Channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))
 	}
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
@@ -78,11 +92,11 @@ func startMoveFile(filepath, target string, force, autoCreateDir bool) {
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func stopMoveFile(filepath, target string) {
+func (that *MoveFile) stopMoveFile(filepath, target string) {
 	origin := path.Join(target, "/", path.Base(filepath))
 
 	ctx := context.Background()
-	response := cl.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, origin, path.Dir(filepath)))
+	response := that.Channel.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, origin, path.Dir(filepath)))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return

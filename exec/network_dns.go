@@ -84,7 +84,7 @@ func (*NetworkDnsExecutor) Name() string {
 	return "dns"
 }
 
-var changeDnsBin = "chaos_changedns"
+var ChangeDnsBin = "chaos_changedns"
 
 func (ns *NetworkDnsExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	err := checkNetworkDnsExpEnv()
@@ -108,12 +108,12 @@ func (ns *NetworkDnsExecutor) Exec(uid string, ctx context.Context, model *spec.
 }
 
 func (ns *NetworkDnsExecutor) start(ctx context.Context, domain, ip string) *spec.Response {
-	return ns.channel.Run(ctx, path.Join(ns.channel.GetScriptPath(), changeDnsBin),
+	return ns.channel.Run(ctx, path.Join(ns.channel.GetScriptPath(), ChangeDnsBin),
 		fmt.Sprintf("--start --domain %s --ip %s --debug=%t", domain, ip, util.Debug))
 }
 
 func (ns *NetworkDnsExecutor) stop(ctx context.Context, domain, ip string) *spec.Response {
-	return ns.channel.Run(ctx, path.Join(ns.channel.GetScriptPath(), changeDnsBin),
+	return ns.channel.Run(ctx, path.Join(ns.channel.GetScriptPath(), ChangeDnsBin),
 		fmt.Sprintf("--stop --domain %s --ip %s --debug=%t", domain, ip, util.Debug))
 }
 

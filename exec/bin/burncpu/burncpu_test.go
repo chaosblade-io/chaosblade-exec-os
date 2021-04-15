@@ -43,6 +43,7 @@ func Test_startBurnCpu(t *testing.T) {
 	}{
 		{"test1", args{"1,2,3,5", 0, 50}},
 		{"test2", args{"", 3, 50}},
+		{"test3", args{"1,2,3,4",2,10}},
 	}
 	runBurnCpuFunc = func(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climTime int) int {
 		return 25233

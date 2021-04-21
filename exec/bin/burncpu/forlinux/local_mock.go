@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package burncpu
 
 import "github.com/containerd/cgroups"
 

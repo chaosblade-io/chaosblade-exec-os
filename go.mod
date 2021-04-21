@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
+	github.com/alecthomas/kong v0.2.16
 	github.com/chaosblade-io/chaosblade-spec-go v1.0.1-0.20210407072125-cc209aa59a09
 	github.com/containerd/cgroups v0.0.0-20191011165608-5fbad35c2a7e
 	github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c

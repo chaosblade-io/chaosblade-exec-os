@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package dropnetwork
 
 import (
 	"context"
@@ -42,8 +42,11 @@ func Test_startDropNet_failed(t *testing.T) {
 		{"", "", "", "", "", ""},
 	}
 
+	dropNetwork := &DropNetwork{}
+	dropNetwork.Assign()
+
 	for _, tt := range tests {
-		startDropNet(tt.sourceIp, tt.destinationIp, tt.sourcePort, tt.destinationPort, tt.stringPattern, tt.networkTraffic)
+		dropNetwork.startDropNet(tt.sourceIp, tt.destinationIp, tt.sourcePort, tt.destinationPort, tt.stringPattern, tt.networkTraffic)
 		if exitCode != 1 {
 			t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 		}
@@ -82,16 +85,18 @@ func Test_handleDropSpecifyPort(t *testing.T) {
 		exitCode = code
 	}
 	var invokeTime int
-	stopDropNetFunc = func(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
+	dropNetwork := &DropNetwork{}
+	dropNetwork.Assign()
+	dropNetwork.Channel = channel.NewMockLocalChannel()
+	dropNetwork.StopDropNet = func(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
 		invokeTime++
 	}
 	for _, tt := range tests {
-		cl = channel.NewMockLocalChannel()
-		mockChannel := cl.(*channel.MockLocalChannel)
+		mockChannel := dropNetwork.Channel.(*channel.MockLocalChannel)
 		mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 			return tt.input.response
 		}
-		handleDropSpecifyPort(tt.input.sourceIp, tt.input.destinationIp, tt.input.sourcePort, tt.input.destinationPort, tt.input.stringPattern, tt.input.networkTraffic, context.Background())
+		dropNetwork.handleDropSpecifyPort(tt.input.sourceIp, tt.input.destinationIp, tt.input.sourcePort, tt.input.destinationPort, tt.input.stringPattern, tt.input.networkTraffic, context.Background())
 		if exitCode != tt.expect.exitCode {
 			t.Errorf("unexpected result: %d, expected result: %d", exitCode, tt.expect.exitCode)
 		}

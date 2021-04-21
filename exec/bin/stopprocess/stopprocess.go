@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package main
+package stopprocess
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"strings"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
@@ -27,57 +29,68 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var stopProcessName string
-var stopProcessInCmd string
+// init registry provider to model.
+func init() {
+	model.Provide(new(StopProcess))
+}
 
-var startFakeDeath, stopFakeDeath, ignoreProcessNotFound bool
+type StopProcess struct {
+	StopProcessName       string `name:"process" json:"process" yaml:"process" default:"" help:"process name"`
+	StopProcessInCmd      string `name:"process-cmd" json:"process-cmd" yaml:"process-cmd" default:"" help:"process in command"`
+	StartFakeDeath        bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start process fake death"`
+	StopFakeDeath         bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"recover process fake death"`
+	IgnoreProcessNotFound bool   `name:"ignore-not-found" json:"ignore-not-found" yaml:"ignore-not-found" default:"false" help:"ignore process that can't be found"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-func main() {
-	flag.StringVar(&stopProcessName, "process", "", "process name")
-	flag.StringVar(&stopProcessInCmd, "process-cmd", "", "process in command")
-	flag.BoolVar(&startFakeDeath, "start", false, "start process fake death")
-	flag.BoolVar(&stopFakeDeath, "stop", false, "recover process fake death")
-	flag.BoolVar(&ignoreProcessNotFound, "ignore-not-found", false, "ignore process that can't be found")
-	bin.ParseFlagAndInitLog()
+func (that *StopProcess) Assign() model.Worker {
+	return &StopProcess{Channel: channel.NewLocalChannel()}
+}
 
-	if startFakeDeath == stopFakeDeath {
+func (that *StopProcess) Name() string {
+	return exec.StopProcessBin
+}
+
+func (that *StopProcess) Exec() *spec.Response {
+	if that.StartFakeDeath == that.StopFakeDeath {
 		bin.PrintErrAndExit("must add --start or --stop flag")
 	}
 
-	if startFakeDeath {
-		doStopProcess(stopProcessName, stopProcessInCmd, ignoreProcessNotFound)
-	} else if stopFakeDeath {
-		doRecoverProcess(stopProcessName, stopProcessInCmd, ignoreProcessNotFound)
+	if that.StartFakeDeath {
+		that.doStopProcess(that.StopProcessName, that.StopProcessInCmd, that.IgnoreProcessNotFound)
+	} else if that.StopFakeDeath {
+		that.doRecoverProcess(that.StopProcessName, that.StopProcessInCmd, that.IgnoreProcessNotFound)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
-var cl = channel.NewLocalChannel()
-
-func doStopProcess(process, processCmd string, ignoreProcessNotFound bool) {
+func (that *StopProcess) doStopProcess(process, processCmd string, ignoreProcessNotFound bool) {
 	var pids []string
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
 	if process != "" {
-		pids, err = cl.GetPidsByProcessName(process, ctx)
+		pids, err = that.Channel.GetPidsByProcessName(process, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
-		stopProcessName = process
+		that.StopProcessName = process
 	} else if processCmd != "" {
-		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
+		pids, err = that.Channel.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
-		stopProcessName = processCmd
+		that.StopProcessName = processCmd
 	}
 	if pids == nil || len(pids) == 0 {
 		if ignoreProcessNotFound {
 			bin.PrintOutputAndExit("process not found")
 			return
 		}
-		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", stopProcessName))
+		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", that.StopProcessName))
 	}
 	args := fmt.Sprintf("-STOP %s", strings.Join(pids, " "))
 	response := channel.NewLocalChannel().Run(ctx, "kill", args)
@@ -87,22 +100,22 @@ func doStopProcess(process, processCmd string, ignoreProcessNotFound bool) {
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func doRecoverProcess(process, processCmd string, ignoreProcessNotFound bool) {
+func (that *StopProcess) doRecoverProcess(process, processCmd string, ignoreProcessNotFound bool) {
 	var pids []string
 	var err error
 	var ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, "blade")
 	if process != "" {
-		pids, err = cl.GetPidsByProcessName(process, ctx)
+		pids, err = that.Channel.GetPidsByProcessName(process, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
-		stopProcessName = process
+		that.StopProcessName = process
 	} else if processCmd != "" {
-		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
+		pids, err = that.Channel.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
 			bin.PrintErrAndExit(err.Error())
 		}
-		stopProcessName = processCmd
+		that.StopProcessName = processCmd
 	}
 
 	if pids == nil || len(pids) == 0 {
@@ -110,7 +123,7 @@ func doRecoverProcess(process, processCmd string, ignoreProcessNotFound bool) {
 			bin.PrintOutputAndExit("process not found")
 			return
 		}
-		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", stopProcessName))
+		bin.PrintErrAndExit(fmt.Sprintf("%s process not found", that.StopProcessName))
 	}
 	response := channel.NewLocalChannel().Run(ctx, "kill", fmt.Sprintf("-CONT %s", strings.Join(pids, " ")))
 	if !response.Success {

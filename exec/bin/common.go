@@ -19,7 +19,10 @@ package bin
 import (
 	"flag"
 	"fmt"
+	"github.com/alecthomas/kong"
 	"os"
+	"runtime"
+	"strconv"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
@@ -51,4 +54,18 @@ func ParseFlagAndInitLog() {
 	util.AddDebugFlag()
 	flag.Parse()
 	util.InitLog(util.Bin)
+}
+
+// ParseFlagModelAndInitLog parse flags to model
+// Return the model pointer
+func ParseFlagModelAndInitLog(model interface{}) error {
+	util.AddDebugFlag()
+	ctx := kong.Parse(model, kong.Vars{
+		"CPUNum": strconv.Itoa(runtime.NumCPU()),
+	})
+	if nil != ctx.Error {
+		return ctx.Error
+	}
+	util.InitLog(util.Bin)
+	return nil
 }

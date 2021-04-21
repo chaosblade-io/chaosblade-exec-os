@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package killprocess
 
 import (
 	"context"
@@ -34,8 +34,10 @@ func Test_killProcess(t *testing.T) {
 		count       int
 		mockChannel *channel.MockLocalChannel
 	}
-	cl = channel.NewMockLocalChannel()
-	mockChannel := cl.(*channel.MockLocalChannel)
+	killProcess := &KillProcess{}
+	killProcess.Assign()
+	killProcess.Channel = channel.NewMockLocalChannel()
+	mockChannel := killProcess.Channel.(*channel.MockLocalChannel)
 	mockChannel.GetPidsByLocalPortsFunc = func(localPorts []string) (strings []string, e error) {
 		return []string{"10000"}, nil
 	}
@@ -74,7 +76,7 @@ func Test_killProcess(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			killProcess(tt.args.process, tt.args.processCmd, tt.args.localPorts, "9", "", tt.args.count, false)
+			killProcess.killProcess(tt.args.process, tt.args.processCmd, tt.args.localPorts, "9", "", tt.args.count, false)
 			if tt.exitCode != exitCode {
 				t.Errorf("unexpected exitCode %d, expected exitCode: %d", exitCode, tt.exitCode)
 			}

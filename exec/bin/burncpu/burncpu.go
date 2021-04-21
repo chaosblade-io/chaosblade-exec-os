@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package main
+package burncpu
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"path"
@@ -33,51 +32,82 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/process"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
+
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 
 	_ "go.uber.org/automaxprocs/maxprocs"
 )
 
-var (
-	burnCpuStart, burnCpuStop, burnCpuNohup bool
-	cpuCount, cpuPercent, climbTime         int
-	slopePercent                            float64
-	cpuList                                 string
-	cpuProcessor                            string
-)
+// init registry provider to model.
+func init() {
+	model.Provide(new(BurnCPU))
+}
 
-func main() {
-	flag.BoolVar(&burnCpuStart, "start", false, "start burn cpu")
-	flag.BoolVar(&burnCpuStop, "stop", false, "stop burn cpu")
-	flag.StringVar(&cpuList, "cpu-list", "", "CPUs in which to allow burning (1,3)")
-	flag.BoolVar(&burnCpuNohup, "nohup", false, "nohup to run burn cpu")
-	flag.IntVar(&climbTime, "climb-time", 0, "durations(s) to climb")
-	flag.IntVar(&cpuCount, "cpu-count", runtime.NumCPU(), "number of cpus")
-	flag.IntVar(&cpuPercent, "cpu-percent", 100, "percent of burn-cpu")
-	flag.StringVar(&cpuProcessor, "cpu-processor", "0", "only used for identifying process of cpu burn")
-	bin.ParseFlagAndInitLog()
+type BurnCPU struct {
+	BurnCpuStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start burn cpu"`
+	BurnCpuStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop burn cpu"`
+	CpuList      string `name:"cpu-list" json:"cpu-list" yaml:"cpu-list" default:"" help:"CPUs in which to allow burning (1,3)"`
+	BurnCpuNohup bool   `name:"nohup" json:"nohup" yaml:"nohup" default:"false" help:"nohup to run burn cpu"`
+	ClimbTime    int    `name:"climb-time" json:"climb-time" yaml:"climb-time" default:"0" help:"durations(s) to climb"`
+	CpuCount     int    `name:"cpu-count" json:"cpu-count" yaml:"cpu-count" default:"${CPUNum}" help:"number of cpus"`
+	CpuPercent   int    `name:"cpu-percent" json:"cpu-percent" yaml:"cpu-percent" default:"100" help:"percent of burn-cpu"`
+	CpuProcessor int    `name:"cpu-processor" json:"cpu-processor" yaml:"cpu-processor" default:"0" help:"only used for identifying process of cpu burn"`
 
-	if cpuCount <= 0 || cpuCount > runtime.NumCPU() {
-		cpuCount = runtime.NumCPU()
+	// default arguments
+	SlopePercent float64           `kong:"-"`
+	Channel      channel.OsChannel `kong:"-"`
+	// for test mock
+	RunBurnCpu           func(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climbTime int) int `kong:"-"`
+	BindBurnCpuByTaskSet func(ctx context.Context, core string, pid int)                                                              `kong:"-"`
+	CheckBurnCpu         func(ctx context.Context)                                                                                    `kong:"-"`
+	StopBurnCpu          func() (bool, string)                                                                                        `kong:"-"`
+}
+
+func (that *BurnCPU) Assign() model.Worker {
+	worker := &BurnCPU{Channel: channel.NewLocalChannel()}
+	worker.RunBurnCpu = func(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climbTime int) int {
+		return worker.runBurnCpu(ctx, cpuCount, cpuPercent, pidNeeded, processor, climbTime)
+	}
+	worker.BindBurnCpuByTaskSet = func(ctx context.Context, core string, pid int) {
+		worker.bindBurnCpuByTaskset(ctx, core, pid)
+	}
+	worker.CheckBurnCpu = func(ctx context.Context) {
+		worker.checkBurnCpu(ctx)
+	}
+	worker.StopBurnCpu = func() (bool, string) {
+		return worker.stopBurnCpu()
+	}
+	return worker
+}
+
+func (that *BurnCPU) Name() string {
+	return exec.BurnCpuBin
+}
+
+func (that *BurnCPU) Exec() *spec.Response {
+	if that.CpuCount <= 0 || that.CpuCount > runtime.NumCPU() {
+		that.CpuCount = runtime.NumCPU()
 	}
 
-	if burnCpuStart {
-		startBurnCpu()
-	} else if burnCpuStop {
-		if success, errs := stopBurnCpuFunc(); !success {
+	if that.BurnCpuStart {
+		that.startBurnCpu()
+	} else if that.BurnCpuStop {
+		if success, errs := that.StopBurnCpu(); !success {
 			bin.PrintErrAndExit(errs)
 		}
-	} else if burnCpuNohup {
-		burnCpu()
+	} else if that.BurnCpuNohup {
+		that.burnCpu()
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
-func burnCpu() {
+func (that *BurnCPU) burnCpu() {
 
-	runtime.GOMAXPROCS(cpuCount)
+	runtime.GOMAXPROCS(that.CpuCount)
 
 	var totalCpuPercent []float64
 	var curProcess *process.Process
@@ -120,24 +150,24 @@ func burnCpu() {
 		}
 	}()
 
-	if climbTime == 0 {
-		slopePercent = float64(cpuPercent)
+	if that.ClimbTime == 0 {
+		that.SlopePercent = float64(that.CpuPercent)
 	} else {
 		var ticker *time.Ticker = time.NewTicker(1 * time.Second)
-		slopePercent = totalCpuPercent[0]
-		var startPercent = float64(cpuPercent) - slopePercent
+		that.SlopePercent = totalCpuPercent[0]
+		var startPercent = float64(that.CpuPercent) - that.SlopePercent
 		go func() {
 			for range ticker.C {
-				if slopePercent < float64(cpuPercent) {
-					slopePercent += startPercent / float64(climbTime)
-				} else if slopePercent > float64(cpuPercent) {
-					slopePercent -= startPercent / float64(climbTime)
+				if that.SlopePercent < float64(that.CpuPercent) {
+					that.SlopePercent += startPercent / float64(that.ClimbTime)
+				} else if that.SlopePercent > float64(that.CpuPercent) {
+					that.SlopePercent -= startPercent / float64(that.ClimbTime)
 				}
 			}
 		}()
 	}
 
-	for i := 0; i < cpuCount; i++ {
+	for i := 0; i < that.CpuCount; i++ {
 		go func() {
 			busy := int64(0)
 			idle := int64(0)
@@ -147,7 +177,7 @@ func burnCpu() {
 			for i := 0; ; i = (i + 1) % 1000 {
 				startTime := time.Now().UnixNano()
 				if i == 0 {
-					dx = (slopePercent - totalCpuPercent[0]) / otherCpuPercent
+					dx = (that.SlopePercent - totalCpuPercent[0]) / otherCpuPercent
 					busy = busy + int64(dx*100000)
 					if busy < 0 {
 						busy = 0
@@ -168,60 +198,48 @@ func burnCpu() {
 	select {}
 }
 
-var burnCpuBin = exec.BurnCpuBin
-
-var cl = channel.NewLocalChannel()
-
-var stopBurnCpuFunc = stopBurnCpu
-
-var runBurnCpuFunc = runBurnCpu
-
-var bindBurnCpuFunc = bindBurnCpuByTaskset
-
-var checkBurnCpuFunc = checkBurnCpu
-
 // startBurnCpu by invoke burnCpuBin with --nohup flag
-func startBurnCpu() {
+func (that *BurnCPU) startBurnCpu() {
 	ctx := context.Background()
-	if cpuList != "" {
-		cpuCount = 1
-		cores := strings.Split(cpuList, ",")
+	if that.CpuList != "" {
+		that.CpuCount = 1
+		cores := strings.Split(that.CpuList, ",")
 		for _, core := range cores {
-			pid := runBurnCpuFunc(ctx, cpuCount, cpuPercent, true, core, climbTime)
-			bindBurnCpuFunc(ctx, core, pid)
+			pid := that.RunBurnCpu(ctx, that.CpuCount, that.CpuPercent, true, core, that.ClimbTime)
+			that.BindBurnCpuByTaskSet(ctx, core, pid)
 		}
 	} else {
-		runBurnCpuFunc(ctx, cpuCount, cpuPercent, false, "", climbTime)
+		that.RunBurnCpu(ctx, that.CpuCount, that.CpuPercent, false, "", that.ClimbTime)
 	}
-	checkBurnCpuFunc(ctx)
+	that.CheckBurnCpu(ctx)
 }
 
 // runBurnCpu
-func runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climbTime int) int {
+func (that *BurnCPU) runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climbTime int) int {
 	args := fmt.Sprintf(`%s --nohup --cpu-count %d --cpu-percent %d --climb-time %d`,
-		path.Join(util.GetProgramPath(), burnCpuBin), cpuCount, cpuPercent, climbTime)
+		path.Join(util.GetProgramPath(), that.Name()), cpuCount, cpuPercent, climbTime)
 	if pidNeeded {
 		args = fmt.Sprintf("%s --cpu-processor %s", args, processor)
 	}
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
-	response := cl.Run(ctx, "nohup", args)
+	response := that.Channel.Run(ctx, "nohup", args)
 	if !response.Success {
-		stopBurnCpuFunc()
+		that.StopBurnCpu()
 		bin.PrintErrAndExit(response.Err)
 	}
 	if pidNeeded {
 		// parse pid
 		newCtx := context.WithValue(context.Background(), channel.ProcessKey, fmt.Sprintf("cpu-processor %s", processor))
-		pids, err := cl.GetPidsByProcessName(burnCpuBin, newCtx)
+		pids, err := that.Channel.GetPidsByProcessName(that.Name(), newCtx)
 		if err != nil {
-			stopBurnCpuFunc()
+			that.StopBurnCpu()
 			bin.PrintErrAndExit(fmt.Sprintf("bind cpu core failed, cannot get the burning program pid, %v", err))
 		}
 		if len(pids) > 0 {
 			// return the first one
 			pid, err := strconv.Atoi(pids[0])
 			if err != nil {
-				stopBurnCpuFunc()
+				that.StopBurnCpu()
 				bin.PrintErrAndExit(fmt.Sprintf("bind cpu core failed, get pid failed, pids: %v, err: %v", pids, err))
 			}
 			return pid
@@ -231,37 +249,37 @@ func runBurnCpu(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded boo
 }
 
 // bindBurnCpu by taskset command
-func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
-	if !cl.IsCommandAvailable("taskset") {
+func (that *BurnCPU) bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
+	if !that.Channel.IsCommandAvailable("taskset") {
 		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandTasksetNotFound].Err)
 	}
-	response := cl.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
+	response := that.Channel.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))
 	if !response.Success {
-		stopBurnCpuFunc()
+		that.StopBurnCpu()
 		bin.PrintErrAndExit(response.Err)
 	}
 }
 
 // checkBurnCpu
-func checkBurnCpu(ctx context.Context) {
+func (that *BurnCPU) checkBurnCpu(ctx context.Context) {
 	time.Sleep(time.Second)
 	// query process
 	ctx = context.WithValue(ctx, channel.ProcessKey, "nohup")
-	pids, _ := cl.GetPidsByProcessName(burnCpuBin, ctx)
+	pids, _ := that.Channel.GetPidsByProcessName(that.Name(), ctx)
 	if pids == nil || len(pids) == 0 {
-		bin.PrintErrAndExit(fmt.Sprintf("%s pid not found", burnCpuBin))
+		bin.PrintErrAndExit(fmt.Sprintf("%s pid not found", that.Name()))
 	}
 }
 
 // stopBurnCpu
-func stopBurnCpu() (success bool, errs string) {
+func (that *BurnCPU) stopBurnCpu() (success bool, errs string) {
 	// add grep nohup
 	ctx := context.WithValue(context.Background(), channel.ProcessKey, "nohup")
-	pids, _ := cl.GetPidsByProcessName(burnCpuBin, ctx)
+	pids, _ := that.Channel.GetPidsByProcessName(that.Name(), ctx)
 	if pids == nil || len(pids) == 0 {
 		return true, errs
 	}
-	response := cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
+	response := that.Channel.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 	if !response.Success {
 		return false, response.Err
 	}

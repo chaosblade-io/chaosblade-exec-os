@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package main
+package burnio
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"path"
 	"strings"
@@ -30,67 +29,88 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 )
 
-const count = 100
+// init registry provider to model.
+func init() {
+	model.Provide(new(BurnIO))
+}
 
-var burnIODirectory, burnIOSize string
-var burnIORead, burnIOWrite, burnIOStart, burnIOStop, burnIONohup bool
+type BurnIO struct {
+	BurnIODirectory string `name:"directory" json:"directory" yaml:"directory" default:"" help:"the directory where the disk is burning"`
+	BurnIOSize      string `name:"size" json:"size" yaml:"size" default:"" help:"block size"`
+	BurnIOWrite     bool   `name:"write" json:"write" yaml:"write" default:"false" help:"write io"`
+	BurnIORead      bool   `name:"read" json:"read" yaml:"read" default:"false" help:"read io"`
+	BurnIOStart     bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start burn io"`
+	BurnIOStop      bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop burn io"`
+	BurnIONohup     bool   `name:"nohup" json:"nohup" yaml:"nohup" default:"false" help:"start by nohup"`
 
-func main() {
-	flag.StringVar(&burnIODirectory, "directory", "", "the directory where the disk is burning")
-	flag.StringVar(&burnIOSize, "size", "", "block size")
-	flag.BoolVar(&burnIOWrite, "write", false, "write io")
-	flag.BoolVar(&burnIORead, "read", false, "read io")
-	flag.BoolVar(&burnIOStart, "start", false, "start burn io")
-	flag.BoolVar(&burnIOStop, "stop", false, "stop burn io")
-	flag.BoolVar(&burnIONohup, "nohup", false, "start by nohup")
-	bin.ParseFlagAndInitLog()
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+	StartBurnIO func(directory, size string, read, write bool) `kong:"-"`
+	StopBurnIO  func(directory string, read, write bool)       `kong:"-"`
+}
 
-	if burnIOStart {
-		startBurnIO(burnIODirectory, burnIOSize, burnIORead, burnIOWrite)
-	} else if burnIOStop {
-		stopBurnIO(burnIODirectory, burnIORead, burnIOWrite)
-	} else if burnIONohup {
-		if burnIORead {
-			go burnRead(burnIODirectory, burnIOSize)
+func (that *BurnIO) Assign() model.Worker {
+	worker := &BurnIO{Channel: channel.NewLocalChannel()}
+	worker.StartBurnIO = func(directory, size string, read, write bool) {
+		worker.startBurnIO(directory, size, read, write)
+	}
+	worker.StopBurnIO = func(directory string, read, write bool) {
+		worker.stopBurnIO(directory, read, write)
+	}
+	return worker
+}
+
+func (that *BurnIO) Name() string {
+	return exec.BurnIOBin
+}
+
+func (that *BurnIO) Exec() *spec.Response {
+	if that.BurnIOStart {
+		that.StartBurnIO(that.BurnIODirectory, that.BurnIOSize, that.BurnIORead, that.BurnIOWrite)
+	} else if that.BurnIOStop {
+		that.StopBurnIO(that.BurnIODirectory, that.BurnIORead, that.BurnIOWrite)
+	} else if that.BurnIONohup {
+		if that.BurnIORead {
+			go that.burnRead(that.BurnIODirectory, that.BurnIOSize)
 		}
-		if burnIOWrite {
-			go burnWrite(burnIODirectory, burnIOSize)
+		if that.BurnIOWrite {
+			go that.burnWrite(that.BurnIODirectory, that.BurnIOSize)
 		}
 		select {}
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
+
+const count = 100
 
 var readFile = "chaos_burnio.read"
 var writeFile = "chaos_burnio.write"
-var burnIOBin = exec.BurnIOBin
 var logFile = util.GetNohupOutput(util.Bin, "chaos_burnio.log")
 
-var cl = channel.NewLocalChannel()
-
-var stopBurnIOFunc = stopBurnIO
-
 // start burn io
-func startBurnIO(directory, size string, read, write bool) {
+func (that *BurnIO) startBurnIO(directory, size string, read, write bool) {
 	ctx := context.Background()
-	response := cl.Run(ctx, "nohup",
+	response := that.Channel.Run(ctx, "nohup",
 		fmt.Sprintf(`%s --directory %s --size %s --read=%t --write=%t --nohup=true > %s 2>&1 &`,
-			path.Join(util.GetProgramPath(), burnIOBin), directory, size, read, write, logFile))
+			path.Join(util.GetProgramPath(), that.Name()), directory, size, read, write, logFile))
 	if !response.Success {
-		stopBurnIOFunc(directory, read, write)
+		that.StopBurnIO(directory, read, write)
 		bin.PrintErrAndExit(response.Err)
 		return
 	}
 	// check
 	time.Sleep(time.Second)
-	response = cl.Run(ctx, "grep", fmt.Sprintf("%s %s", bin.ErrPrefix, logFile))
+	response = that.Channel.Run(ctx, "grep", fmt.Sprintf("%s %s", bin.ErrPrefix, logFile))
 	if response.Success {
 		errMsg := strings.TrimSpace(response.Result.(string))
 		if errMsg != "" {
-			stopBurnIOFunc(directory, read, write)
+			that.StopBurnIO(directory, read, write)
 			bin.PrintErrAndExit(errMsg)
 			return
 		}
@@ -99,47 +119,46 @@ func startBurnIO(directory, size string, read, write bool) {
 }
 
 // stop burn io,  no need to add os.Exit
-func stopBurnIO(directory string, read, write bool) {
+func (that *BurnIO) stopBurnIO(directory string, read, write bool) {
 	ctx := context.WithValue(context.Background(), channel.ExcludeProcessKey, "--stop")
 	if read {
 		// dd process
-		pids, _ := cl.GetPidsByProcessName(readFile, ctx)
+		pids, _ := that.Channel.GetPidsByProcessName(readFile, ctx)
 		if pids != nil && len(pids) > 0 {
-			cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+			that.Channel.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 		}
 		// chaos_burnio process
-		ctxWithKey := context.WithValue(ctx, channel.ProcessKey, burnIOBin)
-		pids, _ = cl.GetPidsByProcessName("--read=true", ctxWithKey)
+		ctxWithKey := context.WithValue(ctx, channel.ProcessKey, that.Name())
+		pids, _ = that.Channel.GetPidsByProcessName("--read=true", ctxWithKey)
 		if pids != nil && len(pids) > 0 {
-			cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+			that.Channel.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 		}
-		cl.Run(ctx, "rm", fmt.Sprintf("-rf %s*", path.Join(directory, readFile)))
+		that.Channel.Run(ctx, "rm", fmt.Sprintf("-rf %s*", path.Join(directory, readFile)))
 	}
 	if write {
 		// dd process
-		pids, _ := cl.GetPidsByProcessName(writeFile, ctx)
+		pids, _ := that.Channel.GetPidsByProcessName(writeFile, ctx)
 		if pids != nil && len(pids) > 0 {
-			cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+			that.Channel.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 		}
-		ctxWithKey := context.WithValue(ctx, channel.ProcessKey, burnIOBin)
-		pids, _ = cl.GetPidsByProcessName("--write=true", ctxWithKey)
+		ctxWithKey := context.WithValue(ctx, channel.ProcessKey, that.Name())
+		pids, _ = that.Channel.GetPidsByProcessName("--write=true", ctxWithKey)
 		if pids != nil && len(pids) > 0 {
-			cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+			that.Channel.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 		}
-		cl.Run(ctx, "rm", fmt.Sprintf("-rf %s*", path.Join(directory, writeFile)))
+		that.Channel.Run(ctx, "rm", fmt.Sprintf("-rf %s*", path.Join(directory, writeFile)))
 	}
 }
 
 // write burn
-func burnWrite(directory, size string) {
-	if !cl.IsCommandAvailable("dd") {
+func (that *BurnIO) burnWrite(directory, size string) {
+	if !that.Channel.IsCommandAvailable("dd") {
 		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandDdNotFound].Err)
 	}
-
 	tmpFileForWrite := path.Join(directory, writeFile)
 	for {
 		args := fmt.Sprintf(`if=/dev/zero of=%s bs=%sM count=%d oflag=dsync`, tmpFileForWrite, size, count)
-		response := cl.Run(context.TODO(), "dd", args)
+		response := that.Channel.Run(context.TODO(), "dd", args)
 		if !response.Success {
 			bin.PrintAndExitWithErrPrefix(response.Err)
 			return
@@ -148,11 +167,11 @@ func burnWrite(directory, size string) {
 }
 
 // read burn
-func burnRead(directory, size string) {
+func (that *BurnIO) burnRead(directory, size string) {
 	// create a 600M file under the directory
 	tmpFileForRead := path.Join(directory, readFile)
 	createArgs := fmt.Sprintf("if=/dev/zero of=%s bs=%dM count=%d oflag=dsync", tmpFileForRead, 6, count)
-	response := cl.Run(context.TODO(), "dd", createArgs)
+	response := that.Channel.Run(context.TODO(), "dd", createArgs)
 	if !response.Success {
 		bin.PrintAndExitWithErrPrefix(
 			fmt.Sprintf("using dd command to create a temp file under %s directory for reading error, %s",
@@ -160,7 +179,7 @@ func burnRead(directory, size string) {
 	}
 	for {
 		args := fmt.Sprintf(`if=%s of=/dev/null bs=%sM count=%d iflag=dsync,direct,fullblock`, tmpFileForRead, size, count)
-		response = cl.Run(context.TODO(), "dd", args)
+		response = that.Channel.Run(context.TODO(), "dd", args)
 		if !response.Success {
 			bin.PrintAndExitWithErrPrefix(fmt.Sprintf("using dd command to burn read io error, %s", response.Err))
 			return

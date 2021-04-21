@@ -14,53 +14,66 @@
  * limitations under the License.
  */
 
-package main
+package chmodfile
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var mark, filepath string
-var appendFileStart, appendFileStop bool
+// init registry provider to model.
+func init() {
+	model.Provide(new(ChmodFile))
+}
 
-func main() {
-	flag.StringVar(&mark, "mark", "", "content")
-	flag.StringVar(&filepath, "filepath", "", "filepath")
-	flag.BoolVar(&appendFileStart, "start", false, "start append file")
-	flag.BoolVar(&appendFileStop, "stop", false, "stop append file")
-	bin.ParseFlagAndInitLog()
+type ChmodFile struct {
+	Filepath        string `name:"filepath" json:"filepath" yaml:"filepath" default:"" help:"filepath"`
+	Mark            string `name:"mark" json:"mark" yaml:"mark" default:"" help:"content"`
+	AppendFileStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start change modify file"`
+	AppendFileStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop change modify file"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-	if appendFileStart {
-		if mark == "" || filepath == "" {
+func (that *ChmodFile) Assign() model.Worker {
+	return &ChmodFile{Channel: channel.NewLocalChannel()}
+}
+
+func (that *ChmodFile) Name() string {
+	return exec.ChmodFileBin
+}
+
+func (that *ChmodFile) Exec() *spec.Response {
+	if that.AppendFileStart {
+		if that.Mark == "" || that.Filepath == "" {
 			bin.PrintErrAndExit("less --mark or --filepath flag")
 		}
-		startChmodFile(filepath, mark)
-	} else if appendFileStop {
-		stopChmodFile(filepath)
+		that.startChmodFile(that.Filepath, that.Mark)
+	} else if that.AppendFileStop {
+		that.stopChmodFile(that.Filepath)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
-
-var cl = channel.NewLocalChannel()
 
 const tmpFileChmod = "/tmp/chaos-file-chmod.tmp"
 
-func startChmodFile(filepath, mark string) {
+func (that *ChmodFile) startChmodFile(filepath, mark string) {
 	ctx := context.Background()
 
-	response := cl.Run(ctx, "grep", fmt.Sprintf(`-q "%s:" "%s"`, filepath, tmpFileChmod))
+	response := that.Channel.Run(ctx, "grep", fmt.Sprintf(`-q "%s:" "%s"`, filepath, tmpFileChmod))
 	if response.Success {
 		bin.PrintErrAndExit(fmt.Sprintf("%s is already being experimented o", filepath))
 		return
@@ -69,12 +82,12 @@ func startChmodFile(filepath, mark string) {
 	fileInfo, _ := os.Stat(filepath)
 	originMark := strconv.FormatInt(int64(fileInfo.Mode().Perm()), 8)
 
-	response = cl.Run(ctx, "echo", fmt.Sprintf(`%s:%s >> %s`, filepath, originMark, tmpFileChmod))
+	response = that.Channel.Run(ctx, "echo", fmt.Sprintf(`%s:%s >> %s`, filepath, originMark, tmpFileChmod))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return
 	}
-	response = cl.Run(ctx, "chmod", fmt.Sprintf(`%s "%s"`, mark, filepath))
+	response = that.Channel.Run(ctx, "chmod", fmt.Sprintf(`%s "%s"`, mark, filepath))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return
@@ -82,13 +95,13 @@ func startChmodFile(filepath, mark string) {
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func stopChmodFile(filepath string) {
+func (that *ChmodFile) stopChmodFile(filepath string) {
 
 	ctx := context.Background()
 	// get origin mark
-	response := cl.Run(ctx, "grep", fmt.Sprintf(`%s: %s | awk -F ':' '{printf $2}'`, filepath, tmpFileChmod))
+	response := that.Channel.Run(ctx, "grep", fmt.Sprintf(`%s: %s | awk -F ':' '{printf $2}'`, filepath, tmpFileChmod))
 	if !response.Success {
-		clearTempFile(filepath, response, ctx)
+		that.clearTempFile(filepath, response, ctx)
 		bin.PrintErrAndExit(response.Err)
 		return
 	}
@@ -96,17 +109,17 @@ func stopChmodFile(filepath string) {
 	originMark := response.Result.(string)
 	match, _ := regexp.MatchString("^([0-7]{3})$", originMark)
 	if !match {
-		bin.PrintErrAndExit(fmt.Sprintf("the %s mark is fail", mark))
+		bin.PrintErrAndExit(fmt.Sprintf("the %s mark is fail", that.Mark))
 		return
 	}
 
-	response = cl.Run(ctx, "chmod", fmt.Sprintf(`%s %s`, originMark, filepath))
+	response = that.Channel.Run(ctx, "chmod", fmt.Sprintf(`%s %s`, originMark, filepath))
 	if !response.Success {
-		clearTempFile(filepath, response, ctx)
+		that.clearTempFile(filepath, response, ctx)
 		bin.PrintErrAndExit(response.Err)
 		return
 	}
-	response, done := clearTempFile(filepath, response, ctx)
+	response, done := that.clearTempFile(filepath, response, ctx)
 	if done {
 		return
 	}
@@ -114,20 +127,17 @@ func stopChmodFile(filepath string) {
 	bin.PrintOutputAndExit(originMark)
 }
 
-func clearTempFile(filepath string, response *spec.Response, ctx context.Context) (*spec.Response, bool) {
-	if !cl.IsCommandAvailable("cat") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandCatNotFound].Err)
-	}
+func (that *ChmodFile) clearTempFile(filepath string, response *spec.Response, ctx context.Context) (*spec.Response, bool) {
 
-	response = cl.Run(ctx, "cat", fmt.Sprintf(`"%s"| grep -v %s:`, tmpFileChmod, filepath))
+	response = that.Channel.Run(ctx, "cat", fmt.Sprintf(`"%s"| grep -v %s:`, tmpFileChmod, filepath))
 	if !response.Success {
-		response = cl.Run(ctx, "rm", fmt.Sprintf(`-rf "%s"`, tmpFileChmod))
+		response = that.Channel.Run(ctx, "rm", fmt.Sprintf(`-rf "%s"`, tmpFileChmod))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 			return nil, true
 		}
 	} else {
-		response = cl.Run(ctx, "echo", fmt.Sprintf(`"%s" > %s`,
+		response = that.Channel.Run(ctx, "echo", fmt.Sprintf(`"%s" > %s`,
 			strings.TrimRight(response.Result.(string), "\n"),
 			tmpFileChmod))
 

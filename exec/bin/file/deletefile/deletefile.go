@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package main
+package deletefile
 
 import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
@@ -30,42 +31,55 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var filepath string
-var appendFileStart, appendFileStop, force bool
+// init registry provider to model.
+func init() {
+	model.Provide(new(DeleteFile))
+}
 
-func main() {
-	flag.StringVar(&filepath, "filepath", "", "filepath")
-	flag.BoolVar(&force, "force", false, "force remove can't be restored")
-	flag.BoolVar(&appendFileStart, "start", false, "start append file")
-	flag.BoolVar(&appendFileStop, "stop", false, "stop append file")
-	bin.ParseFlagAndInitLog()
+type DeleteFile struct {
+	Filepath        string `name:"filepath" json:"filepath" yaml:"filepath" default:"" help:"filepath"`
+	Force           bool   `name:"force" json:"force" yaml:"force" default:"false" help:"force remove can't be restored"`
+	AppendFileStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start delete file"`
+	AppendFileStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop delete file"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-	if appendFileStart {
-		if filepath == "" {
+func (that *DeleteFile) Assign() model.Worker {
+	return &DeleteFile{Channel: channel.NewLocalChannel()}
+}
+
+func (that *DeleteFile) Name() string {
+	return exec.DeleteFileBin
+}
+
+func (that *DeleteFile) Exec() *spec.Response {
+	if that.AppendFileStart {
+		if that.Filepath == "" {
 			bin.PrintErrAndExit("less --filepath flag")
 		}
-		startDeleteFile(filepath, force)
-	} else if appendFileStop {
-		stopDeleteFile(filepath, force)
+		that.startDeleteFile(that.Filepath, that.Force)
+	} else if that.AppendFileStop {
+		that.stopDeleteFile(that.Filepath, that.Force)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
-var cl = channel.NewLocalChannel()
-
-func startDeleteFile(filepath string, force bool) {
+func (that *DeleteFile) startDeleteFile(filepath string, force bool) {
 	ctx := context.Background()
 	var response *spec.Response
 	if force {
-		response = cl.Run(ctx, "rm", fmt.Sprintf(`-rf "%s"`, filepath))
+		response = that.Channel.Run(ctx, "rm", fmt.Sprintf(`-rf "%s"`, filepath))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
 	} else {
 		target := path.Join(path.Dir(filepath), "."+md5Hex(path.Base(filepath)))
-		response = cl.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))
+		response = that.Channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 			return
@@ -74,13 +88,13 @@ func startDeleteFile(filepath string, force bool) {
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func stopDeleteFile(filepath string, force bool) {
+func (that *DeleteFile) stopDeleteFile(filepath string, force bool) {
 	if force {
 		// nothing to do
 	} else {
 		ctx := context.Background()
 		target := path.Join(path.Dir(filepath), "."+md5Hex(path.Base(filepath)))
-		response := cl.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, target, filepath))
+		response := that.Channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, target, filepath))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 			return

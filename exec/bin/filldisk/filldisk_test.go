@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package main
+package filldisk
 
 import (
 	"context"
@@ -54,9 +54,11 @@ func Test_startFill(t *testing.T) {
 			err:  fmt.Errorf("less --size or --percent or --reserve flag"),
 		},
 	}
+	fillDisk := &FillDisk{}
+	fillDisk.Assign()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err, result := startFill(tt.args.directory, tt.args.size, tt.args.percent, tt.args.reserve, tt.args.retainHandle)
+			err, result := fillDisk.startFill(tt.args.directory, tt.args.size, tt.args.percent, tt.args.reserve, tt.args.retainHandle)
 			if !reflect.DeepEqual(err, tt.err) {
 				t.Errorf("startFill() got = %v, want %v", err, tt.err)
 			}
@@ -164,7 +166,7 @@ func Test_stopFill(t *testing.T) {
 		"1": {},
 		"2": {},
 	}
-	cl = &channel.MockLocalChannel{
+	cl := &channel.MockLocalChannel{
 		RunFunc: func(ctx context.Context, script, args string) *spec.Response {
 			if script == "kill" {
 				if args == "-9 1" {
@@ -207,9 +209,12 @@ func Test_stopFill(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	fillDisk := &FillDisk{}
+	fillDisk.Assign()
+	fillDisk.Channel = cl
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := stopFill(tt.args.directory); (err != nil) != tt.wantErr {
+			if err := fillDisk.stopFill(tt.args.directory); (err != nil) != tt.wantErr {
 				t.Errorf("stopFill() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

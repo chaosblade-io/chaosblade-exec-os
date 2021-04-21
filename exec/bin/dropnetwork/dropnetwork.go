@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-package main
+package dropnetwork
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"strings"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -28,50 +30,65 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var dropSourceIp, dropDestinationIp, dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic string
-var dropNetStart, dropNetStop bool
+// init registry provider to model.
+func init() {
+	model.Provide(new(DropNetwork))
+}
 
-func main() {
-	flag.StringVar(&dropSourceIp, "source-ip", "", "source ip")
-	flag.StringVar(&dropDestinationIp, "destination-ip", "", "destination ip")
-	flag.StringVar(&dropSourcePort, "source-port", "", "source port")
-	flag.StringVar(&dropDestinationPort, "destination-port", "", "destination port")
-	flag.StringVar(&dropStringPattern, "string-pattern", "", "string pattern")
-	flag.StringVar(&dropNetworkTraffic, "network-traffic", "", "network traffic")
-	flag.BoolVar(&dropNetStart, "start", false, "start drop")
-	flag.BoolVar(&dropNetStop, "stop", false, "stop drop")
-	bin.ParseFlagAndInitLog()
+type DropNetwork struct {
+	DropSourceIp        string `name:"source-ip" json:"source-ip" yaml:"source-ip" default:"" help:"source ip"`
+	DropDestinationIp   string `name:"destination-ip" json:"destination-ip" yaml:"destination-ip" default:"" help:"destination ip"`
+	DropSourcePort      string `name:"source-port" json:"source-port" yaml:"source-port" default:"" help:"source port"`
+	DropDestinationPort string `name:"destination-port" json:"destination-port" yaml:"destination-port" default:"" help:"destination port"`
+	DropStringPattern   string `name:"string-pattern" json:"string-pattern" yaml:"string-pattern" default:"" help:"string pattern"`
+	DropNetworkTraffic  string `name:"network-traffic" json:"network-traffic" yaml:"network-traffic" default:"" help:"network traffic"`
+	DropNetStart        bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start drop"`
+	DropNetStop         bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop drop"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+	StopDropNet func(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) `kong:"-"`
+}
 
-	if dropNetStart == dropNetStop {
+func (that *DropNetwork) Assign() model.Worker {
+	worker := &DropNetwork{Channel: channel.NewLocalChannel()}
+	worker.StopDropNet = func(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
+		worker.stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic)
+	}
+	return worker
+}
+
+func (that *DropNetwork) Name() string {
+	return exec.DropNetworkBin
+}
+
+func (that *DropNetwork) Exec() *spec.Response {
+	if that.DropNetStart == that.DropNetStop {
 		bin.PrintErrAndExit("must add --start or --stop flag")
 	}
-	if dropNetStart {
-		startDropNet(dropSourceIp, dropDestinationIp, dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic)
-	} else if dropNetStop {
-		stopDropNet(dropSourceIp, dropDestinationIp, dropSourcePort, dropDestinationPort, dropStringPattern, dropNetworkTraffic)
+	if that.DropNetStart {
+		that.startDropNet(that.DropSourceIp, that.DropDestinationIp, that.DropSourcePort, that.DropDestinationPort, that.DropStringPattern, that.DropNetworkTraffic)
+	} else if that.DropNetStop {
+		that.stopDropNet(that.DropSourceIp, that.DropDestinationIp, that.DropSourcePort, that.DropDestinationPort, that.DropStringPattern, that.DropNetworkTraffic)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
-var cl = channel.NewLocalChannel()
-
-var stopDropNetFunc = stopDropNet
-
-func startDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
+func (that *DropNetwork) startDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
 	ctx := context.Background()
 	if destinationIp == "" && sourceIp == "" && destinationPort == "" && sourcePort == "" && stringPattern == "" {
 		bin.PrintErrAndExit("must specify ip or port or string flag")
 		return
 	}
-	handleDropSpecifyPort(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
-}
-
-func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort string, destinationPort string, stringPattern string, networkTraffic string, ctx context.Context) {
-	if !cl.IsCommandAvailable("iptables") {
+	if !that.Channel.IsCommandAvailable("iptables") {
 		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandIptablesNotFound].Err)
 	}
+	that.handleDropSpecifyPort(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic, ctx)
+}
 
+func (that *DropNetwork) handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort string, destinationPort string, stringPattern string, networkTraffic string, ctx context.Context) {
 	var response *spec.Response
 	netFlows := []string{"INPUT", "OUTPUT"}
 	if networkTraffic == "in" {
@@ -115,15 +132,15 @@ func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort str
 		}
 		tcpArgs = fmt.Sprintf("%s -j DROP", tcpArgs)
 		udpArgs = fmt.Sprintf("%s -j DROP", udpArgs)
-		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, tcpArgs))
+		response = that.Channel.Run(ctx, "iptables", fmt.Sprintf(`%s`, tcpArgs))
 		if !response.Success {
-			stopDropNetFunc(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic)
+			that.StopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic)
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
-		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, udpArgs))
+		response = that.Channel.Run(ctx, "iptables", fmt.Sprintf(`%s`, udpArgs))
 		if !response.Success {
-			stopDropNetFunc(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic)
+			that.StopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic)
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
@@ -131,11 +148,7 @@ func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort str
 	bin.PrintOutputAndExit(response.Result.(string))
 }
 
-func stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
-	if !cl.IsCommandAvailable("iptables") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandIptablesNotFound].Err)
-	}
-
+func (that *DropNetwork) stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
 	ctx := context.Background()
 	var response *spec.Response
 	netFlows := []string{"INPUT", "OUTPUT"}
@@ -180,12 +193,12 @@ func stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPat
 		}
 		tcpArgs = fmt.Sprintf("%s -j DROP", tcpArgs)
 		udpArgs = fmt.Sprintf("%s -j DROP", udpArgs)
-		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, tcpArgs))
+		response = that.Channel.Run(ctx, "iptables", fmt.Sprintf(`%s`, tcpArgs))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
-		response = cl.Run(ctx, "iptables", fmt.Sprintf(`%s`, udpArgs))
+		response = that.Channel.Run(ctx, "iptables", fmt.Sprintf(`%s`, udpArgs))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
 			return

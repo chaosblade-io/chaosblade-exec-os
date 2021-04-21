@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package main
+package appendfile
 
 import (
 	"context"
 	"encoding/base64"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -39,32 +39,45 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var content, filepath string
-var count, interval int
-var escape, enableBase64, appendFileStart, appendFileStop, appendFileNoHup bool
+// init registry provider to model.
+func init() {
+	model.Provide(new(AppendFile))
+}
 
-func main() {
-	flag.StringVar(&content, "content", "", "content")
-	flag.StringVar(&filepath, "filepath", "", "filepath")
-	flag.IntVar(&count, "count", 1, "append count")
-	flag.IntVar(&interval, "interval", 1, "append count")
-	flag.BoolVar(&escape, "escape", false, "symbols to escape")
-	flag.BoolVar(&enableBase64, "enable-base64", false, "append content enableBase64 encoding")
-	flag.BoolVar(&appendFileStart, "start", false, "start append file")
-	flag.BoolVar(&appendFileStop, "stop", false, "stop append file")
-	flag.BoolVar(&appendFileNoHup, "nohup", false, "nohup to run append file")
-	bin.ParseFlagAndInitLog()
+type AppendFile struct {
+	Content         string `name:"content" json:"content" yaml:"content" default:"" help:"content"`
+	Filepath        string `name:"filepath" json:"filepath" yaml:"filepath" default:"" help:"filepath"`
+	Count           int    `name:"count" json:"count" yaml:"count" default:"1" help:"append count"`
+	Interval        int    `name:"interval" json:"interval" yaml:"interval" default:"1" help:"append interval"`
+	Escape          bool   `name:"escape" json:"escape" yaml:"escape" default:"false" help:"symbols to escape"`
+	EnableBase64    bool   `name:"enable-base64" json:"enable-base64" yaml:"enable-base64" default:"false" help:"append content enableBase64 encoding"`
+	AppendFileStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start append file"`
+	AppendFileStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop append file"`
+	AppendFileNoHup bool   `name:"nohup" json:"nohup" yaml:"nohup" default:"false" help:"nohup to run append file"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-	if appendFileStart {
-		if content == "" || filepath == "" {
+func (that *AppendFile) Assign() model.Worker {
+	return &AppendFile{Channel: channel.NewLocalChannel()}
+}
+
+func (that *AppendFile) Name() string {
+	return exec.AppendFileBin
+}
+
+func (that *AppendFile) Exec() *spec.Response {
+	if that.AppendFileStart {
+		if that.Content == "" || that.Filepath == "" {
 			bin.PrintErrAndExit("less --content or --filepath flag")
 		}
-		if strings.Contains(content, "@@##") {
-			content = strings.Replace(content, "@@##", " ", -1)
+		if strings.Contains(that.Content, "@@##") {
+			that.Content = strings.Replace(that.Content, "@@##", " ", -1)
 		}
-		startAppendFile(filepath, content, count, interval, escape, enableBase64)
-	} else if appendFileNoHup {
-		appendFile(filepath, content, count, interval, escape, enableBase64)
+		that.startAppendFile(that.Filepath, that.Content, that.Count, that.Interval, that.Escape, that.EnableBase64)
+	} else if that.AppendFileNoHup {
+		that.appendFile(that.Filepath, that.Content, that.Count, that.Interval, that.Escape, that.EnableBase64)
 		// Wait for signals
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGKILL)
@@ -72,29 +85,27 @@ func main() {
 			switch s {
 			case syscall.SIGHUP, syscall.SIGTERM, syscall.SIGKILL, os.Interrupt:
 				fmt.Println("caught interrupt, exit")
-				return
+				return spec.ReturnSuccess("")
 			}
 		}
-	} else if appendFileStop {
+	} else if that.AppendFileStop {
 
-		if success, errs := stopAppendFile(filepath); !success {
+		if success, errs := that.stopAppendFile(that.Filepath); !success {
 			bin.PrintErrAndExit(errs)
 		}
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
-var cl = channel.NewLocalChannel()
-var appendFileBin = exec.AppendFileBin
-
-func startAppendFile(filepath, content string, count int, interval int, escape bool, enableBase64 bool) {
+func (that *AppendFile) startAppendFile(filepath, content string, count int, interval int, escape bool, enableBase64 bool) {
 	// check pid
 	newCtx := context.WithValue(context.Background(), channel.ProcessKey,
 		fmt.Sprintf(`--nohup --filepath %s`, filepath))
-	pids, err := cl.GetPidsByProcessName(appendFileBin, newCtx)
+	pids, err := that.Channel.GetPidsByProcessName(that.Name(), newCtx)
 	if err != nil {
-		stopAppendFile(filepath)
+		that.stopAppendFile(filepath)
 		bin.PrintErrAndExit(fmt.Sprintf("start append file %s failed, cannot get the appending program pid, %v",
 			filepath, err))
 	}
@@ -105,20 +116,20 @@ func startAppendFile(filepath, content string, count int, interval int, escape b
 
 	ctx := context.Background()
 	args := fmt.Sprintf(`%s --nohup --filepath "%s" --content "%s" --count %d --interval %d --escape=%t --enable-base64=%t`,
-		path.Join(util.GetProgramPath(), appendFileBin), filepath, content, count, interval, escape, enableBase64)
+		path.Join(util.GetProgramPath(), that.Name()), filepath, content, count, interval, escape, enableBase64)
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
-	response := cl.Run(ctx, "nohup", args)
+	response := that.Channel.Run(ctx, "nohup", args)
 	if !response.Success {
-		stopAppendFile(filepath)
+		that.stopAppendFile(filepath)
 		bin.PrintErrAndExit(response.Err)
 	}
 
 	// check pid
 	newCtx = context.WithValue(context.Background(), channel.ProcessKey,
 		fmt.Sprintf(`--nohup --filepath %s`, filepath))
-	pids, err = cl.GetPidsByProcessName(appendFileBin, newCtx)
+	pids, err = that.Channel.GetPidsByProcessName(that.Name(), newCtx)
 	if err != nil {
-		stopAppendFile(filepath)
+		that.stopAppendFile(filepath)
 		bin.PrintErrAndExit(fmt.Sprintf("run append file %s failed, cannot get the appending program pid, %v",
 			filepath, err))
 	}
@@ -128,18 +139,18 @@ func startAppendFile(filepath, content string, count int, interval int, escape b
 	}
 }
 
-func appendFile(filepath string, content string, count int, interval int, escape bool, enableBase64 bool) {
+func (that *AppendFile) appendFile(filepath string, content string, count int, interval int, escape bool, enableBase64 bool) {
 
 	go func() {
 		ctx := context.Background()
 		// first append
-		if append(count, ctx, content, filepath, escape, enableBase64) {
+		if that.append(count, ctx, content, filepath, escape, enableBase64) {
 			return
 		}
 
 		ticker := time.NewTicker(time.Second * time.Duration(interval))
 		for range ticker.C {
-			if append(count, ctx, content, filepath, escape, enableBase64) {
+			if that.append(count, ctx, content, filepath, escape, enableBase64) {
 				return
 			}
 		}
@@ -186,7 +197,7 @@ func parseRandom(content string) string {
 	return content
 }
 
-func append(count int, ctx context.Context, content string, filepath string, escape bool, enableBase64 bool) bool {
+func (that *AppendFile) append(count int, ctx context.Context, content string, filepath string, escape bool, enableBase64 bool) bool {
 	var response *spec.Response
 	if enableBase64 {
 		decodeBytes, err := base64.StdEncoding.DecodeString(content)
@@ -200,9 +211,9 @@ func append(count int, ctx context.Context, content string, filepath string, esc
 	for i := 0; i < count; i++ {
 		content = parseRandom(content)
 		if escape {
-			response = cl.Run(ctx, "echo", fmt.Sprintf(`-e "%s" >> "%s"`, content, filepath))
+			response = that.Channel.Run(ctx, "echo", fmt.Sprintf(`-e "%s" >> "%s"`, content, filepath))
 		} else {
-			response = cl.Run(ctx, "echo", fmt.Sprintf(`"%s" >> "%s"`, content, filepath))
+			response = that.Channel.Run(ctx, "echo", fmt.Sprintf(`"%s" >> "%s"`, content, filepath))
 		}
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
@@ -212,15 +223,15 @@ func append(count int, ctx context.Context, content string, filepath string, esc
 	return false
 }
 
-func stopAppendFile(filepath string) (success bool, errs string) {
+func (that *AppendFile) stopAppendFile(filepath string) (success bool, errs string) {
 	ctx := context.WithValue(context.Background(), channel.ProcessKey,
 		fmt.Sprintf(`--nohup --filepath %s`, filepath))
-	pids, _ := cl.GetPidsByProcessName(filepath, ctx)
+	pids, _ := that.Channel.GetPidsByProcessName(filepath, ctx)
 	if pids == nil || len(pids) == 0 {
 		return true, errs
 	}
 
-	response := cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
+	response := that.Channel.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 	if !response.Success {
 		return false, response.Err
 	}

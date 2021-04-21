@@ -14,56 +14,71 @@
  * limitations under the License.
  */
 
-package main
+package changedns
 
 import (
 	"context"
-	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
 
-var dnsDomain, dnsIp string
-var changeDnsStart, changeDnsStop bool
+// init registry provider to model.
+func init() {
+	model.Provide(new(ChangeDNS))
+}
 
-func main() {
-	flag.StringVar(&dnsDomain, "domain", "", "dns domain")
-	flag.StringVar(&dnsIp, "ip", "", "dns ip")
-	flag.BoolVar(&changeDnsStart, "start", false, "start change dns")
-	flag.BoolVar(&changeDnsStop, "stop", false, "recover dns")
-	bin.ParseFlagAndInitLog()
+type ChangeDNS struct {
+	DNSDomain      string `name:"domain" json:"domain" yaml:"domain" default:"" help:"dns domain"`
+	DNSIp          string `name:"ip" json:"ip" yaml:"ip" default:"" help:"dns ip"`
+	ChangeDnsStart bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start change dns"`
+	ChangeDnsStop  bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"recover dns"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+}
 
-	if dnsDomain == "" || dnsIp == "" {
+func (that *ChangeDNS) Assign() model.Worker {
+	worker := &ChangeDNS{Channel: channel.NewLocalChannel()}
+	return worker
+}
+
+func (that *ChangeDNS) Name() string {
+	return exec.ChangeDnsBin
+}
+
+func (that *ChangeDNS) Exec() *spec.Response {
+	if that.DNSDomain == "" || that.DNSIp == "" {
 		bin.PrintErrAndExit("less --domain or --ip flag")
 	}
-	if changeDnsStart {
-		startChangeDns(dnsDomain, dnsIp)
-	} else if changeDnsStop {
-		recoverDns(dnsDomain, dnsIp)
+	if that.ChangeDnsStart {
+		that.startChangeDns(that.DNSDomain, that.DNSIp)
+	} else if that.ChangeDnsStop {
+		that.recoverDns(that.DNSDomain, that.DNSIp)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
+	return spec.ReturnSuccess("")
 }
 
 const hosts = "/etc/hosts"
 const tmpHosts = "/tmp/chaos-hosts.tmp"
 
-var cl = channel.NewLocalChannel()
-
 // startChangeDns by the domain and ip
-func startChangeDns(domain, ip string) {
+func (that *ChangeDNS) startChangeDns(domain, ip string) {
 	ctx := context.Background()
 	dnsPair := createDnsPair(domain, ip)
-	response := cl.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
+	response := that.Channel.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
 	if response.Success {
 		bin.PrintErrAndExit(fmt.Sprintf("%s has been exist", dnsPair))
 		return
 	}
-	response = cl.Run(ctx, "echo", fmt.Sprintf(`"%s" >> %s`, dnsPair, hosts))
+	response = that.Channel.Run(ctx, "echo", fmt.Sprintf(`"%s" >> %s`, dnsPair, hosts))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return
@@ -72,26 +87,21 @@ func startChangeDns(domain, ip string) {
 }
 
 // recoverDns
-func recoverDns(domain, ip string) {
+func (that *ChangeDNS) recoverDns(domain, ip string) {
 	ctx := context.Background()
 	dnsPair := createDnsPair(domain, ip)
-	response := cl.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
+	response := that.Channel.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
 	if !response.Success {
 		bin.PrintOutputAndExit("nothing to do")
 		return
 	}
-
-	if !cl.IsCommandAvailable("cat") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandCatNotFound].Err)
-	}
-
-	response = cl.Run(ctx, "cat", fmt.Sprintf(`%s | grep -v "%s" > %s && cat %s > %s`,
+	response = that.Channel.Run(ctx, "cat", fmt.Sprintf(`%s | grep -v "%s" > %s && cat %s > %s`,
 		hosts, dnsPair, tmpHosts, tmpHosts, hosts))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return
 	}
-	cl.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, tmpHosts))
+	that.Channel.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, tmpHosts))
 }
 
 func createDnsPair(domain, ip string) string {

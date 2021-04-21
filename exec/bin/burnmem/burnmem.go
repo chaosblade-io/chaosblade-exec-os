@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package main
+package burnmem
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"math"
 	"os"
@@ -32,52 +31,72 @@ import (
 	"github.com/containerd/cgroups"
 	v1 "github.com/containerd/cgroups/stats/v1"
 	"github.com/shirou/gopsutil/mem"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 )
+
+// init registry provider to model.
+func init() {
+	model.Provide(new(BurnMem))
+}
+
+type BurnMem struct {
+	BurnMemStart       bool   `name:"start" json:"start" yaml:"start" default:"false" help:"start burn memory"`
+	BurnMemStop        bool   `name:"stop" json:"stop" yaml:"stop" default:"false" help:"stop burn memory"`
+	BurnMemNohup       bool   `name:"nohup" json:"nohup" yaml:"nohup" default:"false" help:"nohup to run burn memory"`
+	IncludeBufferCache bool   `name:"include-buffer-cache" json:"include-buffer-cache" yaml:"include-buffer-cache" default:"false" help:"ram model mem-percent is exclude buffer/cache"`
+	MemPercent         int    `name:"mem-percent" json:"mem-percent" yaml:"mem-percent" default:"0" help:"percent of burn memory"`
+	MemReserve         int    `name:"reserve" json:"reserve" yaml:"reserve" default:"0" help:"reserve to burn memory, unit is M"`
+	MemRate            int    `name:"rate" json:"rate" yaml:"rate" default:"100" help:"burn memory rate, unit is M/S, only support for ram mode"`
+	BurnMemMode        string `name:"mode" json:"mode" yaml:"mode" default:"cache" help:"burn memory mode, cache or ram"`
+	// default arguments
+	Channel channel.OsChannel `kong:"-"`
+	// for test mock
+	StopBurnMem func() (success bool, errs string)                                                                          `kong:"-"`
+	RunBurnMem  func(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) `kong:"-"`
+}
+
+func (that *BurnMem) Assign() model.Worker {
+	worker := &BurnMem{Channel: channel.NewLocalChannel()}
+	worker.StopBurnMem = func() (success bool, errs string) {
+		return worker.stopBurnMem()
+	}
+	worker.RunBurnMem = func(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) {
+		worker.runBurnMem(ctx, memPercent, memReserve, memRate, burnMemMode, includeBufferCache)
+	}
+	return worker
+}
+
+func (that *BurnMem) Name() string {
+	return exec.BurnMemBin
+}
+
+func (that *BurnMem) Exec() *spec.Response {
+	if that.BurnMemStart {
+		that.startBurnMem()
+	} else if that.BurnMemStop {
+		if success, errs := that.stopBurnMem(); !success {
+			bin.PrintErrAndExit(errs)
+		}
+	} else if that.BurnMemNohup {
+		if that.BurnMemMode == "cache" {
+			that.burnMemWithCache()
+		} else if that.BurnMemMode == "ram" {
+			that.burnMemWithRam()
+		}
+	} else {
+		bin.PrintAndExitWithErrPrefix("less --start or --stop flag")
+	}
+	return spec.ReturnSuccess("")
+}
 
 const PageCounterMax uint64 = 9223372036854770000
 
 // 128K
 type Block [32 * 1024]int32
-
-var (
-	burnMemStart, burnMemStop, burnMemNohup, includeBufferCache bool
-	memPercent, memReserve, memRate                             int
-	burnMemMode                                                 string
-)
-
-func main() {
-	flag.BoolVar(&burnMemStart, "start", false, "start burn memory")
-	flag.BoolVar(&burnMemStop, "stop", false, "stop burn memory")
-	flag.BoolVar(&burnMemNohup, "nohup", false, "nohup to run burn memory")
-	flag.BoolVar(&includeBufferCache, "include-buffer-cache", false, "ram model mem-percent is exclude buffer/cache")
-	flag.IntVar(&memPercent, "mem-percent", 0, "percent of burn memory")
-	flag.IntVar(&memReserve, "reserve", 0, "reserve to burn memory, unit is M")
-	flag.IntVar(&memRate, "rate", 100, "burn memory rate, unit is M/S, only support for ram mode")
-	flag.StringVar(&burnMemMode, "mode", "cache", "burn memory mode, cache or ram")
-	bin.ParseFlagAndInitLog()
-
-	if burnMemStart {
-		startBurnMem()
-	} else if burnMemStop {
-		if success, errs := stopBurnMem(); !success {
-			bin.PrintErrAndExit(errs)
-		}
-	} else if burnMemNohup {
-		if burnMemMode == "cache" {
-			burnMemWithCache()
-		} else if burnMemMode == "ram" {
-			burnMemWithRam()
-		}
-	} else {
-		bin.PrintAndExitWithErrPrefix("less --start or --stop flag")
-	}
-
-}
 
 var dirName = "burnmem_tmpfs"
 
@@ -85,24 +104,24 @@ var fileName = "file"
 
 var fileCount = 1
 
-func burnMemWithRam() {
+func (that *BurnMem) burnMemWithRam() {
 	tick := time.Tick(time.Second)
 	var cache = make(map[int][]Block, 1)
 	var count = 1
 	cache[count] = make([]Block, 0)
-	if memRate <= 0 {
-		memRate = 100
+	if that.MemRate <= 0 {
+		that.MemRate = 100
 	}
 	for range tick {
-		_, expectMem, err := calculateMemSize(memPercent, memReserve)
+		_, expectMem, err := that.calculateMemSize(that.MemPercent, that.MemReserve)
 		if err != nil {
-			stopBurnMemFunc()
+			that.StopBurnMem()
 			bin.PrintErrAndExit(err.Error())
 		}
 		fillMem := expectMem
 		if expectMem > 0 {
-			if expectMem > int64(memRate) {
-				fillMem = int64(memRate)
+			if expectMem > int64(that.MemRate) {
+				fillMem = int64(that.MemRate)
 			} else {
 				fillMem = expectMem / 10
 				if fillMem == 0 {
@@ -124,24 +143,24 @@ func burnMemWithRam() {
 	}
 }
 
-func burnMemWithCache() {
+func (that *BurnMem) burnMemWithCache() {
 	filePath := path.Join(path.Join(util.GetProgramPath(), dirName), fileName)
 	tick := time.Tick(time.Second)
 	for range tick {
-		_, expectMem, err := calculateMemSize(memPercent, memReserve)
+		_, expectMem, err := that.calculateMemSize(that.MemPercent, that.MemReserve)
 		if err != nil {
-			stopBurnMemFunc()
+			that.StopBurnMem()
 			bin.PrintErrAndExit(err.Error())
 		}
 		fillMem := expectMem
 		if expectMem > 0 {
-			if expectMem > int64(memRate) {
-				fillMem = int64(memRate)
+			if expectMem > int64(that.MemRate) {
+				fillMem = int64(that.MemRate)
 			}
 			nFilePath := fmt.Sprintf("%s%d", filePath, fileCount)
-			response := cl.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, fillMem))
+			response := that.Channel.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, fillMem))
 			if !response.Success {
-				stopBurnMemFunc()
+				that.StopBurnMem()
 				bin.PrintErrAndExit(response.Error())
 			}
 			fileCount++
@@ -149,21 +168,12 @@ func burnMemWithCache() {
 	}
 }
 
-var burnMemBin = exec.BurnMemBin
-
-var cl = channel.NewLocalChannel()
-
-var stopBurnMemFunc = stopBurnMem
-
-var runBurnMemFunc = runBurnMem
-
-func startBurnMem() {
+func (that *BurnMem) startBurnMem() {
 	ctx := context.Background()
-	if burnMemMode == "cache" {
-		if !cl.IsCommandAvailable("mount") {
+	if that.BurnMemMode == "cache" {
+		if !that.Channel.IsCommandAvailable("mount") {
 			bin.PrintErrAndExit(spec.ResponseErr[spec.CommandMountNotFound].Err)
 		}
-
 		flPath := path.Join(util.GetProgramPath(), dirName)
 		if _, err := os.Stat(flPath); err != nil {
 			err = os.Mkdir(flPath, os.ModePerm)
@@ -171,57 +181,56 @@ func startBurnMem() {
 				bin.PrintErrAndExit(err.Error())
 			}
 		}
-		response := cl.Run(ctx, "mount", fmt.Sprintf("-t tmpfs tmpfs %s -o size=", flPath)+"100%")
+		response := that.Channel.Run(ctx, "mount", fmt.Sprintf("-t tmpfs tmpfs %s -o size=", flPath)+"100%")
 		if !response.Success {
 			bin.PrintErrAndExit(response.Error())
 		}
 	}
-	runBurnMemFunc(ctx, memPercent, memReserve, memRate, burnMemMode, includeBufferCache)
+	that.RunBurnMem(ctx, that.MemPercent, that.MemReserve, that.MemRate, that.BurnMemMode, that.IncludeBufferCache)
 }
 
-func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) {
+func (that *BurnMem) runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) {
 	args := fmt.Sprintf(`%s --nohup --mem-percent %d --reserve %d --rate %d --mode %s --include-buffer-cache=%t`,
-		path.Join(util.GetProgramPath(), burnMemBin), memPercent, memReserve, memRate, burnMemMode, includeBufferCache)
+		path.Join(util.GetProgramPath(), that.Name()), memPercent, memReserve, memRate, burnMemMode, includeBufferCache)
 	args = fmt.Sprintf(`%s > /dev/null 2>&1 &`, args)
-	response := cl.Run(ctx, "nohup", args)
+	response := that.Channel.Run(ctx, "nohup", args)
 	if !response.Success {
-		stopBurnMemFunc()
+		that.StopBurnMem()
 		bin.PrintErrAndExit(response.Err)
 	}
 	// check pid
 	newCtx := context.WithValue(context.Background(), channel.ProcessKey, "--nohup")
-	pids, err := cl.GetPidsByProcessName(burnMemBin, newCtx)
+	pids, err := that.Channel.GetPidsByProcessName(that.Name(), newCtx)
 	if err != nil {
-		stopBurnMemFunc()
+		that.StopBurnMem()
 		bin.PrintErrAndExit(fmt.Sprintf("run burn memory by %s mode failed, cannot get the burning program pid, %v",
 			burnMemMode, err))
 	}
 	if len(pids) == 0 {
-		stopBurnMemFunc()
+		that.StopBurnMem()
 		bin.PrintErrAndExit(fmt.Sprintf("run burn memory by %s mode failed, cannot find the burning program pid",
 			burnMemMode))
 	}
 }
 
-func stopBurnMem() (success bool, errs string) {
+func (that *BurnMem) stopBurnMem() (success bool, errs string) {
 	ctx := context.WithValue(context.Background(), channel.ProcessKey, "nohup")
 	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, "stop")
-	pids, _ := cl.GetPidsByProcessName(burnMemBin, ctx)
+	pids, _ := that.Channel.GetPidsByProcessName(that.Name(), ctx)
 	var response *spec.Response
 	if pids != nil && len(pids) != 0 {
-		response = cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
+		response = that.Channel.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 		if !response.Success {
 			return false, response.Err
 		}
 	}
-	if burnMemMode == "cache" {
+	if that.BurnMemMode == "cache" {
+		if !that.Channel.IsCommandAvailable("umount") {
+			bin.PrintErrAndExit(spec.ResponseErr[spec.CommandUmountNotFound].Err)
+		}
 		dirPath := path.Join(util.GetProgramPath(), dirName)
 		if _, err := os.Stat(dirPath); err == nil {
-			if !cl.IsCommandAvailable("umount") {
-				bin.PrintErrAndExit(spec.ResponseErr[spec.CommandUmountNotFound].Err)
-			}
-
-			response = cl.Run(ctx, "umount", dirPath)
+			response = that.Channel.Run(ctx, "umount", dirPath)
 			if !response.Success {
 				if !strings.Contains(response.Err, "not mounted") {
 					bin.PrintErrAndExit(response.Error())
@@ -236,7 +245,7 @@ func stopBurnMem() (success bool, errs string) {
 	return true, errs
 }
 
-func calculateMemSize(percent, reserve int) (int64, int64, error) {
+func (that *BurnMem) calculateMemSize(percent, reserve int) (int64, int64, error) {
 	total := int64(0)
 	available := int64(0)
 	memoryStat, err := getMemoryStatsByCGroup()
@@ -251,13 +260,13 @@ func calculateMemSize(percent, reserve int) (int64, int64, error) {
 		}
 		total = int64(virtualMemory.Total)
 		available = int64(virtualMemory.Free)
-		if burnMemMode == "ram" && !includeBufferCache {
+		if that.BurnMemMode == "ram" && !that.IncludeBufferCache {
 			available = available + int64(virtualMemory.Buffers+virtualMemory.Cached)
 		}
 	} else {
 		total = int64(memoryStat.Usage.Limit)
 		available = total - int64(memoryStat.Usage.Usage)
-		if burnMemMode == "ram" && !includeBufferCache {
+		if that.BurnMemMode == "ram" && !that.IncludeBufferCache {
 			available = available + int64(memoryStat.Cache)
 		}
 	}

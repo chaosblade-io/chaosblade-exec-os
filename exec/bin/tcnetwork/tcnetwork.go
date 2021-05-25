@@ -210,7 +210,7 @@ func buildExcludeFilterToNewBand(netInterface string, excludePorts []string, exc
 		}
 		args = fmt.Sprintf(
 			`%s && \
-			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %s 0xffff flowid 1:4 && \,
+			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip dport %s 0xffff flowid 1:4 && \,
 			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %s 0xffff flowid 1:4`,
 			args, netInterface, port, netInterface, port)
 	}

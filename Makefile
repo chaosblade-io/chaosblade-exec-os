@@ -10,7 +10,7 @@ GO_FLAGS=-ldflags="-s -w"
 UNAME := $(shell uname)
 
 ifeq ($(BLADE_VERSION), )
-	BLADE_VERSION=1.1.0
+	BLADE_VERSION=1.2.0
 endif
 
 BUILD_TARGET=target
@@ -31,9 +31,9 @@ endif
 
 
 # build os
-build: pre_build build_yaml build_osbin
+build: pre_build build_yaml build_osbin build_os
 
-build_darwin: pre_build build_yaml build_osbin_darwin
+build_darwin: pre_build build_yaml build_osbin_darwin build_os
 
 pre_build:
 	rm -rf $(BUILD_TARGET_PKG_DIR) $(BUILD_TARGET_PKG_FILE_PATH)
@@ -101,6 +101,9 @@ build_kernel_delay: exec/bin/kernel/delay/delay.go
 
 build_kernel_error: exec/bin/kernel/error/error.go
 	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_straceerror $<
+
+build_os: main.go
+	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_os $<
 
 cp_strace:
 	cp extra/strace $(BUILD_TARGET_BIN)/

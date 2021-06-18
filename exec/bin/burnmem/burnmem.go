@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -40,6 +41,11 @@ import (
 )
 
 const PageCounterMax uint64 = 9223372036854770000
+
+const (
+	processOOMScoreAdj = "/proc/%s/oom_score_adj"
+	oomMinScore        = "-1000"
+)
 
 // 128K
 type Block [32 * 1024]int32
@@ -200,6 +206,19 @@ func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMe
 		stopBurnMemFunc()
 		bin.PrintErrAndExit(fmt.Sprintf("run burn memory by %s mode failed, cannot find the burning program pid",
 			burnMemMode))
+	}
+	// adjust process oom_score_adj to avoid being killed
+	for _, pid := range pids {
+		scoreAdjFile := fmt.Sprintf(processOOMScoreAdj, pid)
+		if _, err := os.Stat(scoreAdjFile); os.IsNotExist(err) {
+			continue
+		}
+
+		if err := ioutil.WriteFile(scoreAdjFile, []byte(oomMinScore), 0644); err != nil {
+			stopBurnMemFunc()
+			bin.PrintErrAndExit(fmt.Sprintf("run burn memory by %s mode failed, cannot edit the process oom_score_adj",
+				burnMemMode))
+		}
 	}
 }
 

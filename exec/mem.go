@@ -54,6 +54,9 @@ blade create mem load --mode cache --mem-percent 50
 # The execution memory footprint is 50%, usage contains buffer/cache
 blade create mem load --mode ram --mem-percent 50 --include-buffer-cache
 
+# The execution memory footprint is 50%, avoid mem-burn process being killed
+blade create mem load --mode ram --mem-percent 50 --avoid-being-killed
+
 # The execution memory footprint is 50% for 200 seconds
 blade create mem load --mode ram --mem-percent 50 --timeout 200
 
@@ -88,6 +91,11 @@ blade create mem load --mode ram --reserve 200 --rate 100`,
 				&spec.ExpFlag{
 					Name:   "include-buffer-cache",
 					Desc:   "Ram mode mem-percent is include buffer/cache",
+					NoArgs: true,
+				},
+				&spec.ExpFlag{
+					Name:   "avoid-being-killed",
+					Desc:   "Prevent mem-burn process from being killed by oom-killer",
 					NoArgs: true,
 				},
 			},

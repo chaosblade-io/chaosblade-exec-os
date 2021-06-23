@@ -42,9 +42,13 @@ pre_build:
 build_yaml: build/spec.go
 	$(GO) run $< $(OS_YAML_FILE_PATH)
 
-build_osbin: build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile build_kernel_delay build_kernel_error cp_strace
+build_osbin: build_stopsystemd build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile build_kernel_delay build_kernel_error cp_strace
 
 build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile
+
+# build stop-systemd chaos tools
+build_stopsystemd: exec/bin/stopsystemd/stopsystemd.go
+	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_stopsystemd $<
 
 # build burn-cpu chaos tools
 build_burncpu: exec/bin/burncpu/burncpu.go

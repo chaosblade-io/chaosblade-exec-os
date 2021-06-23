@@ -26,4 +26,5 @@ const (
 	SystemScript  = "system_script"
 	SystemFile    = "system_file"
 	SystemKernel  = "system_kernel"
+	SystemSystemd = "system_systemd"
 )

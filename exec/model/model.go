@@ -53,6 +53,7 @@ func GetAllExpModels() []spec.ExpModelCommandSpec {
 		exec.NewScriptCommandModelSpec(),
 		exec.NewFileCommandSpec(),
 		exec.NewKernelInjectCommandSpec(),
+		exec.NewSystemdCommandModelSpec(),
 	}
 }
 

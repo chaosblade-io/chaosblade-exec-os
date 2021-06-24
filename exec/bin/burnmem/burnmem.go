@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -41,13 +42,18 @@ import (
 
 const PageCounterMax uint64 = 9223372036854770000
 
+const (
+	processOOMScoreAdj = "/proc/%s/oom_score_adj"
+	oomMinScore        = "-1000"
+)
+
 // 128K
 type Block [32 * 1024]int32
 
 var (
-	burnMemStart, burnMemStop, burnMemNohup, includeBufferCache bool
-	memPercent, memReserve, memRate                             int
-	burnMemMode                                                 string
+	burnMemStart, burnMemStop, burnMemNohup, includeBufferCache, avoidBeingKilled bool
+	memPercent, memReserve, memRate                                               int
+	burnMemMode                                                                   string
 )
 
 func main() {
@@ -55,6 +61,7 @@ func main() {
 	flag.BoolVar(&burnMemStop, "stop", false, "stop burn memory")
 	flag.BoolVar(&burnMemNohup, "nohup", false, "nohup to run burn memory")
 	flag.BoolVar(&includeBufferCache, "include-buffer-cache", false, "ram model mem-percent is exclude buffer/cache")
+	flag.BoolVar(&avoidBeingKilled, "avoid-being-killed", false, "prevent mem-burn process from being killed by oom-killer")
 	flag.IntVar(&memPercent, "mem-percent", 0, "percent of burn memory")
 	flag.IntVar(&memReserve, "reserve", 0, "reserve to burn memory, unit is M")
 	flag.IntVar(&memRate, "rate", 100, "burn memory rate, unit is M/S, only support for ram mode")
@@ -200,6 +207,21 @@ func runBurnMem(ctx context.Context, memPercent, memReserve, memRate int, burnMe
 		stopBurnMemFunc()
 		bin.PrintErrAndExit(fmt.Sprintf("run burn memory by %s mode failed, cannot find the burning program pid",
 			burnMemMode))
+	}
+	// adjust process oom_score_adj to avoid being killed
+	if avoidBeingKilled {
+		for _, pid := range pids {
+			scoreAdjFile := fmt.Sprintf(processOOMScoreAdj, pid)
+			if _, err := os.Stat(scoreAdjFile); os.IsNotExist(err) {
+				continue
+			}
+
+			if err := ioutil.WriteFile(scoreAdjFile, []byte(oomMinScore), 0644); err != nil {
+				stopBurnMemFunc()
+				bin.PrintErrAndExit(fmt.Sprintf("run burn memory by %s mode failed, cannot edit the process oom_score_adj",
+					burnMemMode))
+			}
+		}
 	}
 }
 

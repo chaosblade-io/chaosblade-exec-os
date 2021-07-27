@@ -73,7 +73,7 @@ func main() {
 	}
 
 	if !cl.IsCommandAvailable("tc") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandTcNotFound].Err)
+		bin.PrintErrAndExit(spec.CommandTcNotFound.Msg)
 	}
 
 	if tcNetStart {
@@ -386,7 +386,7 @@ func stopNet(netInterface string) {
 // getPeerPorts returns all ports communicating with the port
 func getPeerPorts(port string) ([]string, error) {
 	if !cl.IsCommandAvailable("ss") {
-		return nil, fmt.Errorf(spec.ResponseErr[spec.CommandSsNotFound].Err)
+		return nil, fmt.Errorf(spec.CommandSsNotFound.Msg)
 	}
 	response := cl.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
 	if !response.Success {

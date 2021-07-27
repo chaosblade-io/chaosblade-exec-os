@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
@@ -39,6 +40,10 @@ func PrintErrAndExit(message string) {
 	ExitMessageForTesting = message
 	fmt.Fprint(os.Stderr, message)
 	ExitFunc(1)
+}
+
+func PrintErrRespAndExit(response *spec.Response) {
+	PrintErrAndExit(response.Print())
 }
 
 func PrintOutputAndExit(message string) {

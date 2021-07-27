@@ -161,7 +161,7 @@ func startBurnMem() {
 	ctx := context.Background()
 	if burnMemMode == "cache" {
 		if !cl.IsCommandAvailable("mount") {
-			bin.PrintErrAndExit(spec.ResponseErr[spec.CommandMountNotFound].Err)
+			bin.PrintErrAndExit(spec.CommandMountNotFound.Msg)
 		}
 
 		flPath := path.Join(util.GetProgramPath(), dirName)
@@ -218,7 +218,7 @@ func stopBurnMem() (success bool, errs string) {
 		dirPath := path.Join(util.GetProgramPath(), dirName)
 		if _, err := os.Stat(dirPath); err == nil {
 			if !cl.IsCommandAvailable("umount") {
-				bin.PrintErrAndExit(spec.ResponseErr[spec.CommandUmountNotFound].Err)
+				bin.PrintErrAndExit(spec.CommandUmountNotFound.Msg)
 			}
 
 			response = cl.Run(ctx, "umount", dirPath)

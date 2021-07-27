@@ -149,7 +149,7 @@ func (ce *cpuExecutor) SetChannel(channel spec.Channel) {
 
 func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if ce.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ce.stop(ctx)
@@ -164,14 +164,12 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		var err error
 		cpuPercent, err = strconv.Atoi(cpuPercentStr)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-percent is illegal, it must be a prositive integer", cpuPercentStr))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "cpu-percent"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "cpu-percent"))
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-percent is illegal, it must be a positive integer", cpuPercentStr))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer")
 		}
 		if cpuPercent > 100 || cpuPercent < 0 {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-list is illegal, it must be a prositive integer and not bigger than 100", cpuPercentStr))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "cpu-percent"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "cpu-percent"))
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-list is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer and not bigger than 100")
 		}
 	} else {
 		cpuPercent = 100
@@ -180,14 +178,12 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	cpuListStr := model.ActionFlags["cpu-list"]
 	if cpuListStr != "" {
 		if !channel.NewLocalChannel().IsCommandAvailable("taskset") {
-			return spec.ResponseFailWaitResult(spec.CommandTasksetNotFound, spec.ResponseErr[spec.CommandTasksetNotFound].Err,
-				spec.ResponseErr[spec.CommandTasksetNotFound].ErrInfo)
+			return spec.ResponseFailWithFlags(spec.CommandTasksetNotFound)
 		}
 		cores, err := util.ParseIntegerListToStringSlice("cpu-list", cpuListStr)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-list is illegal", cpuListStr))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "cpu-list"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "cpu-list"))
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-list is illegal, %s", cpuListStr, err.Error()))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-list", cpuListStr, err.Error())
 		}
 		cpuList = strings.Join(cores, ",")
 	} else {
@@ -198,8 +194,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			cpuCount, err = strconv.Atoi(cpuCountStr)
 			if err != nil {
 				util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-count is illegal, cpu-count value must be a positive integer", cpuCountStr))
-				return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "cpu-count"),
-					fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "cpu-count"))
+				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-count", cpuCountStr, "it must be a positive integer")
 			}
 		}
 		if cpuCount <= 0 || int(cpuCount) > runtime.NumCPU() {
@@ -213,13 +208,11 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		climbTime, err = strconv.Atoi(climbTimeStr)
 		if err != nil {
 			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: climb-time is illegal, climb-time value must be a positive integer", climbTimeStr))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "climb-time"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "climb-time"))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "climb-time", climbTimeStr, "it must be a positive integer")
 		}
 		if climbTime > 600 || climbTime < 0 {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: climb-time is illegal, climb-time value must be a prositive integer and not bigger than 600", climbTimeStr))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "climb-time"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "climb-time"))
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: climb-time is illegal, climb-time value must be a positive integer and not bigger than 600", climbTimeStr))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "climb-time", climbTimeStr, "must be a positive integer and not bigger than 600")
 		}
 	}
 

@@ -117,8 +117,8 @@ func (kpe *KillProcessExecutor) Name() string {
 
 func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if kpe.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return spec.ReturnSuccess(uid)
@@ -132,22 +132,22 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	if process == "" && processCmd == "" && localPorts == "" {
 		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd and local-port, less process matcher")
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process&process-cmd&local-port"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process&process-cmd&local-port"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "process|process-cmd|local-port")
 	}
 
 	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
 	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
-	if response := checkProcessInvalid(uid, process, processCmd, localPorts, ctx); response != nil {
-		return response
+	if !ignoreProcessNotFound {
+		if response := checkProcessInvalid(uid, process, processCmd, localPorts, ctx); response != nil {
+			return response
+		}
 	}
 	flags := fmt.Sprintf("--debug=%t", util.Debug)
 	if countValue != "" {
 		count, err := strconv.Atoi(countValue)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "count")+", err: "+err.Error())
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "count"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "count"))
+			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterIllegal.Sprintf("count", countValue, err))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", countValue, err)
 		}
 		flags = fmt.Sprintf("%s --count %d", flags, count)
 	}

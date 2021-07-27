@@ -107,8 +107,8 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 		return response
 	}
 	if be.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	directory := "/"
 	path := model.ActionFlags["path"]
@@ -127,14 +127,12 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 	}
 	if !util.IsDir(directory) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: path is illegal, is not a directory", directory))
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "path"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "path"))
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "path", directory, "it must be a directory")
 	}
 	readExists := model.ActionFlags["read"] == "true"
 	writeExists := model.ActionFlags["write"] == "true"
 	if !readExists && !writeExists {
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "read|write"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "read|write"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "read|write")
 	}
 	size := model.ActionFlags["size"]
 	if size == "" {

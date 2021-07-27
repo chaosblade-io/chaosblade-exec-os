@@ -82,7 +82,7 @@ func recoverDns(domain, ip string) {
 	}
 
 	if !cl.IsCommandAvailable("cat") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandCatNotFound].Err)
+		bin.PrintErrAndExit(spec.CommandCatNotFound.Msg)
 	}
 
 	response = cl.Run(ctx, "cat", fmt.Sprintf(`%s | grep -v "%s" > %s && cat %s > %s`,

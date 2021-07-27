@@ -37,7 +37,7 @@ func Test_startBurnMem(t *testing.T) {
 		exitCode = code
 	}
 
-	runBurnMemFunc = func(context.Context, int, int, int, string) {
+	runBurnMemFunc = func(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) {
 	}
 
 	stopBurnMemFunc = func() (bool, string) {
@@ -85,14 +85,14 @@ func Test_runBurnMem_failed(t *testing.T) {
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found")
+		return spec.ResponseFailWithFlags(spec.CommandNohupNotFound)
 	}
 	expectedCommands := []string{fmt.Sprintf(`nohup %s --nohup --mem-percent 50 > /dev/null 2>&1 &`, burnBin)}
 	stopBurnMemFunc = func() (bool, string) {
 		return true, ""
 	}
 
-	runBurnMem(context.Background(), as.memPercent, as.memReserve, as.memRate, as.burnMemMode)
+	runBurnMem(context.Background(), as.memPercent, as.memReserve, as.memRate, as.burnMemMode, false)
 	if exitCode != 1 {
 		t.Errorf("unexpected result: %d, expected result: %d", exitCode, 1)
 	}

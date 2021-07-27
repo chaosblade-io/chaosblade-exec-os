@@ -87,23 +87,21 @@ func (de *NetworkDuplicateExecutor) Exec(uid string, ctx context.Context, model 
 	}
 
 	if de.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	netInterface := model.ActionFlags["interface"]
 	if netInterface == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "interface"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("interface"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return de.stop(netInterface, ctx)
 	} else {
 		percent := model.ActionFlags["percent"]
 		if percent == "" {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "percent"))
-			return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "percent"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "percent"))
+			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("percent"))
+			return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 		}
 		localPort := model.ActionFlags["local-port"]
 		remotePort := model.ActionFlags["remote-port"]
@@ -119,9 +117,9 @@ func (de *NetworkDuplicateExecutor) Exec(uid string, ctx context.Context, model 
 func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
 	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type duplicate --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
-	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
-	if err != nil {
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
+	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
+	if !response.Success {
+		return response
 	}
 	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), TcNetworkBin), args)
 }

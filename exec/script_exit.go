@@ -89,28 +89,25 @@ func (see *ScriptExitExecutor) Exec(uid string, ctx context.Context, model *spec
 		return response
 	}
 	if see.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	scriptFile := model.ActionFlags["file"]
 	if scriptFile == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "file"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "file"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "file"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("file"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "file")
 	}
 	if !util.IsExist(scriptFile) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`, file is invalid. it not found", scriptFile))
-		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "file"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "file"))
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "file", scriptFile, "the file is not found")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return see.stop(ctx, scriptFile)
 	}
 	functionName := model.ActionFlags["function-name"]
 	if functionName == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "function-name"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "function-name"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "function-name"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("function-name"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "function-name")
 	}
 	exitMessage := model.ActionFlags["exit-message"]
 	exitCode := model.ActionFlags["exit-code"]

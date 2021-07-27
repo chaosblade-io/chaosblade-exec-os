@@ -97,23 +97,21 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 
 	if de.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	netInterface := model.ActionFlags["interface"]
 	if netInterface == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "interface"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("interface"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return de.stop(netInterface, ctx)
 	} else {
 		time := model.ActionFlags["time"]
 		if time == "" {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
-			return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "time"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
+			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("time"))
+			return spec.ResponseFailWithFlags(spec.ParameterLess, "time")
 		}
 		offset := model.ActionFlags["offset"]
 		if offset == "" {
@@ -133,9 +131,9 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp, excludeIp, time, offset, netInterface string,
 	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type delay --interface %s --time %s --offset %s --debug=%t", netInterface, time, offset, util.Debug)
-	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
-	if err != nil {
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
+	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
+	if !response.Success {
+		return response
 	}
 	return de.channel.Run(ctx, path.Join(de.channel.GetScriptPath(), TcNetworkBin), args)
 }

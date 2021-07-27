@@ -56,7 +56,7 @@ func Test_startBurnIO_startFailed(t *testing.T) {
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found")
+		return spec.ResponseFailWithFlags(spec.CommandNohupNotFound)
 	}
 	expectedCommands := []string{fmt.Sprintf(`nohup %s --directory /home/admin --size 1024 --read=true --write=true --nohup=true > %s 2>&1 &`, burnBin, logFile)}
 

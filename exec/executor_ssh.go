@@ -131,8 +131,7 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 	if portStr != "" {
 		port, err = strconv.Atoi(portStr)
 		if err != nil || port < 1 {
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "port"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "port"))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "port", port, "it must be a positive integer")
 		}
 	}
 
@@ -145,8 +144,7 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 		password, err = gopass.GetPasswd()
 		if err != nil {
 			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("password is illegal, err: %s", err.Error()))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "password"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "password"))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "password", "****", err.Error())
 		}
 	} else {
 		useKeyPassphrase := expModel.ActionFlags[SSHKeyPassphraseFlag.Name] == "true"
@@ -155,8 +153,7 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 			keyPassphrase, err = gopass.GetPasswd()
 			if err != nil {
 				util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: get passphrase failed, err: %s", key, err.Error()))
-				return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "passphrase"),
-					fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "passphrase"))
+				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "passphrase", key, err.Error())
 			}
 		}
 	}
@@ -230,11 +227,11 @@ type SSHClient struct {
 func (c SSHClient) RunCommandWithResponse(uid, cmd, functionName string) (*spec.Response, bool) {
 	buf, err := c.RunCommand(cmd)
 	if err != nil {
-		util.Errorf(uid, functionName, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, err.Error()))
+		util.Errorf(uid, functionName, spec.OsCmdExecFailed.Sprintf(cmd, err))
 		if buf != nil {
-			return spec.ResponseFail(spec.OsCmdExecFailed, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, buf)), false
+			return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, cmd, fmt.Sprintf("buf is %s, %v", string(buf), err)), false
 		}
-		return spec.ResponseFail(spec.OsCmdExecFailed, fmt.Sprintf(spec.ResponseErr[spec.OsCmdExecFailed].ErrInfo, cmd, err.Error())), false
+		return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, cmd, err), false
 	}
 	return nil, true
 }
@@ -262,14 +259,13 @@ func ConvertOutputToResponse(uid, output string, err error, defaultResponse *spe
 			return response
 		}
 		output = strings.TrimSpace(output)
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].ErrInfo, output, err.Error()))
-		return spec.ResponseFailWaitResult(spec.SshExecFailed, fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].Err, output, err.Error()),
-			fmt.Sprintf(spec.ResponseErr[spec.SshExecFailed].ErrInfo, output, err.Error()))
+		util.Errorf(uid, util.GetRunFuncName(), spec.SshExecFailed.Sprintf(output, err))
+		return spec.ResponseFailWithFlags(spec.SshExecFailed, output, err)
 	}
 	output = strings.TrimSpace(output)
 	if output == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.SshExecNothing].ErrInfo)
-		return spec.ResponseFailWaitResult(spec.SshExecNothing, spec.ResponseErr[spec.SshExecNothing].Err, spec.ResponseErr[spec.SshExecNothing].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.SshExecNothing.Msg)
+		return spec.ResponseFailWithFlags(spec.SshExecNothing)
 	}
 	response := spec.Decode(output, defaultResponse)
 	return response

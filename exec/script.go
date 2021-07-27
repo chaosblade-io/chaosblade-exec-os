@@ -71,9 +71,7 @@ const bakFileSuffix = "_chaosblade.bak"
 func backScript(channel spec.Channel, scriptFile string) *spec.Response {
 	var bakFile = getBackFile(scriptFile)
 	if util.IsExist(bakFile) {
-
-		return spec.ReturnFail(spec.Code[spec.StatusError],
-			fmt.Sprintf("%s backup file exists, may be annother experiment is running", bakFile))
+		return spec.ResponseFailWithFlags(spec.BackfileExists, bakFile)
 	}
 	return channel.Run(context.TODO(), "cat", fmt.Sprintf("%s > %s", scriptFile, bakFile))
 }
@@ -81,8 +79,7 @@ func backScript(channel spec.Channel, scriptFile string) *spec.Response {
 func recoverScript(channel spec.Channel, scriptFile string) *spec.Response {
 	var bakFile = getBackFile(scriptFile)
 	if !util.IsExist(bakFile) {
-		return spec.ReturnFail(spec.Code[spec.FileNotFound],
-			fmt.Sprintf("%s backup file not exists", bakFile))
+		return spec.ResponseFailWithFlags(spec.FileNotExist, bakFile)
 	}
 	response := channel.Run(context.TODO(), "cat", fmt.Sprintf("%s > %s", bakFile, scriptFile))
 	if !response.Success {
@@ -106,12 +103,12 @@ func insertContentToScriptBy(channel spec.Channel, functionName string, newConte
 	result := strings.TrimSpace(response.Result.(string))
 	lineNums := strings.Split(result, "\n")
 	if len(lineNums) > 1 {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("get too many lines by the %s function name", functionName))
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "function-name", functionName,
+			"the function name must be unique in the script")
 	}
 	if len(lineNums) == 0 || strings.TrimSpace(lineNums[0]) == "" {
-		return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-			fmt.Sprintf("cannot find the %s function name", functionName))
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "function-name", functionName,
+			"cannot find the function name in the script")
 	}
 	lineNum := lineNums[0]
 	// insert content to the line below

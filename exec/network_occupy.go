@@ -93,19 +93,18 @@ func (*OccupyActionExecutor) Name() string {
 
 func (oae *OccupyActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if oae.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	// check reboot permission
 	if osutil.Geteuid() != 0 {
 		// not root
-		return spec.ResponseFailWaitResult(spec.Forbidden, spec.ResponseErr[spec.Forbidden].Err, spec.ResponseErr[spec.Forbidden].ErrInfo)
+		return spec.ResponseFailWithFlags(spec.Forbidden)
 	}
 	port := model.ActionFlags["port"]
 	if port == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "port"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "port"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "port"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("port"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "port")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return oae.stop(port, ctx)

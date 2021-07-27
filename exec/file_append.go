@@ -115,8 +115,8 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 	}
 
 	if f.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 
 	filepath := model.ActionFlags["filepath"]
@@ -137,8 +137,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		count, err = strconv.Atoi(countStr)
 		if err != nil || count < 1 {
 			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` value must be a positive integer", "count"))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "count"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "count"))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", count, "it must be a positive integer")
 		}
 	}
 	if intervalStr != "" {
@@ -146,8 +145,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		interval, err = strconv.Atoi(intervalStr)
 		if err != nil || interval < 1 {
 			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` value must be a positive integer", "interval"))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "interval"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "interval"))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "interval", interval, "it must be a positive integer")
 		}
 	}
 
@@ -156,8 +154,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 
 	if !util.IsExist(filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
-		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "filepath"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "filepath"))
+		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 
 	return f.start(filepath, content, count, interval, escape, enableBase64, ctx)

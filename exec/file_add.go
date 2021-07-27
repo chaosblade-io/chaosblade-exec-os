@@ -110,8 +110,8 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 
 	if f.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 
 	filepath := model.ActionFlags["filepath"]
@@ -121,8 +121,7 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 
 	if util.IsExist(filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: filepath is exist", filepath))
-		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "filepath"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "filepath"))
+		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the path is exist")
 	}
 
 	directory := model.ActionFlags["directory"] == "true"

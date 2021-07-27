@@ -126,8 +126,8 @@ func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spe
 		return response
 	}
 	if ne.channel == nil {
-		util.Errorf(suid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(suid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	sourceIp := model.ActionFlags["source-ip"]
 	destinationIp := model.ActionFlags["destination-ip"]

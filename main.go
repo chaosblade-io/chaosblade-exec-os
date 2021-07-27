@@ -3,14 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
+	"os"
+	"strings"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/sirupsen/logrus"
-	"os"
-	"strings"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 )
 
 const (
@@ -63,7 +65,11 @@ func main() {
 		} else {
 			executor.SetChannel(channel.NewLocalChannel())
 			response := executor.Exec(uid, ctx, expModel)
-			bin.PrintOutputAndExit(response.Print())
+			logrus.Debugf("os response: %v", response)
+			if response.Success {
+				bin.PrintOutputAndExit(response.Print())
+			}
+			bin.PrintErrAndExit(response.Print())
 		}
 	}
 }

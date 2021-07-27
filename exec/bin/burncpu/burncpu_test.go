@@ -43,7 +43,7 @@ func Test_startBurnCpu(t *testing.T) {
 	}{
 		{"test1", args{"1,2,3,5", 0, 50}},
 		{"test2", args{"", 3, 50}},
-		{"test3", args{"1,2,3,4",2,10}},
+		{"test3", args{"1,2,3,4", 2, 10}},
 	}
 	runBurnCpuFunc = func(ctx context.Context, cpuCount int, cpuPercent int, pidNeeded bool, processor string, climTime int) int {
 		return 25233
@@ -87,7 +87,7 @@ func Test_runBurnCpu_failed(t *testing.T) {
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "nohup command not found")
+		return spec.ResponseFailWithFlags(spec.CommandNohupNotFound)
 	}
 	expectedCommands := []string{fmt.Sprintf(`nohup %s --nohup --cpu-count 2 --cpu-percent 50 > /dev/null 2>&1 &`, burnBin)}
 
@@ -120,7 +120,7 @@ func Test_bindBurnCpu(t *testing.T) {
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "taskset command not found")
+		return spec.ResponseFailWithFlags(spec.CommandNohupNotFound)
 	}
 	expectedCommands := []string{fmt.Sprintf(`taskset -a -cp 0 25233`)}
 

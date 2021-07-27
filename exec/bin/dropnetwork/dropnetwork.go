@@ -69,7 +69,7 @@ func startDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPa
 
 func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort string, destinationPort string, stringPattern string, networkTraffic string, ctx context.Context) {
 	if !cl.IsCommandAvailable("iptables") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandIptablesNotFound].Err)
+		bin.PrintErrAndExit(spec.CommandIptablesNotFound.Msg)
 	}
 
 	var response *spec.Response
@@ -133,7 +133,7 @@ func handleDropSpecifyPort(sourceIp string, destinationIp string, sourcePort str
 
 func stopDropNet(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string) {
 	if !cl.IsCommandAvailable("iptables") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandIptablesNotFound].Err)
+		bin.PrintErrAndExit(spec.CommandIptablesNotFound.Msg)
 	}
 
 	ctx := context.Background()

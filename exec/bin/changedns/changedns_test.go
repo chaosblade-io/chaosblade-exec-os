@@ -102,7 +102,7 @@ func Test_recoverDns_failed(t *testing.T) {
 	actualCommands := make([]string, 0)
 	mockChannel.RunFunc = func(ctx context.Context, script, args string) *spec.Response {
 		actualCommands = append(actualCommands, fmt.Sprintf("%s %s", script, args))
-		return spec.ReturnFail(spec.Code[spec.CommandNotFound], "grep command not found")
+		return spec.ResponseFailWithFlags(spec.CommandGrepNotFound)
 	}
 	expectedCommands := []string{fmt.Sprintf(`grep -q "208.80.152.2 abc.com #chaosblade" /etc/hosts`)}
 	recoverDns(as.domain, as.ip)

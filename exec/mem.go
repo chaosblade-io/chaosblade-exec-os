@@ -161,8 +161,8 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	}
 
 	if ce.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ce.stop(ctx, model.ActionFlags["mode"])
@@ -180,22 +180,18 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		var err error
 		memPercent, err = strconv.Atoi(memPercentStr)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: mem-percent  must be a positive integer", memPercent))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "mem-percent"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "mem-percent"))
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: mem-percent  must be a positive integer", memPercentStr))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "mem-percent", memPercentStr, "it must be a positive integer")
 		}
 		if memPercent > 100 || memPercent < 0 {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: mem-percent  must be a positive integer and not bigger than 100", memPercent))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "mem-percent"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "mem-percent"))
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: mem-percent  must be a positive integer and not bigger than 100", memPercentStr))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "mem-percent", memPercentStr, "it must be a positive integer and not bigger than 100")
 		}
 	} else if memReserveStr != "" {
 		memReserve, err = strconv.Atoi(memReserveStr)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: reserve  must be a positive integer", memReserve))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "reserve"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "reserve"))
-
+			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: reserve  must be a positive integer", memReserveStr))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "reserve", memReserveStr, err)
 		}
 	} else {
 		memPercent = 100
@@ -203,8 +199,7 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	if memRateStr != "" {
 		memRate, err = strconv.Atoi(memRateStr)
 		if err != nil {
-			return spec.ReturnFail(spec.Code[spec.IllegalParameters],
-				"--rate value must be a positive integer")
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "rate", memRateStr, "it must be a positive integer")
 		}
 	}
 	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, includeBufferCache)

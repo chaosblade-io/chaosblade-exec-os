@@ -194,13 +194,12 @@ func fillDiskByFallocate(ctx context.Context, size string, dataFile string) *spe
 		return spec.ReturnSuccess(fmt.Sprintf("success because of %s", diskFillErrorMessage))
 	}
 	logrus.Warningf("execute fallocate err, %s", response.Err)
-	return spec.ReturnFail(spec.Code[spec.ExecCommandError], fmt.Sprintf("execute fallocate err, %s", response.Err))
+	return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, "fallocate", response.Err)
 }
 
 func fillDiskByDD(ctx context.Context, dataFile string, directory string, size string) *spec.Response {
 	if !cl.IsCommandAvailable("dd") {
-		return spec.ResponseFailWaitResult(spec.CommandDdNotFound, spec.ResponseErr[spec.CommandDdNotFound].Err,
-			spec.ResponseErr[spec.CommandDdNotFound].ErrInfo)
+		return spec.ResponseFailWithFlags(spec.CommandDdNotFound)
 	}
 
 	// Because of filling disk slowly using dd, so execute dd with 1b size first to test the command.

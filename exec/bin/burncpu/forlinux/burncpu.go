@@ -178,7 +178,7 @@ func runBurnCpu(ctx context.Context, cpuCount int, pidNeeded bool, processor str
 // bindBurnCpu by taskset command
 func bindBurnCpuByTaskset(ctx context.Context, core string, pid int) {
 	if !cl.IsCommandAvailable("taskset") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandTasksetNotFound].Err)
+		bin.PrintErrAndExit(spec.CommandTasksetNotFound.Msg)
 	}
 
 	response := cl.Run(ctx, "taskset", fmt.Sprintf("-a -cp %s %d", core, pid))

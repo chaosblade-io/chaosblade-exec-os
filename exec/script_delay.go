@@ -85,40 +85,35 @@ func (sde *ScriptDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 		return response
 	}
 	if sde.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	scriptFile := model.ActionFlags["file"]
 	if scriptFile == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "file"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "file"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "file"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("file"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "file")
 	}
 	if !util.IsExist(scriptFile) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`, file is invalid. it not found", scriptFile))
-		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "file"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "file"))
+		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "file", scriptFile, "it is not found")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return sde.stop(ctx, scriptFile)
 	}
 	functionName := model.ActionFlags["function-name"]
 	if functionName == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "function-name"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "function-name"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "function-name"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("function-name"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "function-name")
 	}
 	time := model.ActionFlags["time"]
 	if time == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "time"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("time"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "time")
 	}
 	t, err := strconv.Atoi(time)
 	if err != nil {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "time")+", it must be positive integer")
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "time"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "time"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterIllegal.Sprintf("time", time, "it must be a positive integer"))
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "time", time, "ti must be a positive integer")
 	}
 	return sde.start(ctx, scriptFile, functionName, t)
 }

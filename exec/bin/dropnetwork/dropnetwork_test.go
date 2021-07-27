@@ -69,9 +69,9 @@ func Test_handleDropSpecifyPort(t *testing.T) {
 		input  input
 		expect expect
 	}{
-		{input{"", "", "80", "", "", "", spec.ReturnFail(spec.Code[spec.CommandNotFound], "iptables command not found")},
+		{input{"", "", "80", "", "", "", spec.ResponseFailWithFlags(spec.CommandIptablesNotFound)},
 			expect{1, 1}},
-		{input{"", "", "", "80", "", "", spec.ReturnFail(spec.Code[spec.CommandNotFound], "iptables command not found")},
+		{input{"", "", "", "80", "", "", spec.ResponseFailWithFlags(spec.CommandIptablesNotFound)},
 			expect{1, 1}},
 		{input{"", "", "80", "", "", "", spec.ReturnSuccess("success")},
 			expect{0, 0}},

@@ -24,6 +24,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -110,8 +111,8 @@ func (*StraceErrorActionExecutor) Name() string {
 
 func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if dae.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 
 	var pidList string
@@ -123,21 +124,19 @@ func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, mode
 	if pidStr != "" {
 		pids, err := util.ParseIntegerListToStringSlice("pid", pidStr)
 		if err != nil {
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "pid", pidStr, err)
 		}
 		pidList = strings.Join(pids, ",")
 	}
 	return_value := model.ActionFlags["return-value"]
 	if return_value == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "return-value"))
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "return-value"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "return-value"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("return-value"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "return-value")
 	}
 	syscallName := model.ActionFlags["syscall-name"]
 	if syscallName == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "syscall-name"))
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "syscall-name"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "syscall-name"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("syscall-name"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "syscall-name")
 	}
 
 	first_flag = model.ActionFlags["first"]

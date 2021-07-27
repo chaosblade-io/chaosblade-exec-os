@@ -93,15 +93,14 @@ func (spe *StopProcessExecutor) Name() string {
 
 func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if spe.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	process := model.ActionFlags["process"]
 	processCmd := model.ActionFlags["process-cmd"]
 	if process == "" && processCmd == "" {
-		util.Errorf(uid, util.GetRunFuncName(), "less process&process-cmd, less process matcher")
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "process&process-cmd"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "process&process-cmd"))
+		util.Errorf(uid, util.GetRunFuncName(), "less process|process-cmd, less process matcher")
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "process|process-cmd")
 	}
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	flags := fmt.Sprintf("--debug=%t", util.Debug)
@@ -134,32 +133,30 @@ func checkProcessInvalid(uid, process, processCmd, localPorts string, ctx contex
 	if process != "" {
 		pids, err = cl.GetPidsByProcessName(process, ctx)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ProcessIdByNameFailed].ErrInfo, process, err.Error()))
-			return spec.ResponseFail(spec.ProcessIdByNameFailed, fmt.Sprintf(spec.ResponseErr[spec.ProcessIdByNameFailed].ErrInfo, process, err.Error()))
+			util.Errorf(uid, util.GetRunFuncName(), spec.ProcessIdByNameFailed.Sprintf(process, err))
+			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, process, err)
 		}
 		killProcessName = process
 		processParameter = "process"
 	} else if processCmd != "" {
 		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ProcessIdByNameFailed].ErrInfo, processCmd, err.Error()))
-			return spec.ResponseFail(spec.ProcessIdByNameFailed, fmt.Sprintf(spec.ResponseErr[spec.ProcessIdByNameFailed].ErrInfo, processCmd, err.Error()))
+			util.Errorf(uid, util.GetRunFuncName(), spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
+			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, processCmd, err)
 		}
 		killProcessName = processCmd
 		processParameter = "process-cmd"
 	} else if localPorts != "" {
 		ports, err := util.ParseIntegerListToStringSlice("local-port", localPorts)
 		if err != nil {
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "local-port", localPorts, err)
 		}
 		pids, err = cl.GetPidsByLocalPorts(ports)
 		killProcessName = localPorts
 		processParameter = "local-port"
 	}
-
 	if pids == nil || len(pids) == 0 {
-		return spec.ResponseFailWaitResult(spec.ParameterInvalidProName, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalidProName].Err, processParameter, killProcessName),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalidProName].ErrInfo, processParameter, killProcessName))
+		return spec.ResponseFailWithFlags(spec.ParameterInvalidProName, processParameter, killProcessName)
 	}
 	return nil
 }

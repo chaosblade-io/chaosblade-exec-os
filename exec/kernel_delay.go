@@ -24,7 +24,8 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-  "github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const StraceDelayBin = "chaos_stracedelay"
@@ -115,7 +116,7 @@ func (*StraceDelayActionExecutor) Name() string {
 
 func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if dae.channel == nil {
-		return spec.ReturnFail(spec.Code[spec.ServerError], "channel is nil")
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 
 	var pidList string
@@ -127,28 +128,25 @@ func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, mode
 	if pidStr != "" {
 		pids, err := util.ParseIntegerListToStringSlice("pid", pidStr)
 		if err != nil {
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "pid", pidStr, err)
 		}
 		pidList = strings.Join(pids, ",")
 	}
 	time := model.ActionFlags["time"]
 	if time == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "time"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "time"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("time"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "time")
 	}
 	syscallName := model.ActionFlags["syscall-name"]
 	if syscallName == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "syscall-name"))
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "syscall-name"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "syscall-name"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("syscall-name"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "syscall-name")
 	}
 
 	delay_loc_flag = model.ActionFlags["delay-loc"]
 	if delay_loc_flag == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "delay-loc"))
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "delay-loc"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "delay-loc"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("delay-loc"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "delay-loc")
 	}
 	first_flag = model.ActionFlags["first"]
 	end_flag = model.ActionFlags["end"]

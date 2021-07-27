@@ -133,7 +133,7 @@ func stopBurnIO(directory string, read, write bool) {
 // write burn
 func burnWrite(directory, size string) {
 	if !cl.IsCommandAvailable("dd") {
-		bin.PrintErrAndExit(spec.ResponseErr[spec.CommandDdNotFound].Err)
+		bin.PrintErrAndExit(spec.ResponseFailWithFlags(spec.CommandDdNotFound).Print())
 	}
 
 	tmpFileForWrite := path.Join(directory, writeFile)

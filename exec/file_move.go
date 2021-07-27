@@ -104,8 +104,8 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	}
 
 	if f.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 
 	filepath := model.ActionFlags["filepath"]
@@ -117,8 +117,7 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 
 	if !util.IsExist(filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
-		return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "filepath"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "filepath"))
+		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 
 	force := model.ActionFlags["force"] == "true"
@@ -128,8 +127,7 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 		targetFile := path.Join(target, "/", path.Base(filepath))
 		if util.IsExist(targetFile) {
 			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: target file does not exist", targetFile))
-			return spec.ResponseFailWaitResult(spec.ParameterInvalid, fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].Err, "target"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterInvalid].ErrInfo, "target"))
+			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", targetFile, "the target file does not exist")
 		}
 	}
 	return f.start(filepath, target, force, autoCreateDir, ctx)

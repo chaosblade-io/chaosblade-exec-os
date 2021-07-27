@@ -47,7 +47,6 @@ func main() {
 }
 
 var cl = channel.NewLocalChannel()
-
 func killProcess(process, processCmd, localPorts, signal, excludeProcess string, count int, ignoreProcessNotFound bool) {
 	var pids []string
 	var err error

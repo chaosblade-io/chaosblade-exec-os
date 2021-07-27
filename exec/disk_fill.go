@@ -107,8 +107,8 @@ func (*FillActionExecutor) Name() string {
 
 func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if fae.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	directory := "/"
 	path := model.ActionFlags["path"]
@@ -117,8 +117,7 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 	}
 	if !util.IsDir(directory) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: path is illegal, is not a directory", directory))
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "path"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "path"))
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "path", directory, "it must be a directory")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return fae.stop(directory, ctx)
@@ -130,30 +129,26 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 			if reserve == "" {
 				size := model.ActionFlags["size"]
 				if size == "" {
-					return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "size|percent"),
-						fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "size|percent"))
+					return spec.ResponseFailWithFlags(spec.ParameterLess, "size|percent")
 				}
 				_, err := strconv.Atoi(size)
 				if err != nil {
 					util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: size is illegal, it must be positive integer", size))
-					return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "size"),
-						fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "size"))
+					return spec.ResponseFailWithFlags(spec.ParameterIllegal, "size", size, "it must be positive integer")
 				}
 				return fae.start(directory, size, percent, reserve, retainHandle, ctx)
 			}
 			_, err := strconv.Atoi(reserve)
 			if err != nil {
 				util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: reserve is illegal, it must be positive integer", reserve))
-				return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "reserve"),
-					fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "reserve"))
+				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "reserve", reserve, "it must be positive integer")
 			}
 			return fae.start(directory, "", percent, reserve, retainHandle, ctx)
 		}
 		_, err := strconv.Atoi(percent)
 		if err != nil {
 			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: percent is illegal, it must be positive integer", percent))
-			return spec.ResponseFailWaitResult(spec.ParameterIllegal, fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].Err, "percent"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterIllegal].ErrInfo, "percent"))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "percent", percent, "it must be positive integer")
 		}
 		return fae.start(directory, "", percent, "", retainHandle, ctx)
 	}

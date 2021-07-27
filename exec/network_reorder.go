@@ -100,23 +100,21 @@ func (ce *NetworkReorderExecutor) Exec(uid string, ctx context.Context, model *s
 		return response
 	}
 	if ce.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	netInterface := model.ActionFlags["interface"]
 	if netInterface == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "interface"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "interface"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("interface"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ce.stop(netInterface, ctx)
 	} else {
 		percent := model.ActionFlags["percent"]
 		if percent == "" {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "percent"))
-			return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "percent"),
-				fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "percent"))
+			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("percent"))
+			return spec.ResponseFailWithFlags(spec.ParameterLess, "percent")
 		}
 		gap := model.ActionFlags["gap"]
 		time := model.ActionFlags["time"]
@@ -146,9 +144,9 @@ func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, exc
 	if gap != "" {
 		args = fmt.Sprintf("%s --gap %s", args, gap)
 	}
-	args, err := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
-	if err != nil {
-		return spec.ResponseFailWaitResult(spec.ParameterIllegal, err.Error(), err.Error())
+	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
+	if !response.Success {
+		return response
 	}
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), TcNetworkBin), args)
 }

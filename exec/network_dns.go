@@ -95,15 +95,14 @@ func (ns *NetworkDnsExecutor) Exec(uid string, ctx context.Context, model *spec.
 		return response
 	}
 	if ns.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ResponseErr[spec.ChannelNil].ErrInfo)
-		return spec.ResponseFail(spec.ChannelNil, spec.ResponseErr[spec.ChannelNil].ErrInfo)
+		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
+		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	domain := model.ActionFlags["domain"]
 	ip := model.ActionFlags["ip"]
 	if domain == "" || ip == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "domain|ip"))
-		return spec.ResponseFailWaitResult(spec.ParameterLess, fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].Err, "domain|ip"),
-			fmt.Sprintf(spec.ResponseErr[spec.ParameterLess].ErrInfo, "domain|ip"))
+		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("domain|ip"))
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "domain|ip")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ns.stop(ctx, domain, ip)

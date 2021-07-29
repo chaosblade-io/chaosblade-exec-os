@@ -68,6 +68,7 @@ var readFile = "chaos_burnio.read"
 var writeFile = "chaos_burnio.write"
 var burnIOBin = exec.BurnIOBin
 var logFile = util.GetNohupOutput(util.Bin, "chaos_burnio.log")
+var ddCreateArg, ddRunningReadArg, ddRunningWriteArg = getArgs()
 
 var cl = channel.NewLocalChannel()
 
@@ -138,7 +139,7 @@ func burnWrite(directory, size string) {
 
 	tmpFileForWrite := path.Join(directory, writeFile)
 	for {
-		args := fmt.Sprintf(`if=/dev/zero of=%s bs=%sM count=%d oflag=dsync`, tmpFileForWrite, size, count)
+		args := fmt.Sprintf(ddRunningWriteArg, tmpFileForWrite, size, count)
 		response := cl.Run(context.TODO(), "dd", args)
 		if !response.Success {
 			bin.PrintAndExitWithErrPrefix(response.Err)
@@ -151,7 +152,7 @@ func burnWrite(directory, size string) {
 func burnRead(directory, size string) {
 	// create a 600M file under the directory
 	tmpFileForRead := path.Join(directory, readFile)
-	createArgs := fmt.Sprintf("if=/dev/zero of=%s bs=%dM count=%d oflag=dsync", tmpFileForRead, 6, count)
+	createArgs := fmt.Sprintf(ddCreateArg, tmpFileForRead, 6, count)
 	response := cl.Run(context.TODO(), "dd", createArgs)
 	if !response.Success {
 		bin.PrintAndExitWithErrPrefix(
@@ -159,7 +160,7 @@ func burnRead(directory, size string) {
 				directory, response.Err))
 	}
 	for {
-		args := fmt.Sprintf(`if=%s of=/dev/null bs=%sM count=%d iflag=dsync,direct,fullblock`, tmpFileForRead, size, count)
+		args := fmt.Sprintf(ddRunningReadArg, tmpFileForRead, size, count)
 		response = cl.Run(context.TODO(), "dd", args)
 		if !response.Success {
 			bin.PrintAndExitWithErrPrefix(fmt.Sprintf("using dd command to burn read io error, %s", response.Err))
@@ -167,3 +168,26 @@ func burnRead(directory, size string) {
 		}
 	}
 }
+
+func getArgs() (string, string, string) {
+  createArgs  := "if=/dev/zero of=%s bs=%dM count=%d oflag=dsync"
+  runningReadArgs := "if=%s of=/dev/null bs=%sM count=%d iflag=dsync,direct,fullblock"
+  runningWriteArgs:= "if=/dev/zero of=%s bs=%sM count=%d oflag=dsync"
+
+	ctx := context.Background()
+	response := cl.Run(ctx, "cat", "/etc/os-release")
+	if !response.Success {
+		bin.PrintErrAndExit(response.Err)
+		return "", "", ""
+	}
+
+	if strings.Contains(strings.ToUpper(response.Result.(string)), "ID=ALPINE") {
+	  //alpine linux
+    createArgs       = "if=/dev/zero of=%s bs=%dM count=%d oflag=append"
+    runningReadArgs  = "if=%s of=/dev/null bs=%sM count=%d iflag=fullblock oflag=append"
+    runningWriteArgs = "if=/dev/zero of=%s bs=%sM count=%d oflag=append"
+	}
+
+  return createArgs, runningReadArgs, runningWriteArgs
+}
+

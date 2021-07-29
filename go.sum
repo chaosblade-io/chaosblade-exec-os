@@ -1,12 +1,8 @@
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/StackExchange/wmi v1.2.0 h1:BfLCNdXnvwgy5RrRI3IyQ64ZItZngXHN+7PxU5RvKxA=
-github.com/StackExchange/wmi v1.2.0/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/chaosblade-io/chaosblade-spec-go v1.2.0 h1:f1AAqUqrWMPPOYu6JacpUQCVlxe6oFKMhfe0ZMivRQI=
+github.com/StackExchange/wmi v1.2.0/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/chaosblade-io/chaosblade-spec-go v1.2.1-0.20210727105127-cb88024e3ec2 h1:VdnCoIMB0FrRZkHUf0LsUb1qI4buP6Qk03+FVZqTkfM=
 github.com/chaosblade-io/chaosblade-spec-go v1.2.1-0.20210727105127-cb88024e3ec2/go.mod h1:xUF+8r54FphQjBR8fVPnweVqzu7EitE15UsnZ57O5gk=
-github.com/chaosblade-io/chaosblade-spec-go v1.3.0-dev h1:2TU7TDFQop+wMhvTtJqpRKme9cI9dD5brH+fCVgYCfo=
-github.com/chaosblade-io/chaosblade-spec-go v1.3.0-dev/go.mod h1:xUF+8r54FphQjBR8fVPnweVqzu7EitE15UsnZ57O5gk=
 github.com/containerd/cgroups v0.0.0-20191011165608-5fbad35c2a7e h1:3bt+8T1I/CuYx+a5ww32+UT4fc9x8iRiXrhfduFTlBU=
 github.com/containerd/cgroups v0.0.0-20191011165608-5fbad35c2a7e/go.mod h1:OApqhQ4XNSNC13gXIwDjhOQxjWa/NxkwZXJ1EvqT0ko=
 github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e h1:Wf6HqHfScWJN9/ZjdUKyjop4mf3Qdd+1TvvltAvM3m8=

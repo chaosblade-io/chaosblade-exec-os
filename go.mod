@@ -4,8 +4,9 @@ go 1.13
 
 require (
 	github.com/StackExchange/wmi v1.2.0 // indirect
-	github.com/chaosblade-io/chaosblade-spec-go v1.2.1-0.20210727105127-cb88024e3ec2
+	github.com/chaosblade-io/chaosblade-spec-go v1.2.1-0.20210804040202-629a805acf09
 	github.com/containerd/cgroups v0.0.0-20191011165608-5fbad35c2a7e
+	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c
 	github.com/opencontainers/runtime-spec v1.0.2-0.20190716192640-c9a5f6194441
 	github.com/shirou/gopsutil v3.21.6+incompatible

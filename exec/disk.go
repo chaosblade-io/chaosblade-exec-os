@@ -30,6 +30,7 @@ func NewDiskCommandSpec() spec.ExpModelCommandSpec {
 			ExpActions: []spec.ExpActionCommandSpec{
 				NewFillActionSpec(),
 				NewBurnActionSpec(),
+				NewIOHangActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},

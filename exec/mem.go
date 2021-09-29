@@ -182,6 +182,7 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	memRateStr := model.ActionFlags["rate"]
 	burnMemModeStr := model.ActionFlags["mode"]
 	includeBufferCache := model.ActionFlags["include-buffer-cache"] == "true"
+	avoidBeingKilled := model.ActionFlags["avoid-being-killed"] == "true"
 
 	var err error
 	if memPercentStr != "" {
@@ -210,11 +211,11 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "rate", memRateStr, "it must be a positive integer")
 		}
 	}
-	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, includeBufferCache)
+	return ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, includeBufferCache, avoidBeingKilled)
 }
 
 // start burn mem
-func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool) *spec.Response {
+func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool, avoidBeingKilled bool) *spec.Response {
 	args := fmt.Sprintf("--start --mem-percent %d --reserve %d --debug=%t", memPercent, memReserve, util.Debug)
 	if memRate != 0 {
 		args = fmt.Sprintf("%s --rate %d", args, memRate)
@@ -224,6 +225,9 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 	}
 	if includeBufferCache {
 		args = fmt.Sprintf("%s --include-buffer-cache=%t", args, includeBufferCache)
+	}
+	if avoidBeingKilled {
+		args = fmt.Sprintf("%s --avoid-being-killed=%t", args, avoidBeingKilled)
 	}
 	return ce.channel.Run(ctx, path.Join(ce.channel.GetScriptPath(), BurnMemBin), args)
 }

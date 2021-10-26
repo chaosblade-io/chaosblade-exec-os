@@ -377,10 +377,19 @@ func addQdiscForDL(channel spec.Channel, ctx context.Context, netInterface strin
 }
 
 // stopNet, no need to add os.Exit
-func stopNet(netInterface string) {
+func stopNet(netInterface string) *spec.Response{
 	ctx := context.Background()
-	cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
-	cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
+	run := cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+	response := cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
+	if !response.Success {
+		bin.PrintErrAndExit(response.Err)
+		return response
+	} else if !run.Success {
+		bin.PrintErrAndExit(run.Err)
+		return run
+	}
+	bin.PrintOutputAndExit(response.Result.(string))
+	return response
 }
 
 // getPeerPorts returns all ports communicating with the port

@@ -42,7 +42,7 @@ pre_build:
 build_yaml: build/spec.go
 	$(GO) run $< $(OS_YAML_FILE_PATH)
 
-build_osbin: build_stopsystemd build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile build_kernel_delay build_kernel_error cp_strace
+build_osbin: build_stopsystemd build_burncpu build_burnmem build_burnio build_killprocess build_stopprocess build_changedns build_tcnetwork build_dropnetwork build_filldisk build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile build_kernel_delay build_kernel_error cp_strace cp_iohang
 
 build_osbin_darwin: build_burncpu build_killprocess build_stopprocess build_changedns build_occupynetwork build_appendfile build_chmodfile build_addfile build_deletefile build_movefile
 
@@ -111,6 +111,9 @@ build_os: main.go
 
 cp_strace:
 	cp extra/strace $(BUILD_TARGET_BIN)/
+
+cp_iohang:
+	cp extra/disk_controller.py $(BUILD_TARGET_BIN)/
 
 # build chaosblade linux version by docker image
 build_linux:

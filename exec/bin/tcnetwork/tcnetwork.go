@@ -149,8 +149,9 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	if localPort == "" && remotePort == "" && destIp == "" {
 		// Add class rule to 1,2,3 band, exclude port and exclude ip are added to 4 band
 		args := buildNetemToDefaultBandsArgs(netInterface, classRule)
-		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts, excludeIp)
+		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts)
 		response := cl.Run(ctx, "tc", args+excludeFilters)
+		excludeIpRun(excludeIp,ctx,netInterface)
 		if !response.Success {
 			stopDLNetFunc(netInterface)
 			bin.PrintErrAndExit(response.Err)
@@ -198,16 +199,8 @@ func getExcludePorts(excludePort string) ([]string, error) {
 	return excludePorts, nil
 }
 
-func buildExcludeFilterToNewBand(netInterface string, excludePorts []string, excludeIp string) string {
+func buildExcludeFilterToNewBand(netInterface string, excludePorts []string) string {
 	var args string
-	excludeIpRules := getIpRules(excludeIp)
-	for _, rule := range excludeIpRules {
-		args = fmt.Sprintf(
-			`%s && \
-			tc filter add dev %s parent 1: prio 4 protocol ip u32 %s flowid 1:4`,
-			args, netInterface, rule)
-	}
-
 	for _, port := range excludePorts {
 		if strings.TrimSpace(port) == "" {
 			continue
@@ -430,4 +423,22 @@ func getPeerPorts(port string) ([]string, error) {
 		}
 	}
 	return mappingPorts, nil
+}
+
+func excludeIpRun(excludeIp string,ctx context.Context,netInterface string) {
+	excludeIpRules := getIpRules(excludeIp)
+	for _, rule := range excludeIpRules {
+		var args string
+		args = fmt.Sprintf(
+			` filter add dev %s parent 1: prio 4 protocol ip u32 %s flowid 1:4`,
+			netInterface, rule)
+		response := cl.Run(ctx, "tc", args)
+		if !response.Success {
+			stopDLNetFunc(netInterface)
+			bin.PrintErrAndExit(response.Err)
+			return
+		}
+
+	}
+
 }

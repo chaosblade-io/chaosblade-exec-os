@@ -39,6 +39,7 @@ var tcIgnorePeerPorts bool
 var actionType string
 var reorderGap string
 var correlation string
+var tcExcludeIpPort string
 
 const delimiter = ","
 const (
@@ -50,6 +51,7 @@ const (
 )
 
 func main() {
+	flag.StringVar(&tcExcludeIpPort,"excludeIp-port","","exclude ip and port, for example: 101.101.101.100:8080,101.101.101.101:8080")
 	flag.StringVar(&tcNetInterface, "interface", "", "network interface")
 	flag.StringVar(&delayNetTime, "time", "", "delay time")
 	flag.StringVar(&delayNetOffset, "offset", "", "delay offset")
@@ -96,7 +98,7 @@ func main() {
 		default:
 			bin.PrintErrAndExit("unsupported type for network experiments")
 		}
-		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp, tcForce)
+		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp,tcExcludeIpPort, tcForce)
 	} else if tcNetStop {
 		stopNet(tcNetInterface)
 	} else {
@@ -106,7 +108,7 @@ func main() {
 
 var cl = channel.NewLocalChannel()
 
-func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string, force bool) {
+func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp,excludeIpPort  string, force bool) {
 	// check device txqueuelen size, if the size is zero, then set the value to 1000
 	response := preHandleTxqueue(netInterface)
 	if !response.Success {
@@ -126,7 +128,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	}
 	ctx := context.Background()
 	// Only interface flag
-	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" {
+	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" && excludeIpPort == "" {
 		response := cl.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
@@ -146,12 +148,12 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	}
 
 	// only contains excludePort or excludeIP
-	if localPort == "" && remotePort == "" && destIp == "" {
+	if localPort == "" && remotePort == "" && destIp == "" && excludeIpPort == "" {
 		// Add class rule to 1,2,3 band, exclude port and exclude ip are added to 4 band
 		args := buildNetemToDefaultBandsArgs(netInterface, classRule)
 		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts)
 		response := cl.Run(ctx, "tc", args+excludeFilters)
-		excludeIpRun(excludeIp,ctx,netInterface)
+		excludeIpRun(excludeIp, ctx, netInterface)
 		if !response.Success {
 			stopDLNetFunc(netInterface)
 			bin.PrintErrAndExit(response.Err)
@@ -164,7 +166,20 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	// local port or remote port
 	response = executeTargetPortAndIpWithExclude(ctx, cl, netInterface, classRule, localPort, remotePort, destIpRules,
 		excludePorts, excludeIpRules)
-	bin.PrintOutputAndExit(response.Result.(string))
+	if !response.Success {
+		bin.PrintOutputAndExit(response.Result.(string))
+	} else {
+
+		if excludeIpPort != "" {
+			response = buildIpAndPortTcStr(netInterface, classRule, excludeIpPort, ctx, response)
+			if !response.Success {
+				stopDLNetFunc(netInterface)
+				bin.PrintErrAndExit(response.Err)
+				return
+			}
+		}
+		bin.PrintOutputAndExit(response.Result.(string))
+	}
 }
 
 func getExcludePorts(excludePort string) ([]string, error) {
@@ -438,7 +453,26 @@ func excludeIpRun(excludeIp string,ctx context.Context,netInterface string) {
 			bin.PrintErrAndExit(response.Err)
 			return
 		}
-
 	}
+}
+
+
+
+func buildIpAndPortTcStr(netInterface, classRule,excludeIpPort string,ctx context.Context,response *spec.Response)*spec.Response{
+	ipAndPorts := strings.Split(excludeIpPort, delimiter)
+	for _, ipAndPort := range ipAndPorts {
+		targets := strings.Split(ipAndPort, ":")
+		ip := targets[0]
+		port := targets[1]
+		tcStr := fmt.Sprintf(`filter add dev %s parent 1: prio 4 protocol ip u32 match ip dst %s match ip dport %s 0xffff flowid 1:4`,
+			netInterface, ip, port)
+		logrus.Infof("tcstr:%s",tcStr)
+		response = cl.Run(ctx, "tc", tcStr)
+		if !response.Success {
+			stopDLNetFunc(netInterface)
+			return response
+		}
+	}
+	return response
 
 }

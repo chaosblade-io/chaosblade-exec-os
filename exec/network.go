@@ -18,6 +18,7 @@ package exec
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"strings"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -98,10 +99,16 @@ var commFlags = []spec.ExpFlagSpec{
 		Desc:   "Forcibly overwrites the original rules",
 		NoArgs: true,
 	},
+	&spec.ExpFlag{
+		Name: "excludeIp-port",
+		Desc: "Prohibit local access to the specified IP: port and allow multiple parameters separated by commas. Parameter example: 100.101.102.103:8080101.102.103.104:8000",
+	},
 }
 
-func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp string,
+func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp,excludeIpPort string,
 	args string, ignorePeerPort, force bool) (string, *spec.Response) {
+
+	logrus.Infof("excludePort:%s, destinationIp:%s, excludeIp:%s,excludeIpAndPort:%s",excludePort, destinationIp, excludeIp,excludeIpPort)
 	if localPort != "" {
 		localPorts, err := util.ParseIntegerListToStringSlice("local-port", localPort)
 		if err != nil {
@@ -134,6 +141,9 @@ func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp st
 	}
 	if force {
 		args = fmt.Sprintf("%s --force", args)
+	}
+	if excludeIpPort != "" {
+		args = fmt.Sprintf("%s --excludeIp-port %s", args, excludeIpPort)
 	}
 	return args, spec.ReturnSuccess("success")
 }

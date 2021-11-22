@@ -108,16 +108,17 @@ func (ce *NetworkCorruptExecutor) Exec(uid string, ctx context.Context, model *s
 		excludePort := model.ActionFlags["exclude-port"]
 		destIp := model.ActionFlags["destination-ip"]
 		excludeIp := model.ActionFlags["exclude-ip"]
+		excludeIpPort := model.ActionFlags["excludeIp-port"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
 		force := model.ActionFlags["force"] == "true"
-		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, force, ctx)
+		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,excludeIpPort, ignorePeerPort, force, ctx)
 	}
 }
 
-func (ce *NetworkCorruptExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
+func (ce *NetworkCorruptExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,excludeIpPort string,
 	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type corrupt --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
-	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
+	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp,excludeIpPort, args, ignorePeerPort, force)
 	if !response.Success {
 		return response
 	}

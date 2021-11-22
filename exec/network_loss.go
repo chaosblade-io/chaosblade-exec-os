@@ -120,15 +120,17 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 	excludePort := model.ActionFlags["exclude-port"]
 	destIp := model.ActionFlags["destination-ip"]
 	excludeIp := model.ActionFlags["exclude-ip"]
+	excludeIpPort := model.ActionFlags["excludeIp-port"]
 	ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
 	force := model.ActionFlags["force"] == "true"
-	return nle.start(dev, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, force, ctx)
+	return nle.start(dev, localPort, remotePort, excludePort, destIp, excludeIp, percent,excludeIpPort, ignorePeerPort, force, ctx)
 }
 
-func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
+func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,excludeIpPort string,
+
 	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
-	args := fmt.Sprintf("--start --type loss --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
-	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
+	args := fmt.Sprintf("--start --type loss --interface %s --percent %s --debug=%t ", netInterface, percent, util.Debug)
+	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, excludeIpPort, args, ignorePeerPort, force)
 	if !response.Success {
 		return response
 	}

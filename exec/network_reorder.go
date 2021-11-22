@@ -130,21 +130,22 @@ func (ce *NetworkReorderExecutor) Exec(uid string, ctx context.Context, model *s
 		excludePort := model.ActionFlags["exclude-port"]
 		destIp := model.ActionFlags["destination-ip"]
 		excludeIp := model.ActionFlags["exclude-ip"]
+		excludeIpPort := model.ActionFlags["excludeIp-port"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
 		force := model.ActionFlags["force"] == "true"
-		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,
+		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp,excludeIpPort, percent,
 			ignorePeerPort, gap, time, correlation, force, ctx)
 	}
 }
 
-func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
+func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,excludeIpPort string,
 	ignorePeerPort bool, gap, time, correlation string, force bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type reorder --interface %s --percent %s --correlation %s --time %s --debug=%t",
 		netInterface, percent, correlation, time, util.Debug)
 	if gap != "" {
 		args = fmt.Sprintf("%s --gap %s", args, gap)
 	}
-	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp, args, ignorePeerPort, force)
+	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp,excludeIpPort, args, ignorePeerPort, force)
 	if !response.Success {
 		return response
 	}

@@ -122,17 +122,17 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 		excludePort := model.ActionFlags["exclude-port"]
 		destIp := model.ActionFlags["destination-ip"]
 		excludeIp := model.ActionFlags["exclude-ip"]
-		excludeIpPort := model.ActionFlags["excludeIp-port"]
+		destinationIpPort := model.ActionFlags["destinationIp-port"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
 		force := model.ActionFlags["force"] == "true"
-		return de.start(localPort, remotePort, excludePort, destIp, excludeIp, time, offset, netInterface,excludeIpPort, ignorePeerPort, force, ctx)
+		return de.start(localPort, remotePort, excludePort, destIp, excludeIp, time, offset, netInterface,destinationIpPort, ignorePeerPort, force, ctx)
 	}
 }
 
-func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp, excludeIp, time, offset, netInterface,excludeIpPort string,
+func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp, excludeIp, time, offset, netInterface,destinationIpPort string,
 	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type delay --interface %s --time %s --offset %s --debug=%t", netInterface, time, offset, util.Debug)
-	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp,excludeIpPort, args, ignorePeerPort, force)
+	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp,destinationIpPort, args, ignorePeerPort, force)
 	if !response.Success {
 		return response
 	}

@@ -108,17 +108,17 @@ func (de *NetworkDuplicateExecutor) Exec(uid string, ctx context.Context, model 
 		excludePort := model.ActionFlags["exclude-port"]
 		destIp := model.ActionFlags["destination-ip"]
 		excludeIp := model.ActionFlags["exclude-ip"]
-		excludeIpPort := model.ActionFlags["excludeIp-port"]
+		destinationIpPort := model.ActionFlags["destinationIp-port"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
 		force := model.ActionFlags["force"] == "true"
-		return de.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,excludeIpPort, ignorePeerPort, force, ctx)
+		return de.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,destinationIpPort, ignorePeerPort, force, ctx)
 	}
 }
 
-func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,excludeIpPort string,
+func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,destinationIpPort string,
 	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
 	args := fmt.Sprintf("--start --type duplicate --interface %s --percent %s --debug=%t", netInterface, percent, util.Debug)
-	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp,excludeIpPort, args, ignorePeerPort, force)
+	args, response := getCommArgs(localPort, remotePort, excludePort, destIp, excludeIp,destinationIpPort, args, ignorePeerPort, force)
 	if !response.Success {
 		return response
 	}

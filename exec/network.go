@@ -100,15 +100,15 @@ var commFlags = []spec.ExpFlagSpec{
 		NoArgs: true,
 	},
 	&spec.ExpFlag{
-		Name: "excludeIp-port",
+		Name: "destinationIp-port",
 		Desc: "Prohibit local access to the specified IP: port and allow multiple parameters separated by commas. Parameter example: 100.101.102.103:8080101.102.103.104:8000",
 	},
 }
 
-func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp,excludeIpPort string,
+func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp,destinationIpPort string,
 	args string, ignorePeerPort, force bool) (string, *spec.Response) {
 
-	logrus.Infof("excludePort:%s, destinationIp:%s, excludeIp:%s,excludeIpAndPort:%s",excludePort, destinationIp, excludeIp,excludeIpPort)
+	logrus.Infof("excludePort:%s, destinationIp:%s, excludeIp:%s,excludeIpAndPort:%s",excludePort, destinationIp, excludeIp,destinationIpPort)
 	if localPort != "" {
 		localPorts, err := util.ParseIntegerListToStringSlice("local-port", localPort)
 		if err != nil {
@@ -142,8 +142,8 @@ func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp,ex
 	if force {
 		args = fmt.Sprintf("%s --force", args)
 	}
-	if excludeIpPort != "" {
-		args = fmt.Sprintf("%s --excludeIp-port %s", args, excludeIpPort)
+	if destinationIpPort != "" {
+		args = fmt.Sprintf("%s --destinationIp-port %s", args, destinationIpPort)
 	}
 	return args, spec.ReturnSuccess("success")
 }

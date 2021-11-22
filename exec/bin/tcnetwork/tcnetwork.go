@@ -20,13 +20,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"strconv"
-	"strings"
-
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/sirupsen/logrus"
+	"strconv"
+	"strings"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/bin"
 )
@@ -39,7 +38,7 @@ var tcIgnorePeerPorts bool
 var actionType string
 var reorderGap string
 var correlation string
-var tcExcludeIpPort string
+var tcDestinationIpPort string
 
 const delimiter = ","
 const (
@@ -51,7 +50,7 @@ const (
 )
 
 func main() {
-	flag.StringVar(&tcExcludeIpPort,"excludeIp-port","","exclude ip and port, for example: 101.101.101.100:8080,101.101.101.101:8080")
+	flag.StringVar(&tcDestinationIpPort,"destinationIp-port","","exclude ip and port, for example: 101.101.101.100:8080,101.101.101.101:8080")
 	flag.StringVar(&tcNetInterface, "interface", "", "network interface")
 	flag.StringVar(&delayNetTime, "time", "", "delay time")
 	flag.StringVar(&delayNetOffset, "offset", "", "delay offset")
@@ -98,7 +97,7 @@ func main() {
 		default:
 			bin.PrintErrAndExit("unsupported type for network experiments")
 		}
-		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp,tcExcludeIpPort, tcForce)
+		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp,tcDestinationIpPort, tcForce)
 	} else if tcNetStop {
 		stopNet(tcNetInterface)
 	} else {
@@ -108,7 +107,7 @@ func main() {
 
 var cl = channel.NewLocalChannel()
 
-func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp,excludeIpPort  string, force bool) {
+func startNet(netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp,destinationIpPort  string, force bool) {
 	// check device txqueuelen size, if the size is zero, then set the value to 1000
 	response := preHandleTxqueue(netInterface)
 	if !response.Success {
@@ -128,7 +127,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	}
 	ctx := context.Background()
 	// Only interface flag
-	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" && excludeIpPort == "" {
+	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" && destinationIpPort == "" {
 		response := cl.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)
@@ -148,7 +147,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	}
 
 	// only contains excludePort or excludeIP
-	if localPort == "" && remotePort == "" && destIp == "" && excludeIpPort == "" {
+	if localPort == "" && remotePort == "" && destIp == "" && destinationIpPort == "" {
 		// Add class rule to 1,2,3 band, exclude port and exclude ip are added to 4 band
 		args := buildNetemToDefaultBandsArgs(netInterface, classRule)
 		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts)
@@ -167,11 +166,11 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	response = executeTargetPortAndIpWithExclude(ctx, cl, netInterface, classRule, localPort, remotePort, destIpRules,
 		excludePorts, excludeIpRules)
 	if !response.Success {
+		stopDLNetFunc(netInterface)
 		bin.PrintOutputAndExit(response.Result.(string))
 	} else {
-
-		if excludeIpPort != "" {
-			response = buildIpAndPortTcStr(netInterface, classRule, excludeIpPort, ctx, response)
+		if destinationIpPort != "" {
+			response = buildIpAndPortTcStr(netInterface, classRule, destinationIpPort, ctx, response)
 			if !response.Success {
 				stopDLNetFunc(netInterface)
 				bin.PrintErrAndExit(response.Err)
@@ -442,12 +441,15 @@ func getPeerPorts(port string) ([]string, error) {
 
 func excludeIpRun(excludeIp string,ctx context.Context,netInterface string) {
 	excludeIpRules := getIpRules(excludeIp)
-	for _, rule := range excludeIpRules {
-		var args string
-		args = fmt.Sprintf(
-			` filter add dev %s parent 1: prio 4 protocol ip u32 %s flowid 1:4`,
-			netInterface, rule)
-		response := cl.Run(ctx, "tc", args)
+	array := getSplitArray(excludeIpRules)
+	strs := tcExcludeIpStrs(array, netInterface)
+	for _, rule := range strs{
+	//for _, rule := range excludeIpRules {
+	//	var args string
+	//	args = fmt.Sprintf(
+	//		` filter add dev %s parent 1: prio 4 protocol ip u32 %s flowid 1:4`,
+	//		netInterface, rule)
+		response := cl.Run(ctx, "tc", rule)
 		if !response.Success {
 			stopDLNetFunc(netInterface)
 			bin.PrintErrAndExit(response.Err)
@@ -458,15 +460,11 @@ func excludeIpRun(excludeIp string,ctx context.Context,netInterface string) {
 
 
 
-func buildIpAndPortTcStr(netInterface, classRule,excludeIpPort string,ctx context.Context,response *spec.Response)*spec.Response{
-	ipAndPorts := strings.Split(excludeIpPort, delimiter)
-	for _, ipAndPort := range ipAndPorts {
-		targets := strings.Split(ipAndPort, ":")
-		ip := targets[0]
-		port := targets[1]
-		tcStr := fmt.Sprintf(`filter add dev %s parent 1: prio 4 protocol ip u32 match ip dst %s match ip dport %s 0xffff flowid 1:4`,
-			netInterface, ip, port)
-		logrus.Infof("tcstr:%s",tcStr)
+func buildIpAndPortTcStr(netInterface, classRule,destinationIpPort string,ctx context.Context,response *spec.Response)*spec.Response{
+	ipAndPorts := strings.Split(destinationIpPort, delimiter)
+	split4 := getSplitArray(ipAndPorts)
+	strs := getTcStrs(split4,netInterface)
+	for _, tcStr := range strs {
 		response = cl.Run(ctx, "tc", tcStr)
 		if !response.Success {
 			stopDLNetFunc(netInterface)
@@ -474,5 +472,77 @@ func buildIpAndPortTcStr(netInterface, classRule,excludeIpPort string,ctx contex
 		}
 	}
 	return response
+}
+func getSplitArray(split []string) [][]string {
+	var balance [][]string
+	len := len(split)
+	if len <= 100 {
+		balance = append(balance,split)
+		return balance
+	}
+	for i := 0;; i++ {
+		if i==0 {
+			i2 := split[:100*i+100]
+			balance = append(balance, i2)
+		}else if (i*100 +100) < len {
+			i2:= split[100*i : 100*i+100]
+			balance = append(balance,i2)
+		}else{
+			i2 := split[100*i:]
+			balance = append(balance, i2)
+		}
+
+		if (i*100 +100) >= len {
+			return balance
+		}
+
+	}
+}
+
+func getTcStrs(ipAndPorts [] []string,netInterface string) []string{
+	var tcStrs []string
+	for _, ipAndPort := range ipAndPorts {
+		firstIp := strings.Split(ipAndPort[0], ":")[0]
+		firstPort := strings.Split(ipAndPort[0], ":")[1]
+		tcStr := fmt.Sprintf(`filter add dev %s parent 1: prio 4 protocol ip u32 match ip dst %s match ip dport %s 0xffff flowid 1:4`,
+			netInterface, firstIp, firstPort)
+		if len(ipAndPort) >= 2 {
+
+			for i := 1; i < len(ipAndPort); i++ {
+				notFirstIp := strings.Split(ipAndPort[i], ":")[0]
+				notFirstPort := strings.Split(ipAndPort[i], ":")[1]
+				tcStr = fmt.Sprintf(`%s && \
+			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip dst %s match ip dport %s 0xffff flowid 1:4`,
+					tcStr, netInterface, notFirstIp, notFirstPort)
+			}
+			tcStrs = append(tcStrs, tcStr)
+		}else {
+			tcStrs = append(tcStrs, tcStr)
+		}
+	}
+	return tcStrs
+}
+
+func tcExcludeIpStrs(excludeIps [][]string,netInterface string) []string {
+	var result []string
+	for _, ipStr := range excludeIps {
+		firstIp := ipStr[0]
+		args := fmt.Sprintf(
+			` filter add dev %s parent 1: prio 4 protocol ip u32 %s flowid 1:4`,
+			netInterface, firstIp)
+		if len(ipStr) >= 2 {
+
+			for i := 1; i < len(ipStr); i++ {
+				args = fmt.Sprintf(`%s && \
+			tc filter add dev %s parent 1: prio 4 protocol ip u32 %s flowid 1:4`,
+					args, netInterface, ipStr[i])
+			}
+			result = append(result, args)
+		}else {
+			result = append(result, args)
+		}
+	}
+	return result
+
 
 }

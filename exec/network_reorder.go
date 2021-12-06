@@ -133,7 +133,7 @@ func (ce *NetworkReorderExecutor) Exec(uid string, ctx context.Context, model *s
 		destinationIpPort := model.ActionFlags["destinationIp-port"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
 		force := model.ActionFlags["force"] == "true"
-		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp,destinationIpPort, percent,
+		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,destinationIpPort,
 			ignorePeerPort, gap, time, correlation, force, ctx)
 	}
 }

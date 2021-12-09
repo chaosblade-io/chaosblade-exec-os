@@ -98,7 +98,13 @@ func main() {
 		}
 		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp, tcForce)
 	} else if tcNetStop {
-		stopNet(tcNetInterface)
+		var delFilter bool
+		if tcLocalPort == "" && tcRemotePort == "" && tcExcludePort == "" && tcDestinationIp == "" && tcExcludeIp == "" {
+			delFilter = false
+		}else {
+			delFilter = true
+		}
+		stopNet(tcNetInterface,delFilter)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
@@ -122,7 +128,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 		}
 	}
 	if force {
-		stopNet(netInterface)
+		stopNet(netInterface,true)
 	}
 	ctx := context.Background()
 	// Only interface flag
@@ -140,7 +146,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	if excludePort != "" {
 		excludePorts, err = getExcludePorts(excludePort)
 		if err != nil {
-			stopDLNetFunc(netInterface)
+			stopDLNetFunc(netInterface,true)
 			bin.PrintErrAndExit(response.Err)
 		}
 	}
@@ -152,7 +158,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts, excludeIp)
 		response := cl.Run(ctx, "tc", args+excludeFilters)
 		if !response.Success {
-			stopDLNetFunc(netInterface)
+			stopDLNetFunc(netInterface,true)
 			bin.PrintErrAndExit(response.Err)
 		}
 		bin.PrintOutputAndExit(response.Result.(string))
@@ -293,7 +299,7 @@ func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel
 	args = buildTargetFilterPortAndIp(localPort, remotePort, destIpRules, excludePorts, excludeIpRules, args, netInterface)
 	response := channel.Run(ctx, "tc", args)
 	if !response.Success {
-		stopDLNetFunc(netInterface)
+		stopDLNetFunc(netInterface,true)
 		bin.PrintErrAndExit(response.Err)
 	}
 	return response
@@ -377,16 +383,19 @@ func addQdiscForDL(channel spec.Channel, ctx context.Context, netInterface strin
 }
 
 // stopNet, no need to add os.Exit
-func stopNet(netInterface string) *spec.Response{
+func stopNet(netInterface string,delFilter bool) *spec.Response{
 	ctx := context.Background()
-	run := cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+	if delFilter {
+		run := cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+		if !run.Success {
+			bin.PrintErrAndExit(run.Err)
+			return run
+		}
+	}
 	response := cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
 	if !response.Success {
 		bin.PrintErrAndExit(response.Err)
 		return response
-	} else if !run.Success {
-		bin.PrintErrAndExit(run.Err)
-		return run
 	}
 	bin.PrintOutputAndExit(response.Result.(string))
 	return response

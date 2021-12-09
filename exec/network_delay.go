@@ -115,7 +115,7 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 		}
 		offset := model.ActionFlags["offset"]
 		if offset == "" {
-			offset = "10"
+			offset = "0"
 		}
 		localPort := model.ActionFlags["local-port"]
 		remotePort := model.ActionFlags["remote-port"]

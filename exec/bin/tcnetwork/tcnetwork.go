@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -98,13 +99,7 @@ func main() {
 		}
 		startNet(tcNetInterface, classRule, tcLocalPort, tcRemotePort, tcExcludePort, tcDestinationIp, tcExcludeIp, tcForce)
 	} else if tcNetStop {
-		var delFilter bool
-		if tcLocalPort == "" && tcRemotePort == "" && tcExcludePort == "" && tcDestinationIp == "" && tcExcludeIp == "" {
-			delFilter = false
-		}else {
-			delFilter = true
-		}
-		stopNet(tcNetInterface,delFilter)
+		stopNet(tcNetInterface)
 	} else {
 		bin.PrintErrAndExit("less --start or --stop flag")
 	}
@@ -128,7 +123,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 		}
 	}
 	if force {
-		stopNet(netInterface,true)
+		stopNet(netInterface)
 	}
 	ctx := context.Background()
 	// Only interface flag
@@ -146,7 +141,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 	if excludePort != "" {
 		excludePorts, err = getExcludePorts(excludePort)
 		if err != nil {
-			stopDLNetFunc(netInterface,true)
+			stopDLNetFunc(netInterface)
 			bin.PrintErrAndExit(response.Err)
 		}
 	}
@@ -158,7 +153,7 @@ func startNet(netInterface, classRule, localPort, remotePort, excludePort, destI
 		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts, excludeIp)
 		response := cl.Run(ctx, "tc", args+excludeFilters)
 		if !response.Success {
-			stopDLNetFunc(netInterface,true)
+			stopDLNetFunc(netInterface)
 			bin.PrintErrAndExit(response.Err)
 		}
 		bin.PrintOutputAndExit(response.Result.(string))
@@ -299,7 +294,7 @@ func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel
 	args = buildTargetFilterPortAndIp(localPort, remotePort, destIpRules, excludePorts, excludeIpRules, args, netInterface)
 	response := channel.Run(ctx, "tc", args)
 	if !response.Success {
-		stopDLNetFunc(netInterface,true)
+		stopDLNetFunc(netInterface)
 		bin.PrintErrAndExit(response.Err)
 	}
 	return response
@@ -382,23 +377,14 @@ func addQdiscForDL(channel spec.Channel, ctx context.Context, netInterface strin
 	return response
 }
 
-// stopNet, no need to add os.Exit
-func stopNet(netInterface string,delFilter bool) *spec.Response{
+// stopNet
+func stopNet(netInterface string) {
+	if os.Getuid() != 0 {
+		bin.PrintErrAndExit("Operation not permitted")
+	}
 	ctx := context.Background()
-	if delFilter {
-		run := cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
-		if !run.Success {
-			bin.PrintErrAndExit(run.Err)
-			return run
-		}
-	}
-	response := cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
-	if !response.Success {
-		bin.PrintErrAndExit(response.Err)
-		return response
-	}
-	bin.PrintOutputAndExit(response.Result.(string))
-	return response
+	cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+	cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
 }
 
 // getPeerPorts returns all ports communicating with the port

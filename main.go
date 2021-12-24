@@ -81,7 +81,7 @@ func createExpModel(target, actionName string, flags []string) *spec.ExpModel {
 		ActionFlags: make(map[string]string, 0),
 	}
 	for _, flag := range flags {
-		split := strings.Split(flag, SEPARATOR)
+		split := strings.SplitN(flag, SEPARATOR, 2)
 		if len(split) == 2 {
 			expModel.ActionFlags[split[0]] = split[1]
 		} else {

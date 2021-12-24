@@ -200,9 +200,9 @@ func append(count int, ctx context.Context, content string, filepath string, esc
 	for i := 0; i < count; i++ {
 		content = parseRandom(content)
 		if escape {
-			response = cl.Run(ctx, "echo", fmt.Sprintf(`-e "%s" >> "%s"`, content, filepath))
+			response = cl.Run(ctx, "echo", fmt.Sprintf(`-e '%s' >> %s`, content, filepath))
 		} else {
-			response = cl.Run(ctx, "echo", fmt.Sprintf(`"%s" >> "%s"`, content, filepath))
+			response = cl.Run(ctx, "echo", fmt.Sprintf(`'%s' >> %s`, content, filepath))
 		}
 		if !response.Success {
 			bin.PrintErrAndExit(response.Err)

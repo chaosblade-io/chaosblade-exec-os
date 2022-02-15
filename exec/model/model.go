@@ -41,22 +41,6 @@ func GetSHHExecutor() spec.Executor {
 	return exec.NewSSHExecutor()
 }
 
-// GetAllExpModels returns the experiment model specs in the project.
-// Support for other project about chaosblade
-func GetAllExpModels() []spec.ExpModelCommandSpec {
-	return []spec.ExpModelCommandSpec{
-		exec.NewCpuCommandModelSpec(),
-		exec.NewMemCommandModelSpec(),
-		exec.NewProcessCommandModelSpec(),
-		exec.NewNetworkCommandSpec(),
-		exec.NewDiskCommandSpec(),
-		exec.NewScriptCommandModelSpec(),
-		exec.NewFileCommandSpec(),
-		exec.NewKernelInjectCommandSpec(),
-		exec.NewSystemdCommandModelSpec(),
-	}
-}
-
 func ExtractExecutorFromExpModel(expModel spec.ExpModelCommandSpec) map[string]spec.Executor {
 	executors := make(map[string]spec.Executor)
 	for _, actionModel := range expModel.Actions() {

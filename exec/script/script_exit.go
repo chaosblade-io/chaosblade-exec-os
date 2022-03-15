@@ -123,11 +123,11 @@ func (see *ScriptExitExecutor) start(ctx context.Context, scriptFile, functionNa
 	}
 	content = fmt.Sprintf("%sexit %s", content, exitCode)
 	// backup file
-	response := backScript(see.channel, scriptFile)
+	response := backScript(ctx, see.channel, scriptFile)
 	if !response.Success {
 		return response
 	}
-	response = insertContentToScriptBy(see.channel, functionName, content, scriptFile)
+	response = insertContentToScriptBy(ctx, see.channel, functionName, content, scriptFile)
 	if !response.Success {
 		see.stop(ctx, scriptFile)
 	}
@@ -135,7 +135,7 @@ func (see *ScriptExitExecutor) start(ctx context.Context, scriptFile, functionNa
 }
 
 func (see *ScriptExitExecutor) stop(ctx context.Context, scriptFile string) *spec.Response {
-	return recoverScript(see.channel, scriptFile)
+	return recoverScript(ctx, see.channel, scriptFile)
 }
 
 func (see *ScriptExitExecutor) SetChannel(channel spec.Channel) {

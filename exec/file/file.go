@@ -64,7 +64,6 @@ func (*FileCommandSpec) LongDesc() string {
 
 func checkFilepathExists(ctx context.Context, cl spec.Channel, filepath string) bool {
 	response := cl.Run(ctx, fmt.Sprintf("[ -e %s ] && echo true || echo false", filepath), "")
-	fmt.Println(response.Result)
 	if response.Success && strings.Contains(response.Result.(string), "true") {
 		return true
 	}

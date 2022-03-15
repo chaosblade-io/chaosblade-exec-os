@@ -252,7 +252,6 @@ func (c SSHClient) RunCommand(command string) ([]byte, error) {
 }
 
 func ConvertOutputToResponse(uid, output string, err error, defaultResponse *spec.Response) *spec.Response {
-	context.Background()
 	if err != nil {
 		response := spec.Decode(err.Error(), defaultResponse)
 		if response.Success {

@@ -14,53 +14,10 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 )
 
-const (
-	UID     = "uid"
-	DEBUG   = "debug"
-	CREATE  = "create"
-	DESTROY = "destroy"
-)
-
 var executors = model.GetAllOsExecutors()
 var models = model.GetAllExpModels()
 var modelMap = make(map[string]spec.ExpModelCommandSpec)
 var modelActionFlags = make(map[string][]spec.ExpFlag)
-
-var uidFlag = spec.ExpFlag{
-	Name:    "uid",
-	Desc:    "uid",
-	Default: "",
-}
-
-var debugFlag = spec.ExpFlag{
-	Name:    "debug",
-	Desc:    "debug",
-	Default: "",
-}
-
-var channelFlag = spec.ExpFlag{
-	Name:    "channel",
-	Desc:    "channel",
-	Default: "local",
-}
-
-var nsTarget = spec.ExpFlag{
-	Name:    "ns_target",
-	Desc:    "target pid",
-	Default: "local",
-}
-
-var nsPid = spec.ExpFlag{
-	Name:    "ns_pid",
-	Desc:    "pid namespace",
-	Default: "false",
-}
-
-var nsMnt = spec.ExpFlag{
-	Name:    "ns_mnt",
-	Desc:    "mnt namespace",
-	Default: "false",
-}
 
 func init() {
 	for _, commandSpec := range models {
@@ -93,12 +50,13 @@ func init() {
 			util.MergeModels()
 			modelActionFlags[commandSpec.Name()+modelAction.Name()] = append(
 				append(flags, append(xes, matchers...)...),
-				uidFlag,
-				channelFlag,
-				nsTarget,
-				nsPid,
-				nsMnt,
-				debugFlag,
+				model.UidFlag,
+				model.ChannelFlag,
+				model.NsTargetFlag,
+				model.NsPidFlag,
+				model.NsMntFlag,
+				model.NsNetFlag,
+				model.DebugFlag,
 			)
 		}
 	}
@@ -107,8 +65,7 @@ func init() {
 func main() {
 	args := os.Args
 	if len(args) < 4 {
-		fmt.Fprint(os.Stderr, fmt.Sprintf("invalid parameter, %v", args))
-		os.Exit(1)
+		exitAndPrint(spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("invalid parameter, %v", args)), 0)
 	} else {
 		// example => create cpu load cpu-percent=60
 		mode := args[1]
@@ -132,8 +89,7 @@ func main() {
 				}
 
 				if err := cmd.Parse(os.Args[4:]); err != nil {
-					fmt.Fprint(os.Stderr, fmt.Sprintf("invalid parameter, %v", err))
-					os.Exit(1)
+					exitAndPrint(spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("invalid parameter, %v", err)), 0)
 				}
 
 				actionFlags := make(map[string]string, len(flagsx))
@@ -145,21 +101,20 @@ func main() {
 		}
 
 		ctx := context.Background()
-		if mode != CREATE && mode != DESTROY {
-			fmt.Fprint(os.Stderr, fmt.Sprintf("invalid parameter, %v", args))
-			os.Exit(1)
+		if mode != spec.Create && mode != spec.Destroy {
+			exitAndPrint(spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("invalid parameter, %v", args)), 0)
 		}
 
-		uid := expModel.ActionFlags[UID]
+		uid := expModel.ActionFlags[model.UidFlag.Name]
 		if uid == "" {
 			uid, _ = util.GenerateUid()
 		}
 
-		if mode == DESTROY {
-			ctx = spec.SetDestroyFlag(context.Background(), uid)
+		if mode == spec.Destroy {
+			ctx = spec.SetDestroyFlag(ctx, uid)
 		}
 
-		if expModel.ActionFlags[DEBUG] == "true" {
+		if expModel.ActionFlags[model.DebugFlag.Name] == spec.True {
 			util.Debug = true
 		}
 		util.InitLog(util.Bin)
@@ -168,34 +123,34 @@ func main() {
 		key := expModel.Target + expModel.ActionName
 		executor := executors[key]
 		if executor == nil {
-			fmt.Fprint(os.Stderr, fmt.Sprintf("not found executor, target: %s, action: %s", target, action))
-			os.Exit(1)
+			exitAndPrint(spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("not found executor, target: %s, action: %s", target, action)), 0)
 		} else {
-			if expModel.ActionFlags["channel"] == "local" {
+			if expModel.ActionFlags[model.ChannelFlag.Name] == spec.LocalChannel {
 				executor.SetChannel(channel.NewLocalChannel())
-			} else if expModel.ActionFlags["channel"] == "nsexec" {
+			} else if expModel.ActionFlags[model.ChannelFlag.Name] == spec.NSExecBin {
 
-				ctx = context.WithValue(ctx, "ns_target", expModel.ActionFlags["ns_target"])
+				ctx = context.WithValue(ctx, model.NsTargetFlag.Name, expModel.ActionFlags[model.NsTargetFlag.Name])
 
-				if expModel.ActionFlags["ns_pid"] == "true" {
-					ctx = context.WithValue(ctx, "ns_pid", "true")
+				if expModel.ActionFlags[model.NsPidFlag.Name] == spec.True {
+					ctx = context.WithValue(ctx, model.NsPidFlag.Name, spec.True)
 				}
-				if expModel.ActionFlags["ns_mnt"] == "true" {
-					ctx = context.WithValue(ctx, "ns_mnt", "true")
+				if expModel.ActionFlags[model.NsMntFlag.Name] == spec.True {
+					ctx = context.WithValue(ctx, model.NsMntFlag.Name, spec.True)
+				}
+				if expModel.ActionFlags[model.NsNetFlag.Name] == spec.True {
+					ctx = context.WithValue(ctx, model.NsNetFlag.Name, spec.True)
 				}
 
-				executor.SetChannel(channel.NewNsexecChannel())
+				executor.SetChannel(channel.NewNSExecChannel())
 			} else {
 				executor.SetChannel(channel.NewLocalChannel())
 			}
-
-			response := executor.Exec(uid, ctx, expModel)
-			logrus.Debugf("os response: %v", response)
-			if response.Success {
-				fmt.Fprint(os.Stdout, response.Print())
-			} else {
-				fmt.Fprint(os.Stderr, response.Print())
-			}
+			exitAndPrint(executor.Exec(uid, ctx, expModel), 0)
 		}
 	}
+}
+
+func exitAndPrint(response *spec.Response, code int) {
+	fmt.Println(response.Print())
+	os.Exit(code)
 }

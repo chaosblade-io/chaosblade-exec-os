@@ -22,7 +22,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"math"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -165,7 +164,7 @@ func (fae *FillActionExecutor) start(uid, directory, size, percent, reserve stri
 }
 
 func (fae *FillActionExecutor) stop(directory string, ctx context.Context) *spec.Response {
-	return stopFill(directory, fae.channel)
+	return stopFill(ctx, directory, fae.channel)
 }
 
 func (fae *FillActionExecutor) SetChannel(channel spec.Channel) {
@@ -176,46 +175,14 @@ var fillDataFile = "chaos_filldisk.log.dat"
 
 // retainFileHandle by opening the file
 func retainFileHandle(ctx context.Context, cl spec.Channel, fillDiskDirectory string) *spec.Response {
-	dataFilePath := path.Join(fillDiskDirectory, fillDataFile)
 	// open the temp file to retain file handle
-	pid := ctx.Value("ns_target")
-
-	if pid == nil {
-		cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("cat >> %s", dataFilePath))
-		cmd.Stdin = os.Stdin
-		if err := cmd.Start(); err != nil {
-			return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, "retain file handle fail", err.Error())
-		}
-		if err := cmd.Wait(); err != nil {
-			return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, "retain file handle fail", err.Error())
-		}
-		return spec.Success()
+	dataFilePath := path.Join(fillDiskDirectory, fillDataFile)
+	file, err := os.Open(dataFilePath)
+	if err != nil {
+		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("failed to read %s file, %s", dataFilePath, err.Error()))
 	}
-
-	ns_script := fmt.Sprintf("-t %s", pid)
-
-	if ctx.Value("ns_pid") == "true" {
-		ns_script = fmt.Sprintf("%s -p", ns_script)
-	}
-
-	if ctx.Value("ns_mnt") == "true" {
-		ns_script = fmt.Sprintf("%s -m", ns_script)
-	}
-
-	ns_script = fmt.Sprintf("%s -- /bin/sh -c", ns_script)
-
-	split := strings.Split(ns_script, " ")
-
-	cmd := exec.CommandContext(ctx, util.GetNSExecBin(), append(split, fmt.Sprintf("cat >> %s", dataFilePath))...)
-	cmd.Stdin = os.Stdin
-
-	if err := cmd.Start(); err != nil {
-		return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, "retain file handle fail", err.Error())
-	}
-	if err := cmd.Wait(); err != nil {
-		return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, "retain file handle fail", err.Error())
-	}
-	return spec.Success()
+	defer file.Close()
+	select {}
 }
 
 const diskFillErrorMessage = "No space left on device"
@@ -254,7 +221,7 @@ func startFill(ctx context.Context, uid, directory, size, percent, reserve strin
 		}
 		return response
 	}
-	if err = stopFill(directory, cl); err != nil {
+	if err = stopFill(ctx, directory, cl); err != nil {
 		logrus.Warningf("failed to stop fill when starting failed, %v, starting err: %s", err, response.Err)
 	}
 	return response
@@ -332,8 +299,8 @@ func fillDiskByDD(ctx context.Context, dataFile string, directory string, size s
 }
 
 // stopFill contains kill the filldisk process and delete the temp file actions
-func stopFill(directory string, cl spec.Channel) *spec.Response {
-	ctx := context.Background()
+func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Response {
+
 	if directory == "" {
 		util.Errorf("", util.GetRunFuncName(), fmt.Sprintf("`%s`: directory is nil", directory))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "directory is nil")

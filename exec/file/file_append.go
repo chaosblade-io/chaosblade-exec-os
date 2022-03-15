@@ -82,8 +82,8 @@ blade create file append --filepath=/home/logs/nginx.log --content=SEVMTE8gV09ST
 # mock interface timeout exception
 blade create file append --filepath=/home/logs/nginx.log --content="@{DATE:+%Y-%m-%d %H:%M:%S} ERROR invoke getUser timeout [@{RANDOM:100-200}]ms abc  mock exception"
 `,
-			ActionPrograms:   []string{AppendFileBin},
-			ActionCategories: []string{category.SystemFile},
+			ActionPrograms:    []string{AppendFileBin},
+			ActionCategories:  []string{category.SystemFile},
 			ActionProcessHang: true,
 		},
 	}
@@ -125,6 +125,10 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 	}
 
 	filepath := model.ActionFlags["filepath"]
+	if _, ok := spec.IsDestroy(ctx); ok {
+		return f.stop(filepath, ctx)
+	}
+
 	if !checkFilepathExists(ctx, f.channel, filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")

@@ -134,7 +134,7 @@ func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp
 }
 
 func (de *NetworkDelayExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return stopNet(netInterface, de.channel)
+	return stopNet(ctx, netInterface, de.channel)
 }
 
 func (de *NetworkDelayExecutor) SetChannel(channel spec.Channel) {

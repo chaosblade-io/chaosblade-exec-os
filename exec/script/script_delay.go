@@ -121,11 +121,11 @@ func (sde *ScriptDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 func (sde *ScriptDelayExecutor) start(ctx context.Context, scriptFile, functionName string, timt int) *spec.Response {
 	timeInSecond := float32(timt) / 1000.0
 	// backup file
-	response := backScript(sde.channel, scriptFile)
+	response := backScript(ctx, sde.channel, scriptFile)
 	if !response.Success {
 		return response
 	}
-	response = insertContentToScriptBy(sde.channel, functionName, fmt.Sprintf("sleep %f", timeInSecond), scriptFile)
+	response = insertContentToScriptBy(ctx, sde.channel, functionName, fmt.Sprintf("sleep %f", timeInSecond), scriptFile)
 	if !response.Success {
 		sde.stop(ctx, scriptFile)
 	}
@@ -133,7 +133,7 @@ func (sde *ScriptDelayExecutor) start(ctx context.Context, scriptFile, functionN
 }
 
 func (sde *ScriptDelayExecutor) stop(ctx context.Context, scriptFile string) *spec.Response {
-	return recoverScript(sde.channel, scriptFile)
+	return recoverScript(ctx, sde.channel, scriptFile)
 }
 
 func (sde *ScriptDelayExecutor) SetChannel(channel spec.Channel) {

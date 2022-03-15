@@ -121,7 +121,7 @@ func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, e
 }
 
 func (de *NetworkDuplicateExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return stopNet(netInterface, de.channel)
+	return stopNet(ctx, netInterface, de.channel)
 }
 
 func (de *NetworkDuplicateExecutor) SetChannel(channel spec.Channel) {

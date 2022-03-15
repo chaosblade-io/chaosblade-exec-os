@@ -141,7 +141,7 @@ func checkProcessInvalid(uid, process, processCmd, localPorts string, ctx contex
 		if err != nil {
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "local-port", localPorts, err)
 		}
-		pids, err = cl.GetPidsByLocalPorts(ports)
+		pids, err = cl.GetPidsByLocalPorts(ctx, ports)
 		killProcessName = localPorts
 		processParameter = "local-port"
 	}

@@ -68,24 +68,24 @@ func (*ScriptCommandModelSpec) LongDesc() string {
 const bakFileSuffix = "_chaosblade.bak"
 
 // backScript
-func backScript(channel spec.Channel, scriptFile string) *spec.Response {
+func backScript(ctx context.Context, channel spec.Channel, scriptFile string) *spec.Response {
 	var bakFile = getBackFile(scriptFile)
 	if util.IsExist(bakFile) {
 		return spec.ResponseFailWithFlags(spec.BackfileExists, bakFile)
 	}
-	return channel.Run(context.TODO(), "cat", fmt.Sprintf("%s > %s", scriptFile, bakFile))
+	return channel.Run(ctx, "cat", fmt.Sprintf("%s > %s", scriptFile, bakFile))
 }
 
-func recoverScript(channel spec.Channel, scriptFile string) *spec.Response {
+func recoverScript(ctx context.Context, channel spec.Channel, scriptFile string) *spec.Response {
 	var bakFile = getBackFile(scriptFile)
 	if !util.IsExist(bakFile) {
 		return spec.ResponseFailWithFlags(spec.FileNotExist, bakFile)
 	}
-	response := channel.Run(context.TODO(), "cat", fmt.Sprintf("%s > %s", bakFile, scriptFile))
+	response := channel.Run(ctx, "cat", fmt.Sprintf("%s > %s", bakFile, scriptFile))
 	if !response.Success {
 		return response
 	}
-	return channel.Run(context.TODO(), "rm", fmt.Sprintf("-rf %s", bakFile))
+	return channel.Run(ctx, "rm", fmt.Sprintf("-rf %s", bakFile))
 }
 
 func getBackFile(scriptFile string) string {
@@ -94,9 +94,9 @@ func getBackFile(scriptFile string) string {
 
 // awk '/offline\s?\(\)\s*\{/{print NR}' tt.sh
 // sed -i '416 a sleep 100' tt.sh
-func insertContentToScriptBy(channel spec.Channel, functionName string, newContent, scriptFile string) *spec.Response {
+func insertContentToScriptBy(ctx context.Context, channel spec.Channel, functionName string, newContent, scriptFile string) *spec.Response {
 	// search line number by function name
-	response := channel.Run(context.TODO(), "awk", fmt.Sprintf(`'/%s *\(\) *\{/{print NR}' %s`, functionName, scriptFile))
+	response := channel.Run(ctx, "awk", fmt.Sprintf(`'/%s *\(\) *\{/{print NR}' %s`, functionName, scriptFile))
 	if !response.Success {
 		return response
 	}
@@ -112,5 +112,5 @@ func insertContentToScriptBy(channel spec.Channel, functionName string, newConte
 	}
 	lineNum := lineNums[0]
 	// insert content to the line below
-	return channel.Run(context.TODO(), "sed", fmt.Sprintf(`-i '%s a %s' %s`, lineNum, newContent, scriptFile))
+	return channel.Run(ctx, "sed", fmt.Sprintf(`-i '%s a %s' %s`, lineNum, newContent, scriptFile))
 }

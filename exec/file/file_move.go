@@ -106,10 +106,6 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	}
 
 	filepath := model.ActionFlags["filepath"]
-	if !checkFilepathExists(ctx, f.channel, filepath) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
-		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
-	}
 
 	target := model.ActionFlags["target"]
 
@@ -150,7 +146,7 @@ func (f *FileMoveActionExecutor) start(filepath, target string, force, autoCreat
 	} else {
 		response = f.channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))
 	}
-	return response;
+	return response
 }
 
 func (f *FileMoveActionExecutor) stop(filepath, target string, ctx context.Context) *spec.Response {

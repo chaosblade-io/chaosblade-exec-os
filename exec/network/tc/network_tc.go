@@ -116,7 +116,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 		}
 	}
 	if force {
-		stopNet(netInterface, cl)
+		stopNet(ctx, netInterface, cl)
 	}
 	// Only interface flag
 	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" {
@@ -129,7 +129,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 	if excludePort != "" {
 		excludePorts, err = getExcludePorts(ctx, excludePort, ignorePeerPorts, cl)
 		if err != nil {
-			stopNet(netInterface, cl)
+			stopNet(ctx, netInterface, cl)
 			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get exclude ports err %v", err))
 		}
 	}
@@ -141,7 +141,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts, excludeIp)
 		response := cl.Run(ctx, "tc", args+excludeFilters)
 		if !response.Success {
-			stopNet(netInterface, cl)
+			stopNet(ctx, netInterface, cl)
 		}
 		return response
 	}
@@ -228,7 +228,7 @@ func preHandleTxqueue(ctx context.Context, netInterface string, cl spec.Channel)
 	isExist := util.IsExist(txFile)
 	if isExist {
 		// check the value
-		response := cl.Run(context.TODO(), "head", fmt.Sprintf("-1 %s", txFile))
+		response := cl.Run(ctx, "head", fmt.Sprintf("-1 %s", txFile))
 		if response.Success {
 			txlen := strings.TrimSpace(response.Result.(string))
 			len, err := strconv.Atoi(txlen)
@@ -243,13 +243,12 @@ func preHandleTxqueue(ctx context.Context, netInterface string, cl spec.Channel)
 			}
 		}
 	}
-	if cl.IsCommandAvailable(ctx,"ifconfig") {
+	if cl.IsCommandAvailable(ctx, "ifconfig") {
 		// set to 1000 directly
-		response := cl.Run(context.TODO(), "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
+		response := cl.Run(ctx, "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
 		if !response.Success {
 			logrus.Warningf("set txqueuelen for %s err, %s", netInterface, response.Err)
 		}
-		return response
 	}
 	return spec.ReturnSuccess("success")
 }
@@ -277,7 +276,7 @@ func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel
 	args = buildTargetFilterPortAndIp(localPort, remotePort, destIpRules, excludePorts, excludeIpRules, args, netInterface)
 	response := channel.Run(ctx, "tc", args)
 	if !response.Success {
-		stopNet(netInterface, channel)
+		stopNet(ctx, netInterface, channel)
 		return response
 	}
 	return response
@@ -356,11 +355,11 @@ func addQdiscForDL(channel spec.Channel, ctx context.Context, netInterface strin
 }
 
 // stopNet
-func stopNet(netInterface string,  cl spec.Channel) *spec.Response {
+func stopNet(ctx context.Context, netInterface string, cl spec.Channel) *spec.Response {
 	if os.Getuid() != 0 {
 		return spec.ReturnFail(spec.Forbidden, fmt.Sprintf("tc no permission"))
 	}
-	ctx := context.Background()
+
 	resposne := cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
 	if !resposne.Success {
 		return resposne
@@ -370,10 +369,10 @@ func stopNet(netInterface string,  cl spec.Channel) *spec.Response {
 
 // getPeerPorts returns all ports communicating with the port
 func getPeerPorts(ctx context.Context, port string, cl spec.Channel) ([]string, error) {
-	if !cl.IsCommandAvailable(ctx,"ss") {
+	if !cl.IsCommandAvailable(ctx, "ss") {
 		return nil, fmt.Errorf(spec.CommandSsNotFound.Msg)
 	}
-	response := cl.Run(context.TODO(), "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
+	response := cl.Run(ctx, "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
 	if !response.Success {
 		return nil, fmt.Errorf(response.Err)
 	}

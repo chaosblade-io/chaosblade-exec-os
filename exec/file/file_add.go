@@ -115,14 +115,13 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 
 	filepath := model.ActionFlags["filepath"]
+	if _, ok := spec.IsDestroy(ctx); ok {
+		return f.stop(filepath, ctx)
+	}
 
 	if checkFilepathExists(ctx, f.channel, filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: filepath is exist", filepath))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the filepath is exist")
-	}
-
-	if _, ok := spec.IsDestroy(ctx); ok {
-		return f.stop(filepath, ctx)
 	}
 
 	directory := model.ActionFlags["directory"] == "true"

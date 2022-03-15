@@ -92,14 +92,13 @@ func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *s
 	}
 
 	filepath := model.ActionFlags["filepath"]
+	if _, ok := spec.IsDestroy(ctx); ok {
+		return f.stop(filepath, ctx)
+	}
 
 	if !checkFilepathExists(ctx, f.channel, filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
-	}
-
-	if _, ok := spec.IsDestroy(ctx); ok {
-		return f.stop(filepath, ctx)
 	}
 
 	mark := model.ActionFlags["mark"]

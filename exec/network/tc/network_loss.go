@@ -130,7 +130,7 @@ func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, exclu
 }
 
 func (nle *NetworkLossExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return stopNet(netInterface, nle.channel)
+	return stopNet(ctx, netInterface, nle.channel)
 }
 
 func (nle *NetworkLossExecutor) SetChannel(channel spec.Channel) {

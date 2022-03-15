@@ -143,12 +143,12 @@ func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, exc
 	}
 	classRule = fmt.Sprintf("%s delay %sms", classRule, time)
 
-	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort,destIp, excludeIp, force, ignorePeerPort, ce.channel)
+	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, ce.channel)
 
 }
 
 func (ce *NetworkReorderExecutor) stop(netInterface string, ctx context.Context) *spec.Response {
-	return stopNet(netInterface, ce.channel)
+	return stopNet(ctx, netInterface, ce.channel)
 }
 
 func (ce *NetworkReorderExecutor) SetChannel(channel spec.Channel) {

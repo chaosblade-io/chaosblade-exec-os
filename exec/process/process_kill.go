@@ -171,7 +171,7 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	var pids []string
 	var err error
 	var killProcessName string
-	ctx = context.WithValue(context.Background(), channel.ExcludeProcessKey, excludeProcessValue)
+	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
 	if process != "" {
 		pids, err = kpe.channel.GetPidsByProcessName(process, ctx)
 		if err != nil {
@@ -189,7 +189,7 @@ func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 		if err != nil {
 			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("illegal parameter local-port, %v", err))
 		}
-		pids, err = kpe.channel.GetPidsByLocalPorts(ports)
+		pids, err = kpe.channel.GetPidsByLocalPorts(ctx, ports)
 		if err != nil {
 			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("illegal parameter ports, %v", err))
 		}

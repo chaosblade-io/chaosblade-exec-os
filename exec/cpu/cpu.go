@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/shirou/gopsutil/cpu"
+	"github.com/sirupsen/logrus"
 	"os"
 	os_exec "os/exec"
 	"runtime"
@@ -251,38 +251,32 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, 
 	}
 
 	runtime.GOMAXPROCS(cpuCount)
+	logrus.Debugf("cpu counts: %d", cpuCount)
+	slopePercent := float64(cpuPercent)
+	slope(ctx, cpuPercent, climbTime, slopePercent, cpuCount)
 
-	var totalCpuPercent []float64
-
-	var err error
-
-	totalCpuPercent, err = cpu.Percent(time.Second, false)
-	if err != nil {
-		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get cpu total percent err %v", err))
+	quota := make(chan int64)
+	for i := 0; i < cpuCount; i++ {
+		go burn(ctx, quota, slopePercent, cpuCount)
+		go func() {
+			for {
+				quota <- getQuota(ctx, slopePercent, cpuCount)
+			}
+		}()
 	}
 
-	otherCpuPercent := (100.0 - (totalCpuPercent[0])) / 100.0
-	go func() {
-		t := time.NewTicker(3 * time.Second)
-		for {
-			select {
-			// timer 3s
-			case <-t.C:
-				totalCpuPercent, err = cpu.Percent(time.Second, false)
-				if err != nil {
-					// todo ignore?
-				}
-				otherCpuPercent = (100.0 - (totalCpuPercent[0])) / 100.0
-			}
-		}
-	}()
+	for {
+		used := getUsed(ctx, cpuCount)
+		logrus.Debugf("used: %f \n", used)
+	}
+}
 
-	var slopePercent float64
-	if climbTime == 0 {
-		slopePercent = float64(cpuPercent)
-	} else {
-		var ticker = time.NewTicker(1 * time.Second)
-		slopePercent = totalCpuPercent[0]
+const period = int64(10000000)
+
+func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent float64, cpuCount int) {
+	if climbTime != 0 {
+		var ticker = time.NewTicker(time.Second)
+		slopePercent = getUsed(ctx, cpuPercent)
 		var startPercent = float64(cpuPercent) - slopePercent
 		go func() {
 			for range ticker.C {
@@ -294,37 +288,48 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, 
 			}
 		}()
 	}
+}
 
-	for i := 0; i < cpuCount; i++ {
-		go func() {
-			busy := int64(0)
-			idle := int64(0)
-			all := int64(10000000)
-			dx := 0.0
-			ds := time.Duration(0)
-			for i := 0; ; i = (i + 1) % 1000 {
-				startTime := time.Now().UnixNano()
-				if i == 0 {
-					dx = (slopePercent - totalCpuPercent[0]) / otherCpuPercent
-					busy = busy + int64(dx*100000)
-					if busy < 0 {
-						busy = 0
-					}
-					idle = all - busy
-					if idle < 0 {
-						idle = 0
-					}
-					ds, _ = time.ParseDuration(strconv.FormatInt(idle, 10) + "ns")
-				}
-				for time.Now().UnixNano()-startTime < busy {
-				}
-				time.Sleep(ds)
-				runtime.Gosched()
-			}
-		}()
+func getQuota(ctx context.Context, slopePercent float64, cpuCount int) int64 {
+	used := getUsed(ctx, cpuCount)
+	dx := 0.0
+	if used > 100 {
+		dx = (slopePercent - used) / 100
+	} else {
+		dx = (slopePercent - used) / (100 - used)
 	}
-	select {}
+	busy := int64(dx * float64(period))
+	return busy
+}
 
+func burn(ctx context.Context, quota <-chan int64, slopePercent float64, cpuCount int) {
+	q := getQuota(ctx, slopePercent, cpuCount)
+	ds := period - q
+	if ds < 0 {
+		ds = 0
+	}
+	s, _ := time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
+	for {
+		select {
+		case offset := <-quota:
+			q = q + offset
+			if q < 0 {
+				q = 0
+			}
+			ds := period - q
+			if ds < 0 {
+				ds = 0
+			}
+			logrus.Debug(q, ds)
+			s, _ = time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
+		default:
+			startTime := time.Now().UnixNano()
+			for time.Now().UnixNano()-startTime < q {
+			}
+			time.Sleep(s)
+			runtime.Gosched()
+		}
+	}
 }
 
 // stop burn cpu

@@ -267,7 +267,7 @@ func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, 
 				fillMem = int64(memRate)
 			}
 			nFilePath := fmt.Sprintf("%s%d", filePath, fileCount)
-			response := cl.Run(context.Background(), "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, fillMem))
+			response := cl.Run(ctx, "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, fillMem))
 			if !response.Success {
 				fmt.Fprint(os.Stderr, fmt.Sprintf("burn mem with cache err, %v", err))
 				os.Exit(1)

@@ -95,15 +95,16 @@ func (f *FileRemoveActionExecutor) Exec(uid string, ctx context.Context, model *
 	}
 
 	filepath := model.ActionFlags["filepath"]
-	if !checkFilepathExists(ctx, f.channel, filepath) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
-		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
-	}
 
 	force := model.ActionFlags["force"] == "true"
 
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return f.stop(filepath, force, ctx)
+	}
+
+	if !checkFilepathExists(ctx, f.channel, filepath) {
+		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
+		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 
 	return f.start(filepath, force, ctx)
@@ -130,7 +131,6 @@ func (f *FileRemoveActionExecutor) stop(filepath string, force bool, ctx context
 		// nothing to do
 		return nil
 	} else {
-		ctx := context.Background()
 		target := path.Join(path.Dir(filepath), "."+md5Hex(path.Base(filepath)))
 		return f.channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, target, filepath))
 	}

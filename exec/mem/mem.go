@@ -225,11 +225,11 @@ type Block [32 * 1024]int32
 
 const PageCounterMax uint64 = 9223372036854770000
 
-func calculateMemSize(burnMemMode string, percent, reserve int, includeBufferCache bool) (int64, int64, error) {
+func calculateMemSize(ctx context.Context, burnMemMode string, percent, reserve int, includeBufferCache bool) (int64, int64, error) {
 
-	total, available, err := getAvailableAndTotal(burnMemMode, includeBufferCache)
+	total, available, err := getAvailableAndTotal(ctx, burnMemMode, includeBufferCache)
 	if err != nil {
-
+		return 0, 0, err
 	}
 
 	reserved := int64(0)
@@ -256,7 +256,7 @@ func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, 
 	filePath := path.Join(path.Join(util.GetProgramPath(), dirName), fileName)
 	tick := time.Tick(time.Second)
 	for range tick {
-		_, expectMem, err := calculateMemSize(burnMemMode, memPercent, memReserve, includeBufferCache)
+		_, expectMem, err := calculateMemSize(ctx, burnMemMode, memPercent, memReserve, includeBufferCache)
 		if err != nil {
 			fmt.Fprint(os.Stderr, fmt.Sprintf("calculate memsize err, %v", err))
 			os.Exit(1)
@@ -293,7 +293,7 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 		memRate = 100
 	}
 	for range tick {
-		_, expectMem, err := calculateMemSize(burnMemMode, memPercent, memReserve, includeBufferCache)
+		_, expectMem, err := calculateMemSize(ctx, burnMemMode, memPercent, memReserve, includeBufferCache)
 		if err != nil {
 			fmt.Fprint(os.Stderr, fmt.Sprintf("calculate memsize err, %v", err.Error()))
 			os.Exit(1)

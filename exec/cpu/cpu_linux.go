@@ -18,19 +18,15 @@ package cpu
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/containerd/cgroups"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"os"
 	"strconv"
 	"time"
 )
 
-// todo
 func getUsed(ctx context.Context, cpuCount int) float64 {
 
 	pid := ctx.Value(channel.NSTargetFlagName)
@@ -42,7 +38,7 @@ func getUsed(ctx context.Context, cpuCount int) float64 {
 		}
 
 		logrus.Debugf("get cpu useage by cgroup ")
-		cgroup, err := cgroups.Load(cgroups.V1, pidPath(p))
+		cgroup, err := cgroups.Load(cgroups.V1, exec.PidPath(p))
 		if err != nil {
 			logrus.Fatalf("get cpu usage fail, %s", err.Error())
 		}
@@ -68,40 +64,4 @@ func getUsed(ctx context.Context, cpuCount int) float64 {
 		logrus.Fatalf("get cpu usage fail, %s", err.Error())
 	}
 	return totalCpuPercent[0]
-}
-
-func pidPath(pid int) cgroups.Path {
-	p := fmt.Sprintf("/proc/%d/cgroup", pid)
-	paths, err := cgroups.ParseCgroupFile(p)
-	if err != nil {
-		return func(_ cgroups.Name) (string, error) {
-			return "", fmt.Errorf("failed to parse cgroup file %s: %s", p, err.Error())
-		}
-	}
-
-	return func(name cgroups.Name) (string, error) {
-		root, ok := paths[string(name)]
-		if !ok {
-			if root, ok = paths["name="+string(name)]; !ok {
-				return "", errors.New("controller is not supported")
-			}
-
-		}
-		return root, nil
-	}
-}
-
-func getProcessComm(pid int) (string, error) {
-	f, err := os.Open(fmt.Sprintf("%s/%d/comm", "/proc", pid))
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	b, err := ioutil.ReadAll(f)
-	if err != nil {
-		return "", err
-	}
-
-	return string(b), nil
 }

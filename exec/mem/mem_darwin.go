@@ -16,9 +16,12 @@
 
 package mem
 
-import "github.com/shirou/gopsutil/mem"
+import (
+	"context"
+	"github.com/shirou/gopsutil/mem"
+)
 
-func getAvailableAndTotal(burnMemMode string, includeBufferCache bool) (int64, int64, error) {
+func getAvailableAndTotal(ctx context.Context, burnMemMode string, includeBufferCache bool) (int64, int64, error) {
 	//no limit
 	virtualMemory, err := mem.VirtualMemory()
 	if err != nil {

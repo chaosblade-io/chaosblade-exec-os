@@ -32,8 +32,6 @@ endif
 # build os
 build: pre_build build_yaml build_os
 
-build_darwin: pre_build build_yaml build_os
-
 pre_build:
 	rm -rf $(BUILD_TARGET_PKG_DIR) $(BUILD_TARGET_PKG_FILE_PATH)
 	mkdir -p $(BUILD_TARGET_BIN) $(BUILD_TARGET_YAML)
@@ -43,6 +41,7 @@ build_yaml: build/spec.go
 
 build_os: main.go
 	$(GO) build $(GO_FLAGS) -o $(BUILD_TARGET_BIN)/chaos_os $<
+	cp extra/strace $(BUILD_TARGET_BIN)
 
 cp_strace:
 	cp extra/strace $(BUILD_TARGET_BIN)/

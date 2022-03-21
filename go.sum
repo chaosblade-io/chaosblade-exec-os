@@ -1,9 +1,11 @@
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
-github.com/StackExchange/wmi v1.2.0 h1:noJEYkMQVlFCEAc+2ma5YyRhlfjcWfZqk5sBRYozdyM=
-github.com/StackExchange/wmi v1.2.0/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
-github.com/chaosblade-io/chaosblade-spec-go v1.5.1-0.20220317024821-e1c9db03689e h1:A3Prhn3r3iYLTh2lHbh2e98hS48mvCmLiD6LxIYciQo=
-github.com/chaosblade-io/chaosblade-spec-go v1.5.1-0.20220317024821-e1c9db03689e/go.mod h1:xUF+8r54FphQjBR8fVPnweVqzu7EitE15UsnZ57O5gk=
+github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
+github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
+github.com/chaosblade-io/chaosblade-spec-go v1.5.0 h1:egLGiTLNrts5AZi0EKGUrILv6YKwh3TY0wqbFaoqQmI=
+github.com/chaosblade-io/chaosblade-spec-go v1.5.0/go.mod h1:xUF+8r54FphQjBR8fVPnweVqzu7EitE15UsnZ57O5gk=
+github.com/chaosblade-io/chaosblade-spec-go v1.5.1-0.20220321094513-e6d60eaa6a30 h1:gf0T40/sdg2byLw73xfxZZSvk8Xxo0ECTLnC4//94YY=
+github.com/chaosblade-io/chaosblade-spec-go v1.5.1-0.20220321094513-e6d60eaa6a30/go.mod h1:977aR5J4BBfLtFkYZkbHv1i7NJYN1X0x85xO3b8YLpc=
 github.com/cilium/ebpf v0.4.0/go.mod h1:4tRaxcgiL706VnOzHOdBlY8IEAIdxINsQBcU4xJJXRs=
 github.com/containerd/cgroups v1.0.2-0.20210605143700-23b51209bf7b h1:mrRq0rkLJnQOfalr7EwNn1ULsMoyGvD+8kN+hxeNRms=
 github.com/containerd/cgroups v1.0.2-0.20210605143700-23b51209bf7b/go.mod h1:0SJrPIenamHDcZhEcJMNBB85rHcUsw4f25ZfBiPYRkU=

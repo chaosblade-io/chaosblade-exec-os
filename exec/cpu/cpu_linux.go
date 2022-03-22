@@ -37,8 +37,10 @@ func getUsed(ctx context.Context, cpuCount int) float64 {
 			logrus.Fatalf("get cpu usage fail, %s", err.Error())
 		}
 
-		logrus.Debugf("get cpu useage by cgroup ")
-		cgroup, err := cgroups.Load(cgroups.V1, exec.PidPath(p))
+		cgroupRoot := ctx.Value("cgroup-root")
+		logrus.Debugf("get cpu useage by cgroup, root path: %s", cgroupRoot)
+
+		cgroup, err := cgroups.Load(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p))
 		if err != nil {
 			logrus.Fatalf("get cpu usage fail, %s", err.Error())
 		}

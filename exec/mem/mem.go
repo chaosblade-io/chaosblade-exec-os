@@ -103,6 +103,13 @@ blade create mem load --mode ram --reserve 200 --rate 100`,
 					Desc:   "Prevent mem-burn process from being killed by oom-killer",
 					NoArgs: true,
 				},
+				&spec.ExpFlag{
+					Name:     "cgroup-root",
+					Desc:     "cgroup root path, default value /sys/fs/cgroup",
+					NoArgs:   false,
+					Required: false,
+					Default: "/sys/fs/cgroup",
+				},
 			},
 		},
 	}

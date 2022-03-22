@@ -51,6 +51,13 @@ func NewOccupyActionSpec() spec.ExpActionCommandSpec {
 					NoArgs:   true,
 					Required: false,
 				},
+				&spec.ExpFlag{
+					Name:     "cgroup-root",
+					Desc:     "cgroup root path, default value /sys/fs/cgroup",
+					NoArgs:   false,
+					Required: false,
+					Default: "/sys/fs/cgroup",
+				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &OccupyActionExecutor{},

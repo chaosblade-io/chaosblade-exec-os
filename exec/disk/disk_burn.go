@@ -50,6 +50,13 @@ func NewBurnActionSpec() spec.ExpActionCommandSpec {
 					Desc:   "Burn io by write, it will create a file by value of the size flag, for example the size default value is 10, then it will create a 10M*100=1000M file for writing, and delete it when destroy",
 					NoArgs: true,
 				},
+				&spec.ExpFlag{
+					Name:     "cgroup-root",
+					Desc:     "cgroup root path, default value /sys/fs/cgroup",
+					NoArgs:   false,
+					Required: false,
+					Default: "/sys/fs/cgroup",
+				},
 			},
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{

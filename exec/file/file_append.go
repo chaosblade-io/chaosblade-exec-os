@@ -67,6 +67,13 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 					Desc:   "append content enable base64 encoding",
 					NoArgs: true,
 				},
+				&spec.ExpFlag{
+					Name:     "cgroup-root",
+					Desc:     "cgroup root path, default value /sys/fs/cgroup",
+					NoArgs:   false,
+					Required: false,
+					Default: "/sys/fs/cgroup",
+				},
 			},
 			ActionExecutor: &FileAppendActionExecutor{},
 			ActionExample: `

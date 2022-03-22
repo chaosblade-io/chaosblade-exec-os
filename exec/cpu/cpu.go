@@ -93,6 +93,13 @@ blade create cpu load --cpu-percent 60`,
 					Desc:     "durations(s) to climb",
 					Required: false,
 				},
+				&spec.ExpFlag{
+					Name:     "cgroup-root",
+					Desc:     "cgroup root path, default value /sys/fs/cgroup",
+					NoArgs:   false,
+					Required: false,
+					Default: "/sys/fs/cgroup",
+				},
 			},
 		},
 	}
@@ -222,6 +229,8 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "climb-time", climbTimeStr, "must be a positive integer and not bigger than 600")
 		}
 	}
+
+	ctx = context.WithValue(ctx, "cgroup-root", model.ActionFlags["cgroup-root"])
 
 	return ce.start(ctx, cpuList, cpuCount, cpuPercent, climbTime)
 }

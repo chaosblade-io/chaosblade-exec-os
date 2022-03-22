@@ -44,6 +44,13 @@ func NewStraceDelayActionSpec() spec.ExpActionCommandSpec {
 					Desc:     "The Pid of the target process",
 					Required: true,
 				},
+				&spec.ExpFlag{
+					Name:     "cgroup-root",
+					Desc:     "cgroup root path, default value /sys/fs/cgroup",
+					NoArgs:   false,
+					Required: false,
+					Default: "/sys/fs/cgroup",
+				},
 			},
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{

@@ -44,6 +44,13 @@ func NewStraceErrorActionSpec() spec.ExpActionCommandSpec {
 					Desc:     "The Pid of the target process",
 					Required: true,
 				},
+				&spec.ExpFlag{
+					Name:     "cgroup-root",
+					Desc:     "cgroup root path, default value /sys/fs/cgroup",
+					NoArgs:   false,
+					Required: false,
+					Default: "/sys/fs/cgroup",
+				},
 			},
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
@@ -75,6 +82,7 @@ func NewStraceErrorActionSpec() spec.ExpActionCommandSpec {
 blade create strace error --pid 1 --syscall-name mmap --return-value XX --delay-loc enter --first=1`,
 			ActionPrograms:   []string{StraceErrorBin},
 			ActionCategories: []string{category.SystemKernel},
+			ActionProcessHang: true,
 		},
 	}
 }

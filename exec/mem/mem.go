@@ -223,6 +223,7 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "rate", memRateStr, "it must be a positive integer")
 		}
 	}
+	ctx = context.WithValue(ctx, "cgroup-root", model.ActionFlags["cgroup-root"])
 	ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, includeBufferCache, avoidBeingKilled, ce.channel)
 	return spec.Success()
 }

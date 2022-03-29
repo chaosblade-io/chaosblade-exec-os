@@ -40,6 +40,10 @@ func getAvailableAndTotal(ctx context.Context, burnMemMode string, includeBuffer
 		}
 
 		cgroupRoot := ctx.Value("cgroup-root")
+		if cgroupRoot == "" {
+			cgroupRoot = "/sys/fs/cgroup/"
+		}
+
 		logrus.Debugf("get mem useage by cgroup, root path: %s", cgroupRoot)
 
 		cgroup, err := cgroups.Load(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p))

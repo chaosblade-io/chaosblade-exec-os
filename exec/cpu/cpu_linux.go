@@ -38,6 +38,10 @@ func getUsed(ctx context.Context, cpuCount int) float64 {
 		}
 
 		cgroupRoot := ctx.Value("cgroup-root")
+		if cgroupRoot == "" {
+			cgroupRoot = "/sys/fs/cgroup/"
+		}
+
 		logrus.Debugf("get cpu useage by cgroup, root path: %s", cgroupRoot)
 
 		cgroup, err := cgroups.Load(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p))

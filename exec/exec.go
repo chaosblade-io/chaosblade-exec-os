@@ -37,3 +37,11 @@ func Destroy(ctx context.Context, c spec.Channel, action string) *spec.Response 
 	}
 	return cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 }
+
+func CheckFilepathExists(ctx context.Context, cl spec.Channel, filepath string) bool {
+	response := cl.Run(ctx, fmt.Sprintf("[ -e %s ] && echo true || echo false", filepath), "")
+	if response.Success && strings.Contains(response.Result.(string), "true") {
+		return true
+	}
+	return false
+}

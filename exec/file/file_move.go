@@ -19,6 +19,7 @@ package file
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"path"
@@ -113,7 +114,7 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 		return f.stop(filepath, target, ctx)
 	}
 
-	if !checkFilepathExists(ctx, f.channel, target) {
+	if !exec.CheckFilepathExists(ctx, f.channel, target) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: target dir does not exist", filepath))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", target, "the file does not exist")
 	}
@@ -123,7 +124,7 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 
 	if !force {
 		targetFile := path.Join(target, "/", path.Base(filepath))
-		if util.IsExist(targetFile) {
+		if exec.CheckFilepathExists(ctx, f.channel, targetFile) {
 			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: target file does not exist", targetFile))
 			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", targetFile, "the target file does not exist")
 		}
@@ -134,7 +135,7 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 func (f *FileMoveActionExecutor) start(filepath, target string, force, autoCreateDir bool, ctx context.Context) *spec.Response {
 	var response *spec.Response
 
-	if autoCreateDir && !util.IsExist(target) {
+	if autoCreateDir && !exec.CheckFilepathExists(ctx, f.channel, target) {
 		response = f.channel.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, target))
 		if !response.Success {
 			return response

@@ -21,6 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"path"
@@ -102,7 +103,7 @@ func (f *FileRemoveActionExecutor) Exec(uid string, ctx context.Context, model *
 		return f.stop(filepath, force, ctx)
 	}
 
-	if !checkFilepathExists(ctx, f.channel, filepath) {
+	if !exec.CheckFilepathExists(ctx, f.channel, filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}

@@ -3,6 +3,7 @@ package tc
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"github.com/sirupsen/logrus"
@@ -225,7 +226,7 @@ func readServerIps() ([]string, error) {
 
 func preHandleTxqueue(ctx context.Context, netInterface string, cl spec.Channel) *spec.Response {
 	txFile := fmt.Sprintf("/sys/class/net/%s/tx_queue_len", netInterface)
-	isExist := util.IsExist(txFile)
+	isExist := exec.CheckFilepathExists(ctx, cl, txFile)
 	if isExist {
 		// check the value
 		response := cl.Run(ctx, "head", fmt.Sprintf("-1 %s", txFile))

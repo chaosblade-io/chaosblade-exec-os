@@ -19,6 +19,7 @@ package script
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"strconv"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -93,7 +94,7 @@ func (sde *ScriptDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("file"))
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "file")
 	}
-	if !util.IsExist(scriptFile) {
+	if !exec.CheckFilepathExists(ctx, sde.channel, scriptFile) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`, file is invalid. it not found", scriptFile))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "file", scriptFile, "it is not found")
 	}

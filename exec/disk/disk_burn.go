@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/sirupsen/logrus"
 	"path"
 	"strings"
@@ -120,10 +121,9 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
 		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
-	directory := "/"
-	path := model.ActionFlags["path"]
-	if path != "" {
-		directory = path
+	directory := model.ActionFlags["path"]
+	if directory == "" {
+		directory = "/"
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		readExists := model.ActionFlags["read"] == "true"
@@ -162,6 +162,18 @@ func (be *BurnIOExecutor) start(ctx context.Context, read, write bool, directory
 }
 
 func (be *BurnIOExecutor) stop(ctx context.Context, read, write bool, directory string) *spec.Response {
+	if read {
+		resp := localChannel.Run(ctx, "rm", fmt.Sprintf("-rf %s*", path.Join(directory, readFile)))
+		if !resp.Success {
+			logrus.Errorf("clean read file: %s", resp.Err)
+		}
+	}
+	if write {
+		resp := localChannel.Run(ctx, "rm", fmt.Sprintf("-rf %s*", path.Join(directory, writeFile)))
+		if !resp.Success {
+			logrus.Errorf("clean write file: %s", resp.Err)
+		}
+	}
 	return exec.Destroy(ctx, be.channel, "disk burn")
 }
 
@@ -171,41 +183,36 @@ func (be *BurnIOExecutor) SetChannel(channel spec.Channel) {
 
 var readFile = "chaos_burnio.read"
 var writeFile = "chaos_burnio.write"
+var localChannel = channel.NewLocalChannel()
 
 const count = 100
 
 // write burn
-func burnWrite(ctx context.Context, directory, size string, cl spec.Channel) *spec.Response {
-	if !cl.IsCommandAvailable(ctx, "dd") {
-		return spec.ReturnFail(spec.CommandDdNotFound, "command dd not found")
-	}
-
+func burnWrite(ctx context.Context, directory, size string, cl spec.Channel) {
 	tmpFileForWrite := path.Join(directory, writeFile)
+	_, _, ddRunningWriteArg := getArgs(ctx, localChannel)
 	for {
-		_, _, ddRunningWriteArg := getArgs(ctx, cl)
 		args := fmt.Sprintf(ddRunningWriteArg, tmpFileForWrite, size, count)
-		response := cl.Run(ctx, "dd", args)
+		response := localChannel.Run(ctx, "dd", args)
 		if !response.Success {
-			return response
+			logrus.Errorf("disk burn write, run dd err: %s", response.Err)
+			break
 		}
 	}
 }
 
 // read burn
-func burnRead(ctx context.Context, directory, size string, cl spec.Channel) *spec.Response {
+func burnRead(ctx context.Context, directory, size string, cl spec.Channel)  {
 	// create a 600M file under the directory
 	tmpFileForRead := path.Join(directory, readFile)
-	ddCreateArg, ddRunningReadArg, _ := getArgs(ctx, cl)
-	createArgs := fmt.Sprintf(ddCreateArg, tmpFileForRead, 6, count)
-	response := cl.Run(ctx, "dd", createArgs)
-	if !response.Success {
-		return response
-	}
+	_, ddRunningReadArg, _ := getArgs(ctx, localChannel)
 	for {
 		args := fmt.Sprintf(ddRunningReadArg, tmpFileForRead, size, count)
-		response = cl.Run(ctx, "dd", args)
+		//run with local channel
+		response := localChannel.Run(ctx, "dd", args)
 		if !response.Success {
-			return response
+			logrus.Errorf("disk burn read, run dd err: %s", response.Err)
+			break
 		}
 	}
 }

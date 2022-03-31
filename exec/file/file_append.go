@@ -136,7 +136,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		return f.stop(filepath, ctx)
 	}
 
-	if !checkFilepathExists(ctx, f.channel, filepath) {
+	if !exec.CheckFilepathExists(ctx, f.channel, filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}

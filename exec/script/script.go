@@ -19,10 +19,10 @@ package script
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"strings"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
 )
 
 type ScriptCommandModelSpec struct {
@@ -70,7 +70,7 @@ const bakFileSuffix = "_chaosblade.bak"
 // backScript
 func backScript(ctx context.Context, channel spec.Channel, scriptFile string) *spec.Response {
 	var bakFile = getBackFile(scriptFile)
-	if util.IsExist(bakFile) {
+	if exec.CheckFilepathExists(ctx, channel, bakFile) {
 		return spec.ResponseFailWithFlags(spec.BackfileExists, bakFile)
 	}
 	return channel.Run(ctx, "cat", fmt.Sprintf("%s > %s", scriptFile, bakFile))
@@ -78,7 +78,7 @@ func backScript(ctx context.Context, channel spec.Channel, scriptFile string) *s
 
 func recoverScript(ctx context.Context, channel spec.Channel, scriptFile string) *spec.Response {
 	var bakFile = getBackFile(scriptFile)
-	if !util.IsExist(bakFile) {
+	if !exec.CheckFilepathExists(ctx, channel, bakFile) {
 		return spec.ResponseFailWithFlags(spec.FileNotExist, bakFile)
 	}
 	response := channel.Run(ctx, "cat", fmt.Sprintf("%s > %s", bakFile, scriptFile))

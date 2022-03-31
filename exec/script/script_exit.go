@@ -19,6 +19,7 @@ package script
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
@@ -96,7 +97,7 @@ func (see *ScriptExitExecutor) Exec(uid string, ctx context.Context, model *spec
 		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("file"))
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "file")
 	}
-	if !util.IsExist(scriptFile) {
+	if !exec.CheckFilepathExists(ctx, see.channel, scriptFile) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`, file is invalid. it not found", scriptFile))
 		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "file", scriptFile, "the file is not found")
 	}

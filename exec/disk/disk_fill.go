@@ -19,6 +19,7 @@ package disk
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/sirupsen/logrus"
 	"math"
 	"os"
@@ -318,7 +319,7 @@ func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Resp
 		cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
 	}
 	fileName := path.Join(directory, fillDataFile)
-	if util.IsExist(fileName) {
+	if exec.CheckFilepathExists(ctx, cl, fileName) {
 		return cl.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, fileName))
 	}
 	return spec.Success()

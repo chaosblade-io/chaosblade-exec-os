@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -119,7 +120,7 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 		return f.stop(filepath, ctx)
 	}
 
-	if checkFilepathExists(ctx, f.channel, filepath) {
+	if exec.CheckFilepathExists(ctx, f.channel, filepath) {
 		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: filepath is exist", filepath))
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the filepath is exist")
 	}
@@ -135,7 +136,7 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 func (f *FileAddActionExecutor) start(cl spec.Channel, filepath, content string, directory, enableBase64, autoCreateDir bool, ctx context.Context) *spec.Response {
 
 	dir := path.Dir(filepath)
-	if autoCreateDir && !checkFilepathExists(ctx, cl, filepath) {
+	if autoCreateDir && ! exec.CheckFilepathExists(ctx, cl, filepath) {
 		if response := f.channel.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, dir)); !response.Success {
 			return response
 		}

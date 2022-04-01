@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/sirupsen/logrus"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"os"
 	os_exec "os/exec"
 	"runtime"
@@ -98,7 +98,7 @@ blade create cpu load --cpu-percent 60`,
 					Desc:     "cgroup root path, default value /sys/fs/cgroup",
 					NoArgs:   false,
 					Required: false,
-					Default: "/sys/fs/cgroup",
+					Default:  "/sys/fs/cgroup",
 				},
 			},
 		},
@@ -178,11 +178,11 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		var err error
 		cpuPercent, err = strconv.Atoi(cpuPercentStr)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-percent is illegal, it must be a positive integer", cpuPercentStr))
+			log.Errorf(ctx, "`%s`: cpu-percent is illegal, it must be a positive integer", cpuPercentStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer")
 		}
 		if cpuPercent > 100 || cpuPercent < 0 {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-list is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr))
+			log.Errorf(ctx, "`%s`: cpu-list is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer and not bigger than 100")
 		}
 	} else {
@@ -196,7 +196,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		}
 		cores, err := util.ParseIntegerListToStringSlice("cpu-list", cpuListStr)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-list is illegal, %s", cpuListStr, err.Error()))
+			log.Errorf(ctx, "`%s`: cpu-list is illegal, %s", cpuListStr, err.Error())
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-list", cpuListStr, err.Error())
 		}
 		cpuList = strings.Join(cores, ",")
@@ -207,7 +207,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		if cpuCountStr != "" {
 			cpuCount, err = strconv.Atoi(cpuCountStr)
 			if err != nil {
-				util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: cpu-count is illegal, cpu-count value must be a positive integer", cpuCountStr))
+				log.Errorf(ctx, "`%s`: cpu-count is illegal, cpu-count value must be a positive integer", cpuCountStr)
 				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-count", cpuCountStr, "it must be a positive integer")
 			}
 		}
@@ -221,22 +221,22 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		var err error
 		climbTime, err = strconv.Atoi(climbTimeStr)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: climb-time is illegal, climb-time value must be a positive integer", climbTimeStr))
+			log.Errorf(ctx, "`%s`: climb-time is illegal, climb-time value must be a positive integer", climbTimeStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "climb-time", climbTimeStr, "it must be a positive integer")
 		}
 		if climbTime > 600 || climbTime < 0 {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: climb-time is illegal, climb-time value must be a positive integer and not bigger than 600", climbTimeStr))
+			log.Errorf(ctx, "`%s`: climb-time is illegal, climb-time value must be a positive integer and not bigger than 600", climbTimeStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "climb-time", climbTimeStr, "must be a positive integer and not bigger than 600")
 		}
 	}
 
 	ctx = context.WithValue(ctx, "cgroup-root", model.ActionFlags["cgroup-root"])
 
-	return ce.start(ctx, cpuList, cpuCount, cpuPercent, climbTime)
+	return ce.start(ctx, uid, cpuList, cpuCount, cpuPercent, climbTime)
 }
 
 // start burn cpu
-func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, cpuPercent int, climbTime int) *spec.Response {
+func (ce *cpuExecutor) start(ctx context.Context, uid, cpuList string, cpuCount int, cpuPercent int, climbTime int) *spec.Response {
 	ce.channel.GetScriptPath()
 
 	if cpuList != "" {
@@ -260,13 +260,13 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, 
 	}
 
 	runtime.GOMAXPROCS(cpuCount)
-	logrus.Debugf("cpu counts: %d", cpuCount)
+	log.Debugf(ctx,"cpu counts: %d", cpuCount)
 	slopePercent := float64(cpuPercent)
 	slope(ctx, cpuPercent, climbTime, slopePercent, cpuCount)
 
 	quota := make(chan int64)
 	for i := 0; i < cpuCount; i++ {
-		go burn(ctx, quota, slopePercent, cpuCount)
+		go burn(ctx, quota, slopePercent, cpuCount, uid)
 		go func() {
 			for {
 				quota <- getQuota(ctx, slopePercent, cpuCount)
@@ -276,7 +276,7 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount int, 
 
 	for {
 		used := getUsed(ctx, cpuCount)
-		logrus.Debugf("used: %f \n", used)
+		log.Debugf(ctx,"used: %f ", used)
 	}
 }
 
@@ -311,7 +311,7 @@ func getQuota(ctx context.Context, slopePercent float64, cpuCount int) int64 {
 	return busy
 }
 
-func burn(ctx context.Context, quota <-chan int64, slopePercent float64, cpuCount int) {
+func burn(ctx context.Context, quota <-chan int64, slopePercent float64, cpuCount int, uid string) {
 	q := getQuota(ctx, slopePercent, cpuCount)
 	ds := period - q
 	if ds < 0 {
@@ -329,7 +329,6 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, cpuCoun
 			if ds < 0 {
 				ds = 0
 			}
-			logrus.Debug(q, ds)
 			s, _ = time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
 		default:
 			startTime := time.Now().UnixNano()

@@ -4,12 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"os"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"github.com/sirupsen/logrus"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 )
@@ -110,6 +110,7 @@ func main() {
 			uid, _ = util.GenerateUid()
 		}
 
+		ctx = context.WithValue(ctx, spec.Uid, uid)
 		if mode == spec.Destroy {
 			ctx = spec.SetDestroyFlag(ctx, uid)
 		}
@@ -118,7 +119,7 @@ func main() {
 			util.Debug = true
 		}
 		util.InitLog(util.Bin)
-		logrus.Infof("mode: %s, target: %s, action: %s, flags %v", mode, target, action, expModel.ActionFlags)
+		log.Infof(ctx, "mode: %s, target: %s, action: %s, flags %v", mode, target, action, expModel.ActionFlags)
 
 		key := expModel.Target + expModel.ActionName
 		executor := executors[key]

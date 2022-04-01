@@ -20,9 +20,9 @@ import (
 	"context"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/containerd/cgroups"
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/sirupsen/logrus"
 	"strconv"
 	"time"
 )
@@ -34,7 +34,7 @@ func getUsed(ctx context.Context, cpuCount int) float64 {
 	if pid != nil {
 		p, err := strconv.Atoi(pid.(string))
 		if err != nil {
-			logrus.Fatalf("get cpu usage fail, %s", err.Error())
+			log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 		}
 
 		cgroupRoot := ctx.Value("cgroup-root")
@@ -42,22 +42,22 @@ func getUsed(ctx context.Context, cpuCount int) float64 {
 			cgroupRoot = "/sys/fs/cgroup/"
 		}
 
-		logrus.Debugf("get cpu useage by cgroup, root path: %s", cgroupRoot)
+		log.Debugf(ctx, "get cpu useage by cgroup, root path: %s", cgroupRoot)
 
 		cgroup, err := cgroups.Load(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p))
 		if err != nil {
-			logrus.Fatalf("get cpu usage fail, %s", err.Error())
+			log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 		}
 
 		stats, err := cgroup.Stat(cgroups.IgnoreNotExist)
 		if err != nil {
-			logrus.Fatalf("get cpu usage fail, %s", err.Error())
+			log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 		} else {
 			pre := float64(stats.CPU.Usage.Total) / float64(time.Second)
 			time.Sleep(time.Second)
 			nextStats, err := cgroup.Stat(cgroups.IgnoreNotExist)
 			if err != nil {
-				logrus.Fatalf("get cpu usage fail, %s", err.Error())
+				log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 			} else {
 				next := float64(nextStats.CPU.Usage.Total) / float64(time.Second)
 				return ((next - pre) * 100) / float64(cpuCount)
@@ -67,7 +67,7 @@ func getUsed(ctx context.Context, cpuCount int) float64 {
 
 	totalCpuPercent, err := cpu.Percent(time.Second, false)
 	if err != nil {
-		logrus.Fatalf("get cpu usage fail, %s", err.Error())
+		log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 	}
 	return totalCpuPercent[0]
 }

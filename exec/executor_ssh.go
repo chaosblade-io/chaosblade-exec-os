@@ -19,6 +19,7 @@ package exec
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"io/ioutil"
 	"net"
 	"path"
@@ -26,10 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"github.com/sirupsen/logrus"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/version"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"golang.org/x/crypto/ssh"
@@ -208,7 +207,7 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 		}
 		createCommand := fmt.Sprintf("%s create %s %s %s --uid %s -d", bladeBin, expModel.Target, expModel.ActionName, matchers, uid)
 		output, err := client.RunCommand(createCommand)
-		logrus.Debugf("exec blade create command: %s, result: %s, err %s", createCommand, string(output), err)
+		log.Debugf(ctx,"exec blade create command: %s, result: %s, err %s", createCommand, string(output), err)
 		return ConvertOutputToResponse(uid, string(output), err, nil)
 	}
 }

@@ -21,10 +21,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const DropNetworkBin = "chaos_dropnetwork"
@@ -124,10 +122,7 @@ func (ne *NetworkDropExecutor) Exec(suid string, ctx context.Context, model *spe
 	if response, ok := ne.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}
-	if ne.channel == nil {
-		util.Errorf(suid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
+
 	sourceIp := model.ActionFlags["source-ip"]
 	destinationIp := model.ActionFlags["destination-ip"]
 	sourcePort := model.ActionFlags["source-port"]

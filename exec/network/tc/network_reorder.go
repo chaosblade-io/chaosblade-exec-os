@@ -19,10 +19,9 @@ package tc
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 type ReorderActionSpec struct {
@@ -96,13 +95,10 @@ func (ce *NetworkReorderExecutor) Exec(uid string, ctx context.Context, model *s
 	if response, ok := ce.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}
-	if ce.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
+
 	netInterface := model.ActionFlags["interface"]
 	if netInterface == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("interface"))
+		log.Errorf(ctx, "interface is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -110,7 +106,7 @@ func (ce *NetworkReorderExecutor) Exec(uid string, ctx context.Context, model *s
 	} else {
 		percent := model.ActionFlags["percent"]
 		if percent == "" {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("percent"))
+			log.Errorf(ctx, "percent i nil")
 			return spec.ResponseFailWithFlags(spec.ParameterLess, "percent")
 		}
 		gap := model.ActionFlags["gap"]

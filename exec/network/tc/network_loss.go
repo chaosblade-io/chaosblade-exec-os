@@ -19,10 +19,9 @@ package tc
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 type LossActionSpec struct {
@@ -92,14 +91,10 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 		return response
 	}
 
-	if nle.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
 	var dev = ""
 	if netInterface, ok := model.ActionFlags["interface"]; ok {
 		if netInterface == "" {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("interface"))
+			log.Errorf(ctx,"interface is nil")
 			return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 		}
 		dev = netInterface
@@ -109,7 +104,7 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 	percent := model.ActionFlags["percent"]
 	if percent == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("percent"))
+		log.Errorf(ctx, "percent is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "percent")
 	}
 	localPort := model.ActionFlags["local-port"]

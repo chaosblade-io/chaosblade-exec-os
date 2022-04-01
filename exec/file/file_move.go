@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
@@ -101,11 +101,6 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 		return response
 	}
 
-	if f.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
-
 	filepath := model.ActionFlags["filepath"]
 
 	target := model.ActionFlags["target"]
@@ -115,7 +110,7 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	}
 
 	if !exec.CheckFilepathExists(ctx, f.channel, target) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: target dir does not exist", filepath))
+		log.Errorf(ctx, "`%s`: target dir does not exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", target, "the file does not exist")
 	}
 
@@ -125,7 +120,7 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	if !force {
 		targetFile := path.Join(target, "/", path.Base(filepath))
 		if exec.CheckFilepathExists(ctx, f.channel, targetFile) {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: target file does not exist", targetFile))
+			log.Errorf(ctx,"`%s`: target file does not exist", targetFile)
 			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", targetFile, "the target file does not exist")
 		}
 	}

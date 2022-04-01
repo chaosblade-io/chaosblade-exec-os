@@ -19,13 +19,8 @@ package process
 import (
 	"context"
 	"fmt"
-	"strings"
-
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const StopProcessBin = "chaos_stopprocess"
@@ -45,6 +40,22 @@ func NewStopProcessActionCommandSpec() spec.ExpActionCommandSpec {
 				&spec.ExpFlag{
 					Name: "process-cmd",
 					Desc: "Process name in command",
+				},
+				&spec.ExpFlag{
+					Name: "count",
+					Desc: "Limit count, 0 means unlimited",
+				},
+				&spec.ExpFlag{
+					Name: "local-port",
+					Desc: "Local service ports. Separate multiple ports with commas (,) or connector representing ranges, for example: 80,8000-8080",
+				},
+				&spec.ExpFlag{
+					Name: "signal",
+					Desc: "Killing process signal, such as 9,15",
+				},
+				&spec.ExpFlag{
+					Name: "exclude-process",
+					Desc: "Exclude process",
 				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
@@ -92,120 +103,16 @@ func (spe *StopProcessExecutor) Name() string {
 }
 
 func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	if spe.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
+	resp := getPids(ctx, spe.channel, model, uid)
+	if !resp.Success {
+		return resp
 	}
-	process := model.ActionFlags["process"]
-	processCmd := model.ActionFlags["process-cmd"]
-	if process == "" && processCmd == "" {
-		util.Errorf(uid, util.GetRunFuncName(), "less process|process-cmd, less process matcher")
-		return spec.ResponseFailWithFlags(spec.ParameterLess, "process|process-cmd")
-	}
-	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
-
-	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, "blade")
-	if response := checkProcessInvalid(uid, process, processCmd, "", ctx, spe.channel); response != nil {
-		return response
-	}
+	pids := resp.Result.(string)
 	if _, ok := spec.IsDestroy(ctx); ok {
-		return spe.recoverProcess(process, processCmd, ignoreProcessNotFound, ctx)
+		return spe.channel.Run(ctx, "kill", fmt.Sprintf("-STOP %s", pids))
 	} else {
-		return spe.stopProcess(process, processCmd, ignoreProcessNotFound, ctx)
+		return spe.channel.Run(ctx, "kill", fmt.Sprintf("-CONT %s", pids))
 	}
-}
-
-func checkProcessInvalid(uid, process, processCmd, localPorts string, ctx context.Context, cl spec.Channel) *spec.Response {
-	var pids []string
-	var killProcessName string
-	var err error
-	var processParameter string
-	if process != "" {
-		pids, err = cl.GetPidsByProcessName(process, ctx)
-		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ProcessIdByNameFailed.Sprintf(process, err))
-			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, process, err)
-		}
-		killProcessName = process
-		processParameter = "process"
-	} else if processCmd != "" {
-		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
-		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
-			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, processCmd, err)
-		}
-		killProcessName = processCmd
-		processParameter = "process-cmd"
-	} else if localPorts != "" {
-		ports, err := util.ParseIntegerListToStringSlice("local-port", localPorts)
-		if err != nil {
-			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "local-port", localPorts, err)
-		}
-		pids, err = cl.GetPidsByLocalPorts(ctx, ports)
-		killProcessName = localPorts
-		processParameter = "local-port"
-	}
-	if pids == nil || len(pids) == 0 {
-		return spec.ResponseFailWithFlags(spec.ParameterInvalidProName, processParameter, killProcessName)
-	}
-	return nil
-}
-
-func (spe *StopProcessExecutor) stopProcess(process, processCmd string, ignoreProcessNotFound bool, ctx context.Context) *spec.Response {
-
-	var pids []string
-	var err error
-	var stopProcessName string
-	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, "blade")
-	if process != "" {
-		pids, err = spe.channel.GetPidsByProcessName(process, ctx)
-		if err != nil {
-			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get pids by processname err, %v", err))
-		}
-		stopProcessName = process
-	} else if processCmd != "" {
-		pids, err = spe.channel.GetPidsByProcessCmdName(processCmd, ctx)
-		if err != nil {
-			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get pids by processcmdname err, %v", err))
-		}
-		stopProcessName = process
-	}
-	if pids == nil || len(pids) == 0 {
-		if ignoreProcessNotFound {
-			return spec.Success()
-		}
-		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("%s process not found", stopProcessName))
-	}
-	args := fmt.Sprintf("-STOP %s", strings.Join(pids, " "))
-	return spe.channel.Run(ctx, "kill", args)
-}
-
-func (spe *StopProcessExecutor) recoverProcess(process, processCmd string, ignoreProcessNotFound bool, ctx context.Context) *spec.Response {
-	var pids []string
-	var err error
-	var stopProcessName string
-	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, "blade")
-	if process != "" {
-		pids, err = spe.channel.GetPidsByProcessName(process, ctx)
-		if err != nil {
-			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get pids by processname err, %v", err))
-		}
-		stopProcessName = process
-	} else if processCmd != "" {
-		pids, err = spe.channel.GetPidsByProcessCmdName(processCmd, ctx)
-		if err != nil {
-			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get pids by processcmdname err, %v", err))
-		}
-		stopProcessName = processCmd
-	}
-
-	if pids == nil || len(pids) == 0 {
-		if ignoreProcessNotFound {
-			return spec.Success()
-		}
-		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("%s process not found", stopProcessName))
-	}
-	return spe.channel.Run(ctx, "kill", fmt.Sprintf("-CONT %s", strings.Join(pids, " ")))
 }
 
 func (spe *StopProcessExecutor) SetChannel(channel spec.Channel) {

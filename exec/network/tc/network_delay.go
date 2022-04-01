@@ -19,10 +19,9 @@ package tc
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 type DelayActionSpec struct {
@@ -93,13 +92,9 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 		return response
 	}
 
-	if de.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
 	netInterface := model.ActionFlags["interface"]
 	if netInterface == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("interface"))
+		log.Errorf(ctx, "interface is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -107,7 +102,7 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 	} else {
 		time := model.ActionFlags["time"]
 		if time == "" {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("time"))
+			log.Errorf(ctx, "time is nil")
 			return spec.ResponseFailWithFlags(spec.ParameterLess, "time")
 		}
 		offset := model.ActionFlags["offset"]

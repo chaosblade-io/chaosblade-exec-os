@@ -21,12 +21,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"path"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const AddFileBin = "chaos_addfile"
@@ -110,18 +109,13 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 		return response
 	}
 
-	if f.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
-
 	filepath := model.ActionFlags["filepath"]
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return f.stop(filepath, ctx)
 	}
 
 	if exec.CheckFilepathExists(ctx, f.channel, filepath) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: filepath is exist", filepath))
+		log.Errorf(ctx,"`%s`: filepath is exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the filepath is exist")
 	}
 
@@ -149,7 +143,7 @@ func (f *FileAddActionExecutor) start(cl spec.Channel, filepath, content string,
 		} else {
 			if enableBase64 {
 				if decodeBytes, err := base64.StdEncoding.DecodeString(content); err != nil {
-					util.Errorf("", util.GetRunFuncName(), err.Error())
+					log.Errorf(ctx, err.Error())
 					return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the path is exist")
 				} else {
 					content = string(decodeBytes)

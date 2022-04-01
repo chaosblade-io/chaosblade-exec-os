@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/sirupsen/logrus"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"math"
 	"os"
 	"path"
@@ -112,17 +112,13 @@ func (*FillActionExecutor) Name() string {
 }
 
 func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	if fae.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
 	directory := "/"
 	path := model.ActionFlags["path"]
 	if path != "" {
 		directory = path
 	}
 	if !util.IsDir(directory) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: path is illegal, is not a directory", directory))
+		log.Errorf(ctx,"`%s`: path is illegal, is not a directory", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "path", directory, "it must be a directory")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -139,21 +135,21 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 				}
 				_, err := strconv.Atoi(size)
 				if err != nil {
-					util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: size is illegal, it must be positive integer", size))
+					log.Errorf(ctx,"`%s`: size is illegal, it must be positive integer", size)
 					return spec.ResponseFailWithFlags(spec.ParameterIllegal, "size", size, "it must be positive integer")
 				}
 				return fae.start(uid, directory, size, percent, reserve, retainHandle, ctx)
 			}
 			_, err := strconv.Atoi(reserve)
 			if err != nil {
-				util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: reserve is illegal, it must be positive integer", reserve))
+				log.Errorf(ctx,"`%s`: reserve is illegal, it must be positive integer", reserve)
 				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "reserve", reserve, "it must be positive integer")
 			}
 			return fae.start(uid, directory, "", percent, reserve, retainHandle, ctx)
 		}
 		_, err := strconv.Atoi(percent)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: percent is illegal, it must be positive integer", percent))
+			log.Errorf(ctx,"`%s`: percent is illegal, it must be positive integer", percent)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "percent", percent, "it must be positive integer")
 		}
 		return fae.start(uid, directory, "", percent, "", retainHandle, ctx)
@@ -191,15 +187,15 @@ const diskFillErrorMessage = "No space left on device"
 func startFill(ctx context.Context, uid, directory, size, percent, reserve string, retainHandle bool, cl spec.Channel) *spec.Response {
 
 	if directory == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: directory is nil", directory))
+		log.Errorf(ctx, "`%s`: directory is nil", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "directory is nil")
 	}
 	if size == "" && percent == "" && reserve == "" {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: less --size or --percent or --reserve flag", directory))
+		log.Errorf(ctx,"`%s`: less --size or --percent or --reserve flag", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "less --size or --percent or --reserve flag")
 	}
 	dataFile := path.Join(directory, fillDataFile)
-	size, err := calculateFileSize(directory, size, percent, reserve)
+	size, err := calculateFileSize(ctx, directory, size, percent, reserve)
 	if err != nil {
 		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("calculate size err, %v", err))
 	}
@@ -223,7 +219,7 @@ func startFill(ctx context.Context, uid, directory, size, percent, reserve strin
 		return response
 	}
 	if err = stopFill(ctx, directory, cl); err != nil {
-		logrus.Warningf("failed to stop fill when starting failed, %v, starting err: %s", err, response.Err)
+		log.Warnf(ctx, "failed to stop fill when starting failed, %v, starting err: %s", err, response.Err)
 	}
 	return response
 }
@@ -235,7 +231,7 @@ var getSysStatFunc = func(directory string) *syscall.Statfs_t {
 }
 
 // calculateFileSize returns the size which should be filled, unit is M
-func calculateFileSize(directory, size, percent, reserve string) (string, error) {
+func calculateFileSize(ctx context.Context, directory, size, percent, reserve string) (string, error) {
 	if percent == "" && reserve == "" {
 		return size, nil
 	}
@@ -255,7 +251,7 @@ func calculateFileSize(directory, size, percent, reserve string) (string, error)
 			return "", fmt.Errorf("the disk has been used %.2f, large than expected", usedPercentage)
 		}
 		remainderPercentage := expectedPercentage - usedPercentage
-		logrus.Debugf("remainderPercentage: %f", remainderPercentage)
+		log.Debugf(ctx, "remainderPercentage: %f", remainderPercentage)
 		expectSize := math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
 		return fmt.Sprintf("%.f", expectSize), nil
 	} else {
@@ -281,7 +277,7 @@ func fillDiskByFallocate(ctx context.Context, size string, dataFile string, cl s
 	if strings.Contains(response.Err, diskFillErrorMessage) {
 		return spec.ReturnSuccess(fmt.Sprintf("success because of %s", diskFillErrorMessage))
 	}
-	logrus.Warningf("execute fallocate err, %s", response.Err)
+	log.Warnf(ctx, "execute fallocate err, %s", response.Err)
 	return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, "fallocate", response.Err)
 }
 
@@ -303,7 +299,7 @@ func fillDiskByDD(ctx context.Context, dataFile string, directory string, size s
 func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Response {
 
 	if directory == "" {
-		util.Errorf("", util.GetRunFuncName(), fmt.Sprintf("`%s`: directory is nil", directory))
+		log.Errorf(ctx, "`%s`: directory is nil", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "directory is nil")
 	}
 	// kill dd or fallocate process

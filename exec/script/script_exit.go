@@ -20,11 +20,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 type ScriptExitActionCommand struct {
@@ -88,17 +86,14 @@ func (see *ScriptExitExecutor) Exec(uid string, ctx context.Context, model *spec
 	if response, ok := see.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}
-	if see.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
+
 	scriptFile := model.ActionFlags["file"]
 	if scriptFile == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("file"))
+		log.Errorf(ctx, "file is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "file")
 	}
 	if !exec.CheckFilepathExists(ctx, see.channel, scriptFile) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`, file is invalid. it not found", scriptFile))
+		log.Errorf(ctx, "`%s`, file is invalid. it not found", scriptFile)
 		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "file", scriptFile, "the file is not found")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -106,7 +101,7 @@ func (see *ScriptExitExecutor) Exec(uid string, ctx context.Context, model *spec
 	}
 	functionName := model.ActionFlags["function-name"]
 	if functionName == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("function-name"))
+		log.Errorf(ctx, "function-name is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "function-name")
 	}
 	exitMessage := model.ActionFlags["exit-message"]

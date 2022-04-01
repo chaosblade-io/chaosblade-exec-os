@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"path"
 	"strings"
 
@@ -119,10 +120,6 @@ func (*StraceErrorActionExecutor) Name() string {
 }
 
 func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	if dae.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
 
 	var pidList string
 	var first_flag string
@@ -139,12 +136,12 @@ func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, mode
 	}
 	return_value := model.ActionFlags["return-value"]
 	if return_value == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("return-value"))
+		log.Errorf(ctx,"return-value is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "return-value")
 	}
 	syscallName := model.ActionFlags["syscall-name"]
 	if syscallName == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("syscall-name"))
+		log.Errorf(ctx,"syscall-name is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "syscall-name")
 	}
 

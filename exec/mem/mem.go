@@ -20,7 +20,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/sirupsen/logrus"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -108,7 +109,7 @@ blade create mem load --mode ram --reserve 200 --rate 100`,
 					Desc:     "cgroup root path, default value /sys/fs/cgroup",
 					NoArgs:   false,
 					Required: false,
-					Default: "/sys/fs/cgroup",
+					Default:  "/sys/fs/cgroup",
 				},
 			},
 		},
@@ -173,6 +174,13 @@ func (ce *memExecutor) Name() string {
 func (ce *memExecutor) SetChannel(channel spec.Channel) {
 	ce.channel = channel
 }
+
+const (
+	//processOOMScoreAdj = "/proc/%s/oom_score_adj"
+	//oomMinScore        = "-1000"
+	processOOMAdj = "/proc/%s/oom_adj"
+	oomMinAdj     = "-17"
+)
 
 func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	commands := []string{"dd", "mount", "umount"}
@@ -248,7 +256,7 @@ func calculateMemSize(ctx context.Context, burnMemMode string, percent, reserve 
 	}
 	expectSize := available/1024/1024 - reserved
 
-	logrus.Debugf("available: %d, percent: %d, reserved: %d, expectSize: %d",
+	log.Debugf(ctx, "available: %d, percent: %d, reserved: %d, expectSize: %d",
 		available/1024/1024, percent, reserved, expectSize)
 
 	return total / 1024 / 1024, expectSize, nil
@@ -260,14 +268,13 @@ var fileName = "file"
 
 var fileCount = 1
 
-func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool, avoidBeingKilled bool, cl spec.Channel) {
+func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool, cl spec.Channel) {
 	filePath := path.Join(path.Join(util.GetProgramPath(), dirName), fileName)
 	tick := time.Tick(time.Second)
 	for range tick {
 		_, expectMem, err := calculateMemSize(ctx, burnMemMode, memPercent, memReserve, includeBufferCache)
 		if err != nil {
-			fmt.Fprint(os.Stderr, fmt.Sprintf("calculate memsize err, %v", err))
-			os.Exit(1)
+			log.Fatalf(ctx, "calculate memsize err, %v", err)
 		}
 		fillMem := expectMem
 		if expectMem > 0 {
@@ -277,20 +284,27 @@ func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, 
 			nFilePath := fmt.Sprintf("%s%d", filePath, fileCount)
 			response := cl.Run(ctx, "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, fillMem))
 			if !response.Success {
-				fmt.Fprint(os.Stderr, fmt.Sprintf("burn mem with cache err, %v", err))
-				os.Exit(1)
+				log.Fatalf(ctx, "burn mem with cache err, %v", err)
 			}
 			fileCount++
 		}
 	}
-
 }
 
 // start burn mem
 func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool, avoidBeingKilled bool, cl spec.Channel) {
+	// adjust process oom_score_adj to avoid being killed
+	if avoidBeingKilled {
+		scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
+		if _, err := os.Stat(scoreAdjFile); os.IsExist(err) {
+			if err := ioutil.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil {
+				log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj", burnMemMode)
+			}
+		}
+	}
 
 	if burnMemMode == "cache" {
-		burnMemWithCache(ctx, memPercent, memReserve, memRate, burnMemMode, includeBufferCache, avoidBeingKilled, cl)
+		burnMemWithCache(ctx, memPercent, memReserve, memRate, burnMemMode, includeBufferCache, cl)
 		return
 	}
 	tick := time.Tick(time.Second)
@@ -303,8 +317,7 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 	for range tick {
 		_, expectMem, err := calculateMemSize(ctx, burnMemMode, memPercent, memReserve, includeBufferCache)
 		if err != nil {
-			fmt.Fprint(os.Stderr, fmt.Sprintf("calculate memsize err, %v", err.Error()))
-			os.Exit(1)
+			log.Fatalf(ctx, "calculate memsize err, %v", err.Error())
 		}
 		fillMem := expectMem
 		if expectMem > 0 {
@@ -324,7 +337,7 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 				cache[count] = make([]Block, 0)
 				buf = cache[count]
 			}
-			logrus.Debugf("count: %d, len(buf): %d, cap(buf): %d, expect mem: %d, fill size: %d",
+			log.Debugf(ctx, "count: %d, len(buf): %d, cap(buf): %d, expect mem: %d, fill size: %d",
 				count, len(buf), cap(buf), expectMem, fillSize)
 			cache[count] = append(buf, make([]Block, fillSize)...)
 		}

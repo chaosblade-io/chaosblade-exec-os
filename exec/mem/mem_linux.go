@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/containerd/cgroups"
 	"github.com/shirou/gopsutil/mem"
-	"github.com/sirupsen/logrus"
 	"strconv"
 )
 
@@ -44,7 +44,7 @@ func getAvailableAndTotal(ctx context.Context, burnMemMode string, includeBuffer
 			cgroupRoot = "/sys/fs/cgroup/"
 		}
 
-		logrus.Debugf("get mem useage by cgroup, root path: %s", cgroupRoot)
+		log.Debugf(ctx, "get mem useage by cgroup, root path: %s", cgroupRoot)
 
 		cgroup, err := cgroups.Load(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p))
 		if err != nil {

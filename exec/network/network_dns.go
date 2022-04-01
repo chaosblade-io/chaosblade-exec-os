@@ -19,11 +19,10 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/network/tc"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/network/tc"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 type DnsActionSpec struct {
@@ -92,14 +91,11 @@ func (ns *NetworkDnsExecutor) Exec(uid string, ctx context.Context, model *spec.
 	if response, ok := ns.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}
-	if ns.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
+
 	domain := model.ActionFlags["domain"]
 	ip := model.ActionFlags["ip"]
 	if domain == "" || ip == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("domain|ip"))
+		log.Errorf(ctx, "domain|ip is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "domain|ip")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {

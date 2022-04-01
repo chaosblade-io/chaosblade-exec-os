@@ -18,15 +18,15 @@ package cpu
 
 import (
 	"context"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/sirupsen/logrus"
 	"time"
 )
 
 func getUsed(ctx context.Context, cpuCount int) float64 {
 	totalCpuPercent, err := cpu.Percent(time.Second, false)
 	if err != nil {
-		logrus.Fatalf("get cpu usage fail, %s", err.Error())
+		log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 	}
 	return totalCpuPercent[0]
 }

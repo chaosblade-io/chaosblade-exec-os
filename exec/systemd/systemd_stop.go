@@ -19,12 +19,11 @@ package systemd
 import (
 	"context"
 	"fmt"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"path"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const StopSystemdBin = "chaos_stopsystemd"
@@ -85,13 +84,10 @@ func (sse *StopSystemdExecutor) Name() string {
 }
 
 func (sse *StopSystemdExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	if sse.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
+
 	service := model.ActionFlags["service"]
 	if service == "" {
-		util.Errorf(uid, util.GetRunFuncName(), "less service name")
+		log.Errorf(ctx, "less service name")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "service")
 	}
 
@@ -108,12 +104,12 @@ func (sse *StopSystemdExecutor) Exec(uid string, ctx context.Context, model *spe
 
 func checkServiceInvalid(uid, service string, ctx context.Context, cl spec.Channel) *spec.Response {
 	if !cl.IsCommandAvailable(ctx, "systemctl") {
-		util.Errorf(uid, util.GetRunFuncName(), spec.CommandSystemctlNotFound.Msg)
+		log.Errorf(ctx, spec.CommandSystemctlNotFound.Msg)
 		return spec.ResponseFailWithFlags(spec.CommandSystemctlNotFound)
 	}
 	response := cl.Run(ctx, "systemctl", fmt.Sprintf(`status "%s" | grep 'Active' | grep 'running'`, service))
 	if !response.Success {
-		util.Errorf(uid, util.GetRunFuncName(), spec.SystemdNotFound.Sprintf("service", response.Err))
+		log.Errorf(ctx, spec.SystemdNotFound.Sprintf("service", response.Err))
 		return spec.ResponseFailWithFlags(spec.SystemdNotFound, service, response.Err)
 	}
 	return nil

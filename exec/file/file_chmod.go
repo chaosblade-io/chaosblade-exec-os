@@ -20,13 +20,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"path"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"os"
 	"regexp"
-
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"strconv"
+	"strings"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const ChmodFileBin = "chaos_chmodfile"
@@ -81,45 +82,74 @@ func (*FileChmodActionExecutor) Name() string {
 	return "chmod"
 }
 
+const tmpFileChmod = "/tmp/chaos-file-chmod.tmp"
+
 func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	commands := []string{"chmod", "grep", "echo", "rm", "awk"}
+	commands := []string{"chmod", "grep", "echo", "rm", "awk", "cat"}
 	if response, ok := f.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}
-
-	if f.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
+	mark := model.ActionFlags["mark"]
+	match, _ := regexp.MatchString("^([0-7]{3})$", mark)
+	if !match {
+		log.Errorf(ctx, "`%s` mark is illegal", mark)
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "mark", mark, "the mark is not matched")
 	}
 
 	filepath := model.ActionFlags["filepath"]
 	if _, ok := spec.IsDestroy(ctx); ok {
-		return f.stop(filepath, ctx)
+		return f.stopChmodFile(ctx, filepath, mark)
 	}
 
 	if !exec.CheckFilepathExists(ctx, f.channel, filepath) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
+		log.Errorf(ctx, "`%s`: file does not exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 
-	mark := model.ActionFlags["mark"]
-	match, _ := regexp.MatchString("^([0-7]{3})$", mark)
-	if !match {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` mark is illegal", mark))
-		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "mark", mark, "the mark is not matched")
+	response := f.channel.Run(ctx, "grep", fmt.Sprintf(`-q "%s:" "%s"`, filepath, tmpFileChmod))
+	if response.Success {
+		log.Errorf(ctx, "%s is already being experimented", filepath)
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "filepath", filepath, "already being experimented")
 	}
 
-	return f.start(filepath, mark, ctx)
+	fileInfo, _ := os.Stat(filepath)
+	originMark := strconv.FormatInt(int64(fileInfo.Mode().Perm()), 8)
+
+	response = f.channel.Run(ctx, "echo", fmt.Sprintf(`%s:%s >> %s`, filepath, originMark, tmpFileChmod))
+	if !response.Success {
+		return response
+	}
+	return f.channel.Run(ctx, "chmod", fmt.Sprintf(`%s "%s"`, mark, filepath))
 }
 
-func (f *FileChmodActionExecutor) start(filepath string, mark string, ctx context.Context) *spec.Response {
-	flags := fmt.Sprintf(`--start --filepath "%s" --mark %s --debug=%t`, filepath, mark, util.Debug)
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), ChmodFileBin), flags)
+func (f *FileChmodActionExecutor) stopChmodFile(ctx context.Context, filepath, mark string) *spec.Response {
+	// get origin mark
+	response := f.channel.Run(ctx, "grep", fmt.Sprintf(`%s: %s | awk -F ':' '{printf $2}'`, filepath, tmpFileChmod))
+	if !response.Success {
+		f.clearTempFile(filepath, response, ctx)
+		return response
+	}
+	originMark := response.Result.(string)
+	response = f.channel.Run(ctx, "chmod", fmt.Sprintf(`%s %s`, originMark, filepath))
+	f.clearTempFile(filepath, response, ctx)
+	return response
 }
 
-func (f *FileChmodActionExecutor) stop(filepath string, ctx context.Context) *spec.Response {
-	return f.channel.Run(ctx, path.Join(f.channel.GetScriptPath(), ChmodFileBin),
-		fmt.Sprintf(`--stop --filepath "%s" --debug=%t`, filepath, util.Debug))
+func (f *FileChmodActionExecutor) clearTempFile(filepath string, response *spec.Response, ctx context.Context) {
+	response = f.channel.Run(ctx, "cat", fmt.Sprintf(`"%s"| grep -v %s:`, tmpFileChmod, filepath))
+	if !response.Success {
+		response = f.channel.Run(ctx, "rm", fmt.Sprintf(`-rf "%s"`, tmpFileChmod))
+		if !response.Success {
+			log.Errorf(ctx, "clean temp file error %s", response.Err)
+		}
+	} else {
+		response = f.channel.Run(ctx, "echo", fmt.Sprintf(`"%s" > %s`,
+			strings.TrimRight(response.Result.(string), "\n"),
+			tmpFileChmod))
+		if !response.Success {
+			log.Errorf(ctx, "clean temp file error %s", response.Err)
+		}
+	}
 }
 
 func (f *FileChmodActionExecutor) SetChannel(channel spec.Channel) {

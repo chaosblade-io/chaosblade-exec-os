@@ -21,16 +21,15 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const AppendFileBin = "chaos_appendfile"
@@ -126,18 +125,13 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		return response
 	}
 
-	if f.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
-
 	filepath := model.ActionFlags["filepath"]
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return f.stop(filepath, ctx)
 	}
 
 	if !exec.CheckFilepathExists(ctx, f.channel, filepath) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
+		log.Errorf(ctx,"`%s`: file does not exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 
@@ -153,7 +147,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		var err error
 		count, err = strconv.Atoi(countStr)
 		if err != nil || count < 1 {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` value must be a positive integer", "count"))
+			log.Errorf(ctx,"`%s` value must be a positive integer", "count")
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", count, "it must be a positive integer")
 		}
 	}
@@ -161,7 +155,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		var err error
 		interval, err = strconv.Atoi(intervalStr)
 		if err != nil || interval < 1 {
-			util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s` value must be a positive integer", "interval"))
+			log.Errorf(ctx, "`%s` value must be a positive integer", "interval")
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "interval", interval, "it must be a positive integer")
 		}
 	}

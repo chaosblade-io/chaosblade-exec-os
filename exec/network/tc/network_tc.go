@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"github.com/sirupsen/logrus"
 	"os"
 	"strconv"
 	"strings"
@@ -165,11 +165,11 @@ func getExcludePorts(ctx context.Context, excludePort string, ignorePeerPorts bo
 		if !ignorePeerPorts {
 			peerPorts, err := getPeerPorts(ctx, p, cl)
 			if err != nil {
-				logrus.Warningf("get peer ports for %s err, %v", p, err)
+				log.Warnf(ctx, "get peer ports for %s err, %v", p, err)
 				errMsg := fmt.Sprintf("get peer ports for %s err, %v, please solve the problem or skip to exclude peer ports by --ignore-peer-port flag", p, err)
 				return nil, fmt.Errorf(errMsg)
 			}
-			logrus.Infof("peer ports for %s: %v", p, peerPorts)
+			log.Infof(ctx, "peer ports for %s: %v", p, peerPorts)
 			for _, mp := range peerPorts {
 				if _, ok := portSet[mp]; ok {
 					continue
@@ -234,12 +234,12 @@ func preHandleTxqueue(ctx context.Context, netInterface string, cl spec.Channel)
 			txlen := strings.TrimSpace(response.Result.(string))
 			len, err := strconv.Atoi(txlen)
 			if err != nil {
-				logrus.Warningf("parse %s file err, %v", txFile, err)
+				log.Warnf(ctx, "parse %s file err, %v", txFile, err)
 			} else {
 				if len > 0 {
 					return response
 				} else {
-					logrus.Infof("the tx_queue_len value for %s is %s", netInterface, txlen)
+					util.Infof("the tx_queue_len value for %s is %s", netInterface, txlen)
 				}
 			}
 		}
@@ -248,7 +248,7 @@ func preHandleTxqueue(ctx context.Context, netInterface string, cl spec.Channel)
 		// set to 1000 directly
 		response := cl.Run(ctx, "ifconfig", fmt.Sprintf("%s txqueuelen 1000", netInterface))
 		if !response.Success {
-			logrus.Warningf("set txqueuelen for %s err, %s", netInterface, response.Err)
+			log.Warnf(ctx, "set txqueuelen for %s err, %s", netInterface, response.Err)
 		}
 	}
 	return spec.ReturnSuccess("success")
@@ -386,7 +386,7 @@ func getPeerPorts(ctx context.Context, port string, cl spec.Channel) ([]string, 
 		return []string{}, nil
 	}
 	sockets := strings.Split(ssMsg, "\n")
-	logrus.Infof("sockets for %s, %v", port, sockets)
+	log.Infof(ctx, "sockets for %s, %v", port, sockets)
 	mappingPorts := make([]string, 0)
 	for idx, s := range sockets {
 		if idx == 0 {
@@ -399,7 +399,7 @@ func getPeerPorts(ctx context.Context, port string, cl spec.Channel) ([]string, 
 			}
 			ipPort := strings.Split(f, ":")
 			if len(ipPort) != 2 {
-				logrus.Warningf("illegal socket address: %s", f)
+				log.Warnf(ctx, "illegal socket address: %s", f)
 				continue
 			}
 			mappingPorts = append(mappingPorts, ipPort[1])

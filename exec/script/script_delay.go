@@ -20,12 +20,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"strconv"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 type ScriptDelayActionCommand struct {
@@ -85,17 +84,13 @@ func (sde *ScriptDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 		return response
 	}
 
-	if sde.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
 	scriptFile := model.ActionFlags["file"]
 	if scriptFile == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("file"))
+		log.Errorf(ctx, "file is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "file")
 	}
 	if !exec.CheckFilepathExists(ctx, sde.channel, scriptFile) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`, file is invalid. it not found", scriptFile))
+		log.Errorf(ctx, "`%s`, file is invalid. it not found", scriptFile)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "file", scriptFile, "it is not found")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -103,17 +98,17 @@ func (sde *ScriptDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 	functionName := model.ActionFlags["function-name"]
 	if functionName == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("function-name"))
+		log.Errorf(ctx, "function-name")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "function-name")
 	}
 	time := model.ActionFlags["time"]
 	if time == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("time"))
+		log.Errorf(ctx, "time")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "time")
 	}
 	t, err := strconv.Atoi(time)
 	if err != nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterIllegal.Sprintf("time", time, "it must be a positive integer"))
+		log.Errorf(ctx, "time %v it must be a positive integer", time)
 		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "time", time, "ti must be a positive integer")
 	}
 	return sde.start(ctx, scriptFile, functionName, t)

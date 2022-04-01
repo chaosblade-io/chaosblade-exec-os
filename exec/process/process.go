@@ -17,7 +17,13 @@
 package process
 
 import (
+	"context"
+	"fmt"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"strconv"
+	"strings"
 )
 
 type ProcessCommandModelSpec struct {
@@ -52,4 +58,128 @@ func (*ProcessCommandModelSpec) ShortDesc() string {
 
 func (*ProcessCommandModelSpec) LongDesc() string {
 	return "Process experiment, for example, kill process"
+}
+
+func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid string) (*spec.Response) {
+	if _, ok := spec.IsDestroy(ctx); ok {
+		return spec.ReturnSuccess(uid)
+	}
+	countValue := model.ActionFlags["count"]
+	process := model.ActionFlags["process"]
+	processCmd := model.ActionFlags["process-cmd"]
+	localPorts := model.ActionFlags["local-port"]
+
+	excludeProcess := model.ActionFlags["exclude-process"]
+	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
+	if process == "" && processCmd == "" && localPorts == "" {
+		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd and local-port, less process matcher")
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "process|process-cmd|local-port")
+	}
+
+	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
+	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
+	if !ignoreProcessNotFound {
+		if response := checkProcessInvalid(uid, process, processCmd, localPorts, ctx, cl); response != nil {
+			return response
+		}
+	}
+	flags := fmt.Sprintf("--debug=%t", util.Debug)
+	if countValue != "" {
+		count, err := strconv.Atoi(countValue)
+		if err != nil {
+			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterIllegal.Sprintf("count", countValue, err))
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", countValue, err)
+		}
+		flags = fmt.Sprintf("%s --count %d", flags, count)
+	}
+	if process != "" {
+		flags = fmt.Sprintf(`%s --process "%s"`, flags, process)
+	} else if processCmd != "" {
+		flags = fmt.Sprintf(`%s --process-cmd "%s"`, flags, processCmd)
+	} else if localPorts != "" {
+		flags = fmt.Sprintf(`%s --local-port "%s"`, flags, localPorts)
+	}
+
+	if excludeProcess != "" {
+		flags = fmt.Sprintf(`%s --exclude-process %s`, flags, excludeProcess)
+	}
+	if ignoreProcessNotFound {
+		flags = fmt.Sprintf(`%s --ignore-not-found=%t`, flags, ignoreProcessNotFound)
+	}
+
+	var pids []string
+	var err error
+	var killProcessName string
+	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
+	if process != "" {
+		pids, err = cl.GetPidsByProcessName(process, ctx)
+		if err != nil {
+			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get pids by processname err, %v", err))
+		}
+		killProcessName = process
+	} else if processCmd != "" {
+		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
+		if err != nil {
+			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get pids by processcmdname err, %v", err))
+		}
+		killProcessName = processCmd
+	} else if localPorts != "" {
+		ports, err := util.ParseIntegerListToStringSlice("local-port", localPorts)
+		if err != nil {
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("illegal parameter local-port, %v", err))
+		}
+		pids, err = cl.GetPidsByLocalPorts(ctx, ports)
+		if err != nil {
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("illegal parameter ports, %v", err))
+		}
+	}
+	if pids == nil || len(pids) == 0 {
+		if ignoreProcessNotFound {
+			return spec.Success()
+		}
+		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("%s process not found", killProcessName))
+	}
+	count, _ := strconv.Atoi(countValue)
+	// remove duplicates
+	pids = util.RemoveDuplicates(pids)
+	if count > 0 && len(pids) > count {
+		pids = pids[:count]
+	}
+	return spec.ReturnSuccess(strings.Join(pids, " "))
+}
+
+func checkProcessInvalid(uid, process, processCmd, localPorts string, ctx context.Context, cl spec.Channel) *spec.Response {
+	var pids []string
+	var killProcessName string
+	var err error
+	var processParameter string
+	if process != "" {
+		pids, err = cl.GetPidsByProcessName(process, ctx)
+		if err != nil {
+			util.Errorf(uid, util.GetRunFuncName(), spec.ProcessIdByNameFailed.Sprintf(process, err))
+			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, process, err)
+		}
+		killProcessName = process
+		processParameter = "process"
+	} else if processCmd != "" {
+		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
+		if err != nil {
+			util.Errorf(uid, util.GetRunFuncName(), spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
+			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, processCmd, err)
+		}
+		killProcessName = processCmd
+		processParameter = "process-cmd"
+	} else if localPorts != "" {
+		ports, err := util.ParseIntegerListToStringSlice("local-port", localPorts)
+		if err != nil {
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "local-port", localPorts, err)
+		}
+		pids, err = cl.GetPidsByLocalPorts(ctx, ports)
+		killProcessName = localPorts
+		processParameter = "local-port"
+	}
+	if pids == nil || len(pids) == 0 {
+		return spec.ResponseFailWithFlags(spec.ParameterInvalidProName, processParameter, killProcessName)
+	}
+	return nil
 }

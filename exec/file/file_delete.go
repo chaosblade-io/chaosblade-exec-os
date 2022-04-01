@@ -22,8 +22,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"path"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
@@ -90,11 +90,6 @@ func (f *FileRemoveActionExecutor) Exec(uid string, ctx context.Context, model *
 		return response
 	}
 
-	if f.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
-	}
-
 	filepath := model.ActionFlags["filepath"]
 
 	force := model.ActionFlags["force"] == "true"
@@ -104,7 +99,7 @@ func (f *FileRemoveActionExecutor) Exec(uid string, ctx context.Context, model *
 	}
 
 	if !exec.CheckFilepathExists(ctx, f.channel, filepath) {
-		util.Errorf(uid, util.GetRunFuncName(), fmt.Sprintf("`%s`: file does not exist", filepath))
+		log.Errorf(ctx,"`%s`: file does not exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 

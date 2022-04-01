@@ -19,14 +19,9 @@ package process
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
-
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const KillProcessBin = "chaos_killprocess"
@@ -116,97 +111,17 @@ func (kpe *KillProcessExecutor) Name() string {
 }
 
 func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	if kpe.channel == nil {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ChannelNil.Msg)
-		return spec.ResponseFailWithFlags(spec.ChannelNil)
+	resp := getPids(ctx, kpe.channel, model, uid)
+	if !resp.Success {
+		return resp
 	}
-	if _, ok := spec.IsDestroy(ctx); ok {
-		return spec.ReturnSuccess(uid)
-	}
-	countValue := model.ActionFlags["count"]
-	process := model.ActionFlags["process"]
-	processCmd := model.ActionFlags["process-cmd"]
-	localPorts := model.ActionFlags["local-port"]
+	pids := resp.Result.(string)
 	signal := model.ActionFlags["signal"]
-	excludeProcess := model.ActionFlags["exclude-process"]
-	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
-	if process == "" && processCmd == "" && localPorts == "" {
-		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd and local-port, less process matcher")
-		return spec.ResponseFailWithFlags(spec.ParameterLess, "process|process-cmd|local-port")
+	if signal == "" {
+		log.Errorf(ctx, "less signal flag value")
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "signal")
 	}
-
-	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
-	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
-	if !ignoreProcessNotFound {
-		if response := checkProcessInvalid(uid, process, processCmd, localPorts, ctx, kpe.channel); response != nil {
-			return response
-		}
-	}
-	flags := fmt.Sprintf("--debug=%t", util.Debug)
-	if countValue != "" {
-		count, err := strconv.Atoi(countValue)
-		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterIllegal.Sprintf("count", countValue, err))
-			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", countValue, err)
-		}
-		flags = fmt.Sprintf("%s --count %d", flags, count)
-	}
-	if process != "" {
-		flags = fmt.Sprintf(`%s --process "%s"`, flags, process)
-	} else if processCmd != "" {
-		flags = fmt.Sprintf(`%s --process-cmd "%s"`, flags, processCmd)
-	} else if localPorts != "" {
-		flags = fmt.Sprintf(`%s --local-port "%s"`, flags, localPorts)
-	}
-	if signal != "" {
-		flags = fmt.Sprintf(`%s --signal %s`, flags, signal)
-	}
-	if excludeProcess != "" {
-		flags = fmt.Sprintf(`%s --exclude-process %s`, flags, excludeProcess)
-	}
-	if ignoreProcessNotFound {
-		flags = fmt.Sprintf(`%s --ignore-not-found=%t`, flags, ignoreProcessNotFound)
-	}
-
-	var pids []string
-	var err error
-	var killProcessName string
-	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
-	if process != "" {
-		pids, err = kpe.channel.GetPidsByProcessName(process, ctx)
-		if err != nil {
-			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get pids by processname err, %v", err))
-		}
-		killProcessName = process
-	} else if processCmd != "" {
-		pids, err = kpe.channel.GetPidsByProcessCmdName(processCmd, ctx)
-		if err != nil {
-			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get pids by processcmdname err, %v", err))
-		}
-		killProcessName = processCmd
-	} else if localPorts != "" {
-		ports, err := util.ParseIntegerListToStringSlice("local-port", localPorts)
-		if err != nil {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("illegal parameter local-port, %v", err))
-		}
-		pids, err = kpe.channel.GetPidsByLocalPorts(ctx, ports)
-		if err != nil {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("illegal parameter ports, %v", err))
-		}
-	}
-	if pids == nil || len(pids) == 0 {
-		if ignoreProcessNotFound {
-			return spec.Success()
-		}
-		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("%s process not found", killProcessName))
-	}
-	count, _ := strconv.Atoi(countValue)
-	// remove duplicates
-	pids = util.RemoveDuplicates(pids)
-	if count > 0 && len(pids) > count {
-		pids = pids[:count]
-	}
-	return kpe.channel.Run(ctx, "kill", fmt.Sprintf("-%s %s", signal, strings.Join(pids, " ")))
+	return kpe.channel.Run(ctx, "kill", fmt.Sprintf("-%s %s", signal, pids))
 }
 
 func (kpe *KillProcessExecutor) SetChannel(channel spec.Channel) {

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"path"
 	"strings"
 
@@ -143,18 +144,18 @@ func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, mode
 	}
 	time := model.ActionFlags["time"]
 	if time == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("time"))
+		log.Errorf(ctx, "time is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "time")
 	}
 	syscallName := model.ActionFlags["syscall-name"]
 	if syscallName == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("syscall-name"))
+		log.Errorf(ctx, "syscall-name is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "syscall-name")
 	}
 
 	delay_loc_flag = model.ActionFlags["delay-loc"]
 	if delay_loc_flag == "" {
-		util.Errorf(uid, util.GetRunFuncName(), spec.ParameterLess.Sprintf("delay-loc"))
+		log.Errorf(ctx,"delay-loc is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "delay-loc")
 	}
 	first_flag = model.ActionFlags["first"]

@@ -23,10 +23,16 @@ import (
 	"time"
 )
 
-func getUsed(ctx context.Context, cpuCount int) float64 {
-	totalCpuPercent, err := cpu.Percent(time.Second, false)
+func getUsed(ctx context.Context, precpu bool, cpuIndex int) float64 {
+	totalCpuPercent, err := cpu.Percent(time.Second, precpu)
 	if err != nil {
 		log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
+	}
+	if precpu {
+		if cpuIndex > len(totalCpuPercent){
+			log.Fatalf(ctx, "illegal cpu index %d", cpuIndex)
+		}
+		return totalCpuPercent[cpuIndex]
 	}
 	return totalCpuPercent[0]
 }

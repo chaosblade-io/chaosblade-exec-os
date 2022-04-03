@@ -89,6 +89,11 @@ blade create cpu load --cpu-percent 60`,
 					Required: false,
 				},
 				&spec.ExpFlag{
+					Name:     "cpu-index",
+					Desc:     "cpu index, user unavailable!",
+					Required: false,
+				},
+				&spec.ExpFlag{
 					Name:     "climb-time",
 					Desc:     "durations(s) to climb",
 					Required: false,
@@ -211,7 +216,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-count", cpuCountStr, "it must be a positive integer")
 			}
 		}
-		if cpuCount <= 0 || int(cpuCount) > runtime.NumCPU() {
+		if cpuCount <= 0 || cpuCount > runtime.NumCPU() {
 			cpuCount = runtime.NumCPU()
 		}
 	}
@@ -232,20 +237,22 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 
 	ctx = context.WithValue(ctx, "cgroup-root", model.ActionFlags["cgroup-root"])
 
-	return ce.start(ctx, uid, cpuList, cpuCount, cpuPercent, climbTime)
+	return ce.start(ctx, cpuList, cpuCount, cpuPercent, climbTime, model.ActionFlags["cpu-index"])
 }
 
 // start burn cpu
-func (ce *cpuExecutor) start(ctx context.Context, uid, cpuList string, cpuCount int, cpuPercent int, climbTime int) *spec.Response {
-	ce.channel.GetScriptPath()
-
+func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuPercent, climbTime int, cpuIndexStr string) *spec.Response {
+	ctx = context.WithValue(ctx, "cpuCount", cpuCount)
 	if cpuList != "" {
-		cores := strings.Split(cpuList, ",")
-
+		cores, err := util.ParseIntegerListToStringSlice("cpu-list", cpuList)
+		if err != nil {
+			log.Errorf(ctx, "`%s`: cpu-list is illegal, %s", cpuList, err.Error())
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-list", cpuList, err.Error())
+		}
 		for _, core := range cores {
 
-			args := fmt.Sprintf(`%s create cpu fullload --cpu-count 1 --cpu-percent %d --climb-time %d`,
-				os.Args[0], cpuPercent, climbTime)
+			args := fmt.Sprintf(`%s create cpu fullload --cpu-count 1 --cpu-percent %d --climb-time %d --cpu-index %s --uid %s`,
+				os.Args[0], cpuPercent, climbTime, core, ctx.Value(spec.Uid))
 
 			args = fmt.Sprintf("-c %s %s", core, args)
 			argsArray := strings.Split(args, " ")
@@ -253,39 +260,52 @@ func (ce *cpuExecutor) start(ctx context.Context, uid, cpuList string, cpuCount 
 			command.SysProcAttr = &syscall.SysProcAttr{}
 
 			if err := command.Start(); err != nil {
-				sprintf := fmt.Sprintf("taskset exec failed, %v", err)
-				return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+				return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("taskset exec failed, %v", err))
 			}
 		}
+		return spec.ReturnSuccess(ctx.Value(spec.Uid))
 	}
 
 	runtime.GOMAXPROCS(cpuCount)
-	log.Debugf(ctx,"cpu counts: %d", cpuCount)
+	log.Debugf(ctx, "cpu counts: %d", cpuCount)
 	slopePercent := float64(cpuPercent)
-	slope(ctx, cpuPercent, climbTime, slopePercent, cpuCount)
+
+	var cpuIndex int
+	precpu := false
+	if cpuIndexStr != "" {
+		precpu = true
+		var err error
+		cpuIndex, err = strconv.Atoi(cpuIndexStr)
+		if err != nil {
+			log.Errorf(ctx, "`%s`: cpu-index is illegal, cpu-index value must be a positive integer", cpuIndexStr)
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-index", cpuIndexStr, "it must be a positive integer")
+		}
+	}
+
+	slope(ctx, cpuPercent, climbTime, slopePercent, precpu, cpuIndex)
 
 	quota := make(chan int64)
 	for i := 0; i < cpuCount; i++ {
-		go burn(ctx, quota, slopePercent, cpuCount, uid)
+		go burn(ctx, quota, slopePercent, precpu, cpuIndex)
 		go func() {
 			for {
-				quota <- getQuota(ctx, slopePercent, cpuCount)
+				quota <- getQuota(ctx, slopePercent, precpu, cpuIndex)
 			}
 		}()
 	}
 
 	for {
-		used := getUsed(ctx, cpuCount)
-		log.Debugf(ctx,"used: %f ", used)
+		used := getUsed(ctx, precpu, cpuIndex)
+		log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
 	}
 }
 
 const period = int64(10000000)
 
-func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent float64, cpuCount int) {
+func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent float64, precpu bool, cpuIndex int) {
 	if climbTime != 0 {
 		var ticker = time.NewTicker(time.Second)
-		slopePercent = getUsed(ctx, cpuPercent)
+		slopePercent = getUsed(ctx, precpu, cpuIndex)
 		var startPercent = float64(cpuPercent) - slopePercent
 		go func() {
 			for range ticker.C {
@@ -299,8 +319,8 @@ func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent floa
 	}
 }
 
-func getQuota(ctx context.Context, slopePercent float64, cpuCount int) int64 {
-	used := getUsed(ctx, cpuCount)
+func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex int) int64 {
+	used := getUsed(ctx, precpu, cpuIndex)
 	dx := 0.0
 	if used > 100 {
 		dx = (slopePercent - used) / 100
@@ -311,8 +331,8 @@ func getQuota(ctx context.Context, slopePercent float64, cpuCount int) int64 {
 	return busy
 }
 
-func burn(ctx context.Context, quota <-chan int64, slopePercent float64, cpuCount int, uid string) {
-	q := getQuota(ctx, slopePercent, cpuCount)
+func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int) {
+	q := getQuota(ctx, slopePercent, precpu, cpuIndex)
 	ds := period - q
 	if ds < 0 {
 		ds = 0

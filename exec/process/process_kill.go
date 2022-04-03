@@ -111,6 +111,10 @@ func (kpe *KillProcessExecutor) Name() string {
 }
 
 func (kpe *KillProcessExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
+	if _, ok := spec.IsDestroy(ctx); ok {
+		return spec.ReturnSuccess(uid)
+	}
+
 	resp := getPids(ctx, kpe.channel, model, uid)
 	if !resp.Success {
 		return resp

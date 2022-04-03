@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 	"strconv"
@@ -61,9 +62,7 @@ func (*ProcessCommandModelSpec) LongDesc() string {
 }
 
 func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid string) (*spec.Response) {
-	if _, ok := spec.IsDestroy(ctx); ok {
-		return spec.ReturnSuccess(uid)
-	}
+
 	countValue := model.ActionFlags["count"]
 	process := model.ActionFlags["process"]
 	processCmd := model.ActionFlags["process-cmd"]
@@ -72,14 +71,14 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 	excludeProcess := model.ActionFlags["exclude-process"]
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	if process == "" && processCmd == "" && localPorts == "" {
-		util.Errorf(uid, util.GetRunFuncName(), "less process、process-cmd and local-port, less process matcher")
+		log.Errorf(ctx, "less process、process-cmd and local-port, less process matcher")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "process|process-cmd|local-port")
 	}
 
 	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
 	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
 	if !ignoreProcessNotFound {
-		if response := checkProcessInvalid(uid, process, processCmd, localPorts, ctx, cl); response != nil {
+		if response := checkProcessInvalid(ctx, process, processCmd, localPorts, cl); response != nil {
 			return response
 		}
 	}
@@ -87,7 +86,7 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 	if countValue != "" {
 		count, err := strconv.Atoi(countValue)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ParameterIllegal.Sprintf("count", countValue, err))
+			log.Errorf(ctx, spec.ParameterIllegal.Sprintf("count", countValue, err))
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", countValue, err)
 		}
 		flags = fmt.Sprintf("%s --count %d", flags, count)
@@ -148,7 +147,7 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 	return spec.ReturnSuccess(strings.Join(pids, " "))
 }
 
-func checkProcessInvalid(uid, process, processCmd, localPorts string, ctx context.Context, cl spec.Channel) *spec.Response {
+func checkProcessInvalid(ctx context.Context, process, processCmd, localPorts string, cl spec.Channel) *spec.Response {
 	var pids []string
 	var killProcessName string
 	var err error
@@ -156,7 +155,7 @@ func checkProcessInvalid(uid, process, processCmd, localPorts string, ctx contex
 	if process != "" {
 		pids, err = cl.GetPidsByProcessName(process, ctx)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ProcessIdByNameFailed.Sprintf(process, err))
+			log.Errorf(ctx, spec.ProcessIdByNameFailed.Sprintf(process, err))
 			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, process, err)
 		}
 		killProcessName = process
@@ -164,7 +163,7 @@ func checkProcessInvalid(uid, process, processCmd, localPorts string, ctx contex
 	} else if processCmd != "" {
 		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
-			util.Errorf(uid, util.GetRunFuncName(), spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
+			log.Errorf(ctx, spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
 			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, processCmd, err)
 		}
 		killProcessName = processCmd

@@ -239,7 +239,7 @@ func preHandleTxqueue(ctx context.Context, netInterface string, cl spec.Channel)
 				if len > 0 {
 					return response
 				} else {
-					util.Infof("the tx_queue_len value for %s is %s", netInterface, txlen)
+					log.Infof(ctx,"the tx_queue_len value for %s is %s", netInterface, txlen)
 				}
 			}
 		}

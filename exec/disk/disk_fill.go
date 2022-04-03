@@ -304,15 +304,17 @@ func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Resp
 	}
 	// kill dd or fallocate process
 	pids, _ := cl.GetPidsByProcessName(fillDataFile, ctx)
-	if pids != nil || len(pids) >= 0 {
-		cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+	if pids != nil && len(pids) >= 0 {
+		resp := cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+		log.Errorf(ctx, "kill fallocate process err: %s", resp.Err)
 	}
 	// kill daemon process
 	//todo
-	//	ctx = context.WithValue(ctx, channel.ProcessKey, fillDiskBin)
+	//ctx = context.WithValue(ctx, channel.ProcessKey, fillDiskBin)
 	pids, _ = cl.GetPidsByProcessName("disk fill", ctx)
-	if pids != nil || len(pids) >= 0 {
-		cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+	if pids != nil && len(pids) >= 0 {
+		resp := cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))
+		log.Errorf(ctx, "kill disk fill daemon process err: %s", resp.Err)
 	}
 	fileName := path.Join(directory, fillDataFile)
 	if exec.CheckFilepathExists(ctx, cl, fileName) {

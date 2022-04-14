@@ -112,9 +112,12 @@ func (*BurnIOExecutor) Name() string {
 	return "burn"
 }
 
+var localChannel = channel.NewLocalChannel()
+
 func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	commands := []string{"rm", "dd"}
-	if response, ok := be.channel.IsAllCommandsAvailable(ctx, commands); !ok {
+	// use local channel
+	if response, ok := localChannel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}
 	directory := model.ActionFlags["path"]
@@ -138,6 +141,7 @@ func (be *BurnIOExecutor) Exec(uid string, ctx context.Context, model *spec.ExpM
 	readExists := model.ActionFlags["read"] == "true"
 	writeExists := model.ActionFlags["write"] == "true"
 	if !readExists && !writeExists {
+		log.Errorf(ctx, "less params, read|write")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "read|write")
 	}
 	size := model.ActionFlags["size"]
@@ -179,7 +183,6 @@ func (be *BurnIOExecutor) SetChannel(channel spec.Channel) {
 
 var readFile = "chaos_burnio.read"
 var writeFile = "chaos_burnio.write"
-var localChannel = channel.NewLocalChannel()
 
 const count = 100
 
@@ -201,7 +204,13 @@ func burnWrite(ctx context.Context, directory, size string, cl spec.Channel) {
 func burnRead(ctx context.Context, directory, size string, cl spec.Channel) {
 	// create a 600M file under the directory
 	tmpFileForRead := path.Join(directory, readFile)
-	_, ddRunningReadArg, _ := getArgs(ctx, localChannel)
+	ddCreateArg, ddRunningReadArg, _ := getArgs(ctx, localChannel)
+	createArgs := fmt.Sprintf(ddCreateArg, tmpFileForRead, 6, count)
+	response := localChannel.Run(ctx, "dd", createArgs)
+	if !response.Success {
+		log.Errorf(ctx, "disk burn read, run dd err: %s", response.Err)
+	}
+
 	for {
 		args := fmt.Sprintf(ddRunningReadArg, tmpFileForRead, size, count)
 		//run with local channel

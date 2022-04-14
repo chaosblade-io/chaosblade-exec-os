@@ -284,23 +284,20 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 
 	slope(ctx, cpuPercent, climbTime, slopePercent, precpu, cpuIndex)
 
-	quota := make(chan int64)
+	quota := make(chan int64, cpuCount)
 	for i := 0; i < cpuCount; i++ {
 		go burn(ctx, quota, slopePercent, precpu, cpuIndex)
-		go func() {
-			for {
-				quota <- getQuota(ctx, slopePercent, precpu, cpuIndex)
-			}
-		}()
 	}
 
 	for {
-		used := getUsed(ctx, precpu, cpuIndex)
-		log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
+		q := getQuota(ctx, slopePercent, precpu, cpuIndex)
+		for i := 0; i < cpuCount; i++ {
+			quota <- q
+		}
 	}
 }
 
-const period = int64(10000000)
+const period = int64(1000000000)
 
 func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent float64, precpu bool, cpuIndex int) {
 	if climbTime != 0 {
@@ -321,12 +318,8 @@ func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent floa
 
 func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex int) int64 {
 	used := getUsed(ctx, precpu, cpuIndex)
-	dx := 0.0
-	if used > 100 {
-		dx = (slopePercent - used) / 100
-	} else {
-		dx = (slopePercent - used) / (100 - used)
-	}
+	log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
+	dx := (slopePercent - used) / 100
 	busy := int64(dx * float64(period))
 	return busy
 }
@@ -339,6 +332,7 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 	}
 	s, _ := time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
 	for {
+		startTime := time.Now().UnixNano()
 		select {
 		case offset := <-quota:
 			q = q + offset
@@ -351,11 +345,10 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 			}
 			s, _ = time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
 		default:
-			startTime := time.Now().UnixNano()
 			for time.Now().UnixNano()-startTime < q {
 			}
-			time.Sleep(s)
 			runtime.Gosched()
+			time.Sleep(s)
 		}
 	}
 }

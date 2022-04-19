@@ -346,5 +346,6 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 
 // stop burn mem
 func (ce *memExecutor) stop(ctx context.Context, burnMemMode string) *spec.Response {
+	ctx = context.WithValue(ctx,"bin", BurnMemBin)
 	return exec.Destroy(ctx, ce.channel, "mem load")
 }

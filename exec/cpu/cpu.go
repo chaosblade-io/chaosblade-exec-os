@@ -355,5 +355,6 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 
 // stop burn cpu
 func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
+	ctx = context.WithValue(ctx, "bin", BurnCpuBin)
 	return exec.Destroy(ctx, ce.channel, "cpu fullload")
 }

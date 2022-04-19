@@ -200,5 +200,6 @@ func (dae *StraceDelayActionExecutor) start(ctx context.Context, pidList string,
 }
 
 func (dae *StraceDelayActionExecutor) stop(ctx context.Context, pidList string, syscallName string) *spec.Response {
+	ctx = context.WithValue(ctx,"bin", StraceDelayBin)
 	return exec.Destroy(ctx, dae.channel, "strace delay")
 }

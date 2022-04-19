@@ -184,6 +184,7 @@ func (f *FileAppendActionExecutor) start(filepath string, content string, count 
 }
 
 func (f *FileAppendActionExecutor) stop(filepath string, ctx context.Context) *spec.Response {
+	ctx = context.WithValue(ctx,"bin", AppendFileBin)
 	return exec.Destroy(ctx, f.channel, "file append")
 }
 

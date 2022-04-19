@@ -174,6 +174,7 @@ func (be *BurnIOExecutor) stop(ctx context.Context, read, write bool, directory 
 			log.Errorf(ctx, "clean write file: %s", resp.Err)
 		}
 	}
+	ctx = context.WithValue(ctx, "bin", BurnIOBin)
 	return exec.Destroy(ctx, be.channel, "disk burn")
 }
 

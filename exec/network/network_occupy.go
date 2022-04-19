@@ -153,6 +153,7 @@ func (oae *OccupyActionExecutor) start(port string, ctx context.Context) *spec.R
 }
 
 func (oae *OccupyActionExecutor) stop(port string, ctx context.Context) *spec.Response {
+	ctx = context.WithValue(ctx,"bin", OccupyNetworkBin)
 	return exec.Destroy(ctx, oae.channel, "network occupy")
 }
 

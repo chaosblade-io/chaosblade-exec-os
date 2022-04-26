@@ -109,9 +109,9 @@ func (spe *StopProcessExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 	pids := resp.Result.(string)
 	if _, ok := spec.IsDestroy(ctx); ok {
-		return spe.channel.Run(ctx, "kill", fmt.Sprintf("-STOP %s", pids))
-	} else {
 		return spe.channel.Run(ctx, "kill", fmt.Sprintf("-CONT %s", pids))
+	} else {
+		return spe.channel.Run(ctx, "kill", fmt.Sprintf("-STOP %s", pids))
 	}
 }
 

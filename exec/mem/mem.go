@@ -178,7 +178,7 @@ func (ce *memExecutor) SetChannel(channel spec.Channel) {
 const (
 	//processOOMScoreAdj = "/proc/%s/oom_score_adj"
 	//oomMinScore        = "-1000"
-	processOOMAdj = "/proc/%s/oom_adj"
+	processOOMAdj = "/proc/%d/oom_adj"
 	oomMinAdj     = "-17"
 )
 
@@ -300,6 +300,8 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 			if err := ioutil.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil {
 				log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj", burnMemMode)
 			}
+		} else {
+			log.Errorf(ctx, "score adjust file: %s not exists", scoreAdjFile)
 		}
 	}
 

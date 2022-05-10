@@ -100,6 +100,8 @@ func (ns *NetworkDnsExecutor) Exec(uid string, ctx context.Context, model *spec.
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return ns.stop(ctx, domain, ip)
+	} else if _, ok := spec.IsVerify(ctx); ok {
+		return ns.verify(ctx, domain, ip)
 	}
 
 	return ns.start(ctx, domain, ip)
@@ -131,6 +133,14 @@ func (ns *NetworkDnsExecutor) stop(ctx context.Context, domain, ip string) *spec
 		return response
 	}
 	return ns.channel.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, tmpHosts))
+}
+
+func (ns *NetworkDnsExecutor) verify(ctx context.Context, domain, ip string) *spec.Response {
+	response := ns.channel.Run(ctx, "ping", fmt.Sprintf(`%s -c 1 | grep -q "(%s)"`, domain, ip))
+	if !response.Success {
+		return spec.ResponseFailWithFlags(spec.DnsSelfVerifyFailed, domain, ip)
+	}
+	return spec.Success()
 }
 
 func (ns *NetworkDnsExecutor) SetChannel(channel spec.Channel) {

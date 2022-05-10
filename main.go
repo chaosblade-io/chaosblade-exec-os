@@ -101,7 +101,7 @@ func main() {
 		}
 
 		ctx := context.Background()
-		if mode != spec.Create && mode != spec.Destroy {
+		if mode != spec.Create && mode != spec.Destroy && mode != spec.Verify {
 			exitAndPrint(spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("invalid parameter, %v", args)), 0)
 		}
 
@@ -113,6 +113,8 @@ func main() {
 		ctx = context.WithValue(ctx, spec.Uid, uid)
 		if mode == spec.Destroy {
 			ctx = spec.SetDestroyFlag(ctx, uid)
+		} else if mode == spec.Verify {
+			ctx = spec.SetVerifyFlag(ctx, uid)
 		}
 
 		if expModel.ActionFlags[model.DebugFlag.Name] == spec.True {

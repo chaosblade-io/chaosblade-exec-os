@@ -56,7 +56,7 @@ func NewOccupyActionSpec() spec.ExpActionCommandSpec {
 					Desc:     "cgroup root path, default value /sys/fs/cgroup",
 					NoArgs:   false,
 					Required: false,
-					Default: "/sys/fs/cgroup",
+					Default:  "/sys/fs/cgroup",
 				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
@@ -110,11 +110,13 @@ func (oae *OccupyActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	}
 	port := model.ActionFlags["port"]
 	if port == "" {
-		log.Errorf(ctx,"port is nil")
+		log.Errorf(ctx, "port is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "port")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return oae.stop(port, ctx)
+	} else if _, ok := spec.IsVerify(ctx); ok {
+		return oae.verify(port, ctx)
 	}
 	force := model.ActionFlags["force"]
 	if force == "true" {
@@ -153,8 +155,18 @@ func (oae *OccupyActionExecutor) start(port string, ctx context.Context) *spec.R
 }
 
 func (oae *OccupyActionExecutor) stop(port string, ctx context.Context) *spec.Response {
-	ctx = context.WithValue(ctx,"bin", OccupyNetworkBin)
+	ctx = context.WithValue(ctx, "bin", OccupyNetworkBin)
 	return exec.Destroy(ctx, oae.channel, "network occupy")
+}
+
+func (oae *OccupyActionExecutor) verify(port string, ctx context.Context) *spec.Response {
+	// netstat -tanp | grep 3306 | grep chaos_os
+	response := oae.channel.Run(ctx, "netstat", fmt.Sprintf(`-tuanp | awk '{print $4,$7}' | grep ":%s" | head -n 1 | grep -q "%s\|%s"`,
+		port, OccupyNetworkBin, "chaos_os"))
+	if !response.Success {
+		return spec.ResponseFailWithFlags(spec.OccupySelfVerifyFailed, port)
+	}
+	return spec.Success()
 }
 
 func (oae *OccupyActionExecutor) SetChannel(channel spec.Channel) {

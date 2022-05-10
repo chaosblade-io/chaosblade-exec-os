@@ -27,6 +27,7 @@ func NewNetworkCommandSpec() spec.ExpModelCommandSpec {
 				NewDropActionSpec(),
 				NewDnsActionSpec(),
 				NewOccupyActionSpec(),
+				NewPingActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},

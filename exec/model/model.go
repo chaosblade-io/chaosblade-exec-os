@@ -61,6 +61,7 @@ func GetSSHExpFlags() []spec.ExpFlagSpec {
 		exec.BladeRelease,
 		exec.OverrideBladeRelease,
 		exec.InstallPath,
+		exec.BladeTgzCheckSize,
 	}
 	return flags
 }

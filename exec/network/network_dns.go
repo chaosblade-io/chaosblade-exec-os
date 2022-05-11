@@ -19,11 +19,15 @@ package network
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/network/tc"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
+
+const sep = ","
 
 type DnsActionSpec struct {
 	spec.BaseExpActionCommandSpec
@@ -109,6 +113,7 @@ const hosts = "/etc/hosts"
 const tmpHosts = "/tmp/chaos-hosts.tmp"
 
 func (ns *NetworkDnsExecutor) start(ctx context.Context, domain, ip string) *spec.Response {
+	domain = strings.ReplaceAll(domain, sep, " ")
 	dnsPair := createDnsPair(domain, ip)
 	response := ns.channel.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
 	if response.Success {
@@ -118,6 +123,7 @@ func (ns *NetworkDnsExecutor) start(ctx context.Context, domain, ip string) *spe
 }
 
 func (ns *NetworkDnsExecutor) stop(ctx context.Context, domain, ip string) *spec.Response {
+	domain = strings.ReplaceAll(domain, sep, " ")
 	dnsPair := createDnsPair(domain, ip)
 	response := ns.channel.Run(ctx, "grep", fmt.Sprintf(`-q "%s" %s`, dnsPair, hosts))
 	if !response.Success {

@@ -28,6 +28,8 @@ func NewNetworkCommandSpec() spec.ExpModelCommandSpec {
 				NewDnsActionSpec(),
 				NewOccupyActionSpec(),
 				NewPingActionSpec(),
+				NewListenActionSpec(),
+				NewSendActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},

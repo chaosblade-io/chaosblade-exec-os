@@ -34,6 +34,8 @@ func NewNetworkCommandSpec() spec.ExpModelCommandSpec {
 				tc.NewReorderActionSpec(),
 				NewOccupyActionSpec(),
 				NewPingActionSpec(),
+				NewListenActionSpec(),
+				NewSendActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},

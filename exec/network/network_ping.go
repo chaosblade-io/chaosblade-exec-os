@@ -52,7 +52,7 @@ func NewPingActionSpec() spec.ExpActionCommandSpec {
 				},
 				&spec.ExpFlag{
 					Name:     "type",
-					Desc:     "Type",
+					Desc:     "Type, Optional value: loss, duplicate, reorder, corrupt, delay",
 					Required: true,
 				},
 				&spec.ExpFlag{

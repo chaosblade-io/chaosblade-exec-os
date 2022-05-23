@@ -29,13 +29,23 @@ var cl = channel.NewLocalChannel()
 
 // stop hang process
 func Destroy(ctx context.Context, c spec.Channel, action string) *spec.Response {
-	ctx = context.WithValue(ctx, channel.ProcessKey, action)
+	suid := ctx.Value(spec.Uid)
+	/* If suid is specified, it will be deleted exactly 
+	 * according to suid, otherwise it will be based on action. */
+	if suid != nil && suid != spec.UnknownUid {
+		ctx = context.WithValue(ctx, channel.ProcessKey, suid)
+	} else {
+		ctx = context.WithValue(ctx, channel.ProcessKey, action)
+	}
+
+	// Adapt to old versions.
 	originalBin := ctx.Value("bin")
 	pids := make([]string, 0)
 	if originalBin != nil {
 		originalPids, _ := cl.GetPidsByProcessName(originalBin.(string), ctx)
 		pids = append(pids, originalPids...)
 	}
+
 	ps, _ := cl.GetPidsByProcessName("chaos_os", ctx)
 	pids = append(ps, pids...)
 	if pids == nil || len(pids) == 0 {

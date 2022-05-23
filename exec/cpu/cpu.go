@@ -28,6 +28,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	//"math/rand"
+	"math"
+	"unsafe"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
@@ -37,6 +40,11 @@ import (
 )
 
 const BurnCpuBin = "chaos_burncpu"
+
+type StressCpuMethodInfo struct {
+	name  			string			/* human readable form of stressor */
+	stress 			func(string) 	/* the cpu method function */
+}
 
 type CpuCommandModelSpec struct {
 	spec.BaseExpModelCommandSpec
@@ -285,6 +293,7 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	slope(ctx, cpuPercent, climbTime, slopePercent, precpu, cpuIndex)
 
 	quota := make(chan int64, cpuCount)
+	fmt.Printf("cpucount : %d\n", cpuCount)
 	for i := 0; i < cpuCount; i++ {
 		go burn(ctx, quota, slopePercent, precpu, cpuIndex)
 	}
@@ -321,6 +330,7 @@ func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex i
 	log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
 	dx := (slopePercent - used) / 100
 	busy := int64(dx * float64(period))
+	fmt.Println("((((((((((((", used, dx, busy, cpuIndex)
 	return busy
 }
 
@@ -330,25 +340,35 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 	if ds < 0 {
 		ds = 0
 	}
-	s, _ := time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
+	fmt.Println(q, ds, slopePercent)
+	//s, _ := time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
 	for {
-		startTime := time.Now().UnixNano()
 		select {
 		case offset := <-quota:
 			q = q + offset
 			if q < 0 {
 				q = 0
 			}
-			ds := period - q
+			ds = period - q
+			fmt.Println("////////////", q, ds, offset)
 			if ds < 0 {
 				ds = 0
 			}
-			s, _ = time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
 		default:
-			for time.Now().UnixNano()-startTime < q {
+			// Execute (100*q/(q+s))% of calculations in one second.
+			cpuPercent := float64(q)/float64(q+ds)*100
+			// It is possible that quota gets two values when stress_cpu is not 
+			// started, so that the value of q is always greater than slopePercent.
+			if cpuPercent <= 0 || cpuPercent > slopePercent {
+				q = getQuota(ctx, slopePercent, precpu, cpuIndex)
+				ds = period - q
+				cpuPercent = float64(q)/float64(q+ds)*100
+				fmt.Println("xiufu: ", q, ds)
 			}
-			runtime.Gosched()
-			time.Sleep(s)
+			fmt.Println("------------", q, ds, cpuPercent, float64(q)/float64(q+ds)*100)
+			stress_cpu(time.Duration(q+ds), cpuPercent)
+			//stress_cpu(time.Second, cpuPercent)
+			//runtime.Gosched()
 		}
 	}
 }
@@ -357,4 +377,212 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
 	ctx = context.WithValue(ctx, "bin", BurnCpuBin)
 	return exec.Destroy(ctx, ce.channel, "cpu fullload")
+}
+
+var cpu_methods = []StressCpuMethodInfo {
+	{ "ackermann", 	stress_cpu_ackermann,	},
+	{ "bitops",		stress_cpu_bitops,		},
+	{ "collatz",	stress_cpu_collatz,		},
+	// { "crc16",		stress_cpu_crc16,		},
+	{ "factorial",	stress_cpu_factorial,	},
+}
+
+func ackermann(m uint32, n uint32) uint32 {
+	if m == 0 {
+		return n + 1
+	} else if n == 0 {
+		return ackermann(m - 1, 1)
+	} else {
+		return ackermann(m - 1, ackermann(m, n - 1))
+	}
+}
+
+func stress_cpu_ackermann(name string) {
+	a := ackermann(3, 7);
+
+	if a != 0x3fd {
+		fmt.Printf("%s: ackermann error detected, ackermann(3,9) miscalculated\n", name);
+	}
+}
+
+func stress_cpu_bitops(name string) {
+	var i_sum uint32 = 0
+	var sum uint32 = 0x8aac0aab
+
+	for i := 0; i < 16384; i++ {
+		{
+			var r uint32 = uint32(i)
+			var v uint32 = uint32(i)
+			var s uint32 = uint32((unsafe.Sizeof(v) * 8) - 1)
+			for v >>= 1; v != 0; v, s = v>>1, s-1 {
+				r <<= 1
+				r |= v & 1
+			}
+			r <<= s
+			i_sum += r
+		}
+		{
+			/* parity check */
+			var v uint32 = uint32(i)
+
+			v ^= v >> 16
+			v ^= v >> 8
+			v ^= v >> 4
+			v &= 0xf
+			i_sum += (0x6996 >> v) & 1
+		}
+		{
+			/* Brian Kernighan count bits */
+			var v uint32 = uint32(i)
+			var j uint32 = uint32(i)
+
+			for j = 0; v != 0; j++ {
+				v &= v - 1
+			}
+			i_sum += j
+		}
+		{
+			/* round up to nearest highest power of 2 */
+			var v uint32 = uint32(i - 1)
+
+			v |= v >> 1
+			v |= v >> 2
+			v |= v >> 4
+			v |= v >> 8
+			v |= v >> 16
+			i_sum += v
+		}
+	}
+	if i_sum != sum {
+		fmt.Printf("%s: bitops error detected, failed bitops operations\n", name)
+	}
+}
+
+func stress_cpu_collatz(name string) {
+	var n uint64 = 989345275647
+	var i int
+	for i = 0; n != 1; i++ {
+		if n&1 != 0 {
+			n = (3 * n) + 1
+		} else {
+			n = n / 2
+		}
+	}
+
+	if i != 1348 {
+		fmt.Printf("%s: error detected, failed collatz progression\n", name)
+	}
+}
+
+// func stress_cpu_crc16(name string) {
+// 	randBytes := make([]byte, 1024)
+// 	rand.Read(randBytes)
+
+// 	for i := 1; i < len(randBytes); i++ {
+// 		ccitt_crc16([]uint8(randBytes), i)
+// 	}
+// }
+
+// func ccitt_crc16(data *uint8, n int) uint16 {
+// 	/*
+// 	 *  The CCITT CRC16 polynomial is
+// 	 *     16    12    5
+// 	 *    x   + x   + x  + 1
+// 	 *
+// 	 *  which is 0x11021, but to make the computation
+// 	 *  simpler, this has been reversed to 0x8408 and
+// 	 *  the top bit ignored..
+// 	 *  We can get away with a 17 bit polynomial
+// 	 *  being represented by a 16 bit value because
+// 	 *  we are assuming the top bit is always set.
+// 	 */
+// 	var polynomial uint16 = 0x8408
+// 	var crc uint16 = 0xffff
+
+// 	if n == 0 {
+// 		return 0
+// 	}
+
+// 	for ; n!=0; n-- {
+// 		data += 1
+// 		var val uint8 = (uint16(0xff) & *data)
+// 		for i := 8; i; i, val = i-1, val>>1 {
+// 			var do_xor bool = 1 & (val ^ crc)
+// 			crc >>= 1;
+// 			var tmp uint16 = 0
+// 			if do_xor {
+// 				tmp = polynomial
+// 			}
+// 			crc ^= tmp
+// 		}
+// 	}
+
+// 	crc = ^crc
+// 	return ((uint16)(crc << 8)) | (crc >> 8);
+// }
+
+func stress_cpu_factorial(name string) {
+	var f float64 = 1.0
+	var precision float64 = 1.0e-6
+
+	for n := 1; n < 150; n++ {
+		np1 := float64(n + 1)
+		fact := math.Round(math.Exp(math.Gamma(np1)))
+		var dn float64
+
+		f *= float64(n);
+
+		/* Stirling */
+		if (f - fact) / fact > precision {
+			fmt.Println("%s: Stirling's approximation of factorial(%d) out of range\n",
+				name, n);
+		}
+
+		/* Ramanujan */
+		dn = float64(n);
+		fact = math.SqrtPi * math.Pow((dn / float64(math.E)), dn)
+		fact *= math.Pow((((((((8 * dn) + 4)) * dn) + 1) * dn) + 1.0/30.0), (1.0/6.0));
+		if ((f - fact) / fact > precision) {
+			fmt.Println("%s: Ramanujan's approximation of factorial(%d) out of range\n",
+				name, n);
+		}
+	}
+}
+
+// Make a single CPU load rate reach cpuPercent% within the time interval.
+// This function can also be used to implement something similar to stress-ng --cpu-load.
+func stress_cpu(interval time.Duration, cpuPercent float64) {
+	bias := 0.0
+	startTime := time.Now().UnixNano()
+	nanoInterval := int64(interval/time.Nanosecond)
+	fmt.Printf("============ nanoInterval[%d]\n", nanoInterval)
+	for {
+		if time.Now().UnixNano() - startTime > nanoInterval {
+			break
+		}
+
+		startTime1 := time.Now().UnixNano()
+		// Loops and methods may be specified later.
+		for i := 0; i < len(cpu_methods); i++ {
+			stress_cpu_method(i)
+		}
+		endTime1 := time.Now().UnixNano()
+		//fmt.Println(startTime1, endTime1, cpuPercent)
+		delay := ((100 - cpuPercent) * float64(endTime1 - startTime1) / cpuPercent)
+		//fmt.Printf("delay : [%f], bias : [%f]\n", delay, bias)
+		delay -= bias
+		if delay <= 0.0 {
+			bias = 0.0;
+		} else {
+			startTime2 := time.Now().UnixNano()
+			time.Sleep(time.Duration(delay) * time.Nanosecond)
+			endTime2 := time.Now().UnixNano()
+			bias = float64(endTime2 - startTime2) - delay
+		}
+	}
+}
+
+// No need to perform subscript checking.
+func stress_cpu_method(method int) {
+	cpu_methods[method].stress("lizhaolong");
 }

@@ -337,7 +337,9 @@ func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex i
 
 // The root cause of the complexity is that getUsed requires sleep.
 func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int) {
+	var beforeCpuPercent float64 = 0
 	q := getQuota(ctx, slopePercent, precpu, cpuIndex)
+	cpu.Percent(time.Second, true)
 	ds := period - q
 	if ds < 0 {
 		ds = 0
@@ -356,28 +358,44 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 				ds = 0
 			}
 		default:
-			// Execute (100*q/(q+s))% of calculations in one second.
 			cpuPercent := float64(q)/float64(q+ds)*100
-			// It is possible that quota gets two values when stress_cpu is not 
-			// started, so that the value of q is always greater than slopePercent.
-			if cpuPercent <= 0 || cpuPercent > slopePercent {
+			// When the first case executes with a lag, it causes q 
+			// to be increased by multiple offsets, resulting in a 
+			// higher CPU load than expectedPercent.
+			// cpuPercent cannot be less than zero.
+			fmt.Println("+++++++++++", cpuPercent)
+			if cpuPercent == 0 || cpuPercent > slopePercent {
 				totalCpuPercent, err := cpu.Percent(0, true)
 				if err != nil {
 					log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
-				}
-				if totalCpuPercent[cpuIndex] >= slopePercent {
-					fmt.Println("bigger than slopePercent")
 					continue
 				}
-				cpuPercent = slopePercent - totalCpuPercent[cpuIndex]
+				if totalCpuPercent[cpuIndex] >= slopePercent {
+					fmt.Println("current CPU load is higher than slopePercent.")
+					log.Debugf(ctx, "current CPU load is higher than slopePercent.")
+					// When the specified CPU frequency is greater than the expected CPU 
+					// frequency of chaos_os, we expect the behavior to be that chaos_os 
+					// does not occupy the CPU.
+					time.Sleep(time.Second)
+					cpu.Percent(time.Second, true)
+					continue
+				}
+				other := totalCpuPercent[cpuIndex] - beforeCpuPercent
+				if other < 0 {
+					other = 0
+				}
+				cpuPercent := slopePercent - other
+				if cpuPercent < 0 {
+					cpuPercent = 0
+				}
 				q = int64(cpuPercent/float64(100)*float64(period))
 				ds = period - q
 
-				fmt.Println("xiufu: ", q, ds, cpuPercent, totalCpuPercent[cpuIndex])
+				fmt.Println("xiufu: ", q, ds, cpuPercent, slopePercent, totalCpuPercent[cpuIndex])
 			}
 			fmt.Println("------------", q, ds, cpuPercent, float64(q)/float64(q+ds)*100)
 			stress_cpu(time.Duration(q+ds), cpuPercent)
-			//runtime.Gosched()
+			beforeCpuPercent = cpuPercent
 		}
 	}
 }
@@ -564,7 +582,6 @@ func stress_cpu(interval time.Duration, cpuPercent float64) {
 	bias := 0.0
 	startTime := time.Now().UnixNano()
 	nanoInterval := int64(interval/time.Nanosecond)
-	fmt.Printf("============ nanoInterval[%d]\n", nanoInterval)
 	for {
 		if time.Now().UnixNano() - startTime > nanoInterval {
 			break

@@ -34,6 +34,7 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+	"github.com/shirou/gopsutil/cpu"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	_ "go.uber.org/automaxprocs/maxprocs"
@@ -334,6 +335,7 @@ func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex i
 	return busy
 }
 
+// The root cause of the complexity is that getUsed requires sleep.
 func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int) {
 	q := getQuota(ctx, slopePercent, precpu, cpuIndex)
 	ds := period - q
@@ -341,7 +343,6 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 		ds = 0
 	}
 	fmt.Println(q, ds, slopePercent)
-	//s, _ := time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
 	for {
 		select {
 		case offset := <-quota:
@@ -360,14 +361,22 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 			// It is possible that quota gets two values when stress_cpu is not 
 			// started, so that the value of q is always greater than slopePercent.
 			if cpuPercent <= 0 || cpuPercent > slopePercent {
-				q = getQuota(ctx, slopePercent, precpu, cpuIndex)
+				totalCpuPercent, err := cpu.Percent(0, true)
+				if err != nil {
+					log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
+				}
+				if totalCpuPercent[cpuIndex] >= slopePercent {
+					fmt.Println("bigger than slopePercent")
+					continue
+				}
+				cpuPercent = slopePercent - totalCpuPercent[cpuIndex]
+				q = int64(cpuPercent/float64(100)*float64(period))
 				ds = period - q
-				cpuPercent = float64(q)/float64(q+ds)*100
-				fmt.Println("xiufu: ", q, ds)
+
+				fmt.Println("xiufu: ", q, ds, cpuPercent, totalCpuPercent[cpuIndex])
 			}
 			fmt.Println("------------", q, ds, cpuPercent, float64(q)/float64(q+ds)*100)
 			stress_cpu(time.Duration(q+ds), cpuPercent)
-			//stress_cpu(time.Second, cpuPercent)
 			//runtime.Gosched()
 		}
 	}

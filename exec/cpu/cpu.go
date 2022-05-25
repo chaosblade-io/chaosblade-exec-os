@@ -28,7 +28,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	//"math/rand"
+	"math/rand"
 	"math"
 	"unsafe"
 
@@ -38,6 +38,8 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	_ "go.uber.org/automaxprocs/maxprocs"
+	"github.com/mjibson/go-dsp/fft"
+	"github.com/howeyc/crc16"
 )
 
 const BurnCpuBin = "chaos_burncpu"
@@ -419,8 +421,11 @@ var cpu_methods = []StressCpuMethodInfo {
 	{ "ackermann", 	stress_cpu_ackermann,	},
 	{ "bitops",		stress_cpu_bitops,		},
 	{ "collatz",	stress_cpu_collatz,		},
-	// { "crc16",		stress_cpu_crc16,		},
+	{ "crc16",		stress_cpu_crc16,		},
 	{ "factorial",	stress_cpu_factorial,	},
+	{ "fft", 		stress_cpu_fft,         },
+	//{ "pi", 		stress_cpu_pi,			}, 
+	{ "fibonacci",	stress_cpu_fibonacci,	},
 }
 
 func ackermann(m uint32, n uint32) uint32 {
@@ -510,52 +515,13 @@ func stress_cpu_collatz(name string) {
 	}
 }
 
-// func stress_cpu_crc16(name string) {
-// 	randBytes := make([]byte, 1024)
-// 	rand.Read(randBytes)
-
-// 	for i := 1; i < len(randBytes); i++ {
-// 		ccitt_crc16([]uint8(randBytes), i)
-// 	}
-// }
-
-// func ccitt_crc16(data *uint8, n int) uint16 {
-// 	/*
-// 	 *  The CCITT CRC16 polynomial is
-// 	 *     16    12    5
-// 	 *    x   + x   + x  + 1
-// 	 *
-// 	 *  which is 0x11021, but to make the computation
-// 	 *  simpler, this has been reversed to 0x8408 and
-// 	 *  the top bit ignored..
-// 	 *  We can get away with a 17 bit polynomial
-// 	 *  being represented by a 16 bit value because
-// 	 *  we are assuming the top bit is always set.
-// 	 */
-// 	var polynomial uint16 = 0x8408
-// 	var crc uint16 = 0xffff
-
-// 	if n == 0 {
-// 		return 0
-// 	}
-
-// 	for ; n!=0; n-- {
-// 		data += 1
-// 		var val uint8 = (uint16(0xff) & *data)
-// 		for i := 8; i; i, val = i-1, val>>1 {
-// 			var do_xor bool = 1 & (val ^ crc)
-// 			crc >>= 1;
-// 			var tmp uint16 = 0
-// 			if do_xor {
-// 				tmp = polynomial
-// 			}
-// 			crc ^= tmp
-// 		}
-// 	}
-
-// 	crc = ^crc
-// 	return ((uint16)(crc << 8)) | (crc >> 8);
-// }
+func stress_cpu_crc16(name string) {
+	var randomBuffer [4096]byte
+	rand.Read(randomBuffer[:])
+	for i := 0; i < 8; i++ {
+		crc16.ChecksumIBM(randomBuffer[:])
+	}
+}
 
 func stress_cpu_factorial(name string) {
 	var f float64 = 1.0
@@ -584,6 +550,34 @@ func stress_cpu_factorial(name string) {
 		}
 	}
 }
+
+func stress_cpu_fft(name string) {
+	var buffer [128]float64
+	for i := 0; i < 128; i++ {
+		buffer[i] = float64(i%64)
+	}
+	for i := 0; i < 8; i++ {
+		fft.FFTReal(buffer[:])
+	}
+}
+
+func stress_cpu_fibonacci(name string) {
+	var fn_res uint64 = 0xa94fad42221f2702
+	var f1 uint64 = 1
+	var f2 uint64 = 1
+	var fn uint64 = 1
+
+	for !(fn & 0x8000000000000000 != 0) {
+		fn = f1 + f2
+		f1 = f2
+		f2 = fn
+	}
+
+	if fn_res != fn {
+		fmt.Printf("%s: fibonacci error detected, summation or assignment failure\n", name);
+	}
+}
+
 
 // Make a single CPU load rate reach cpuPercent% within the time interval.
 // This function can also be used to implement something similar to stress-ng --cpu-load.

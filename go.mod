@@ -5,7 +5,9 @@ go 1.13
 require (
 	github.com/chaosblade-io/chaosblade-spec-go v1.5.1-0.20220423030509-6d8dbd90b300
 	github.com/containerd/cgroups v1.0.2-0.20210605143700-23b51209bf7b
+	github.com/howeyc/crc16 v0.0.0-20171223171357-2b2a61e366a6
 	github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c
+	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/shirou/gopsutil v3.21.6+incompatible
 	github.com/tklauser/go-sysconf v0.3.7 // indirect
 	go.uber.org/automaxprocs v1.3.0

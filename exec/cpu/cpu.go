@@ -340,7 +340,7 @@ func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex i
 
 // The root cause of the complexity is that getUsed requires sleep.
 func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int) {
-	var beforeCpuPercent float64 = slopePercent
+	//var beforeCpuPercent float64 = slopePercent
 	q := getQuota(ctx, slopePercent, precpu, cpuIndex)
 	cpu.Percent(0, true)
 	ds := period - q
@@ -371,43 +371,49 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 			// 这个循环是为了处理quota错误的更新q的，假设cpu_percent为70，目前系统负载10%，有两种情况会使得进入此循环
 			// 1. q连续两次被quota更新，然后执行default，offset两次都是60
 			// 2. q先执行一次quota，再执行default，再执行quota，offset两次都是60
-			if cpuPercent > slopePercent {
-				totalCpuPercent, err := cpu.Percent(0, true)
-				if err != nil {
-					log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
-					continue
-				}
-				fmt.Println("sssssssssss", totalCpuPercent[cpuIndex])
-				// 这里其实是一个重试策略，因为这个371行的判断其实是为了防止quota不准的
-				// 如果真的进入这个判断的话有两种情况：
-				// 1. 一数据不准，那么不修改q，ds，直接重试
-				// 2. 确实有其他进程抢占了CPU，q，ds会通过quota修正
-				if totalCpuPercent[cpuIndex] >= slopePercent {
-					// 正常情况也可能跑到这里导致CPU频率下降
-					fmt.Println("current CPU load is higher than slopePercent.", q, ds, cpuPercent)
-					log.Debugf(ctx, "current CPU load is higher than slopePercent.")
-					continue
-				}
-				// 此时我们认为数据可能是正常的，开始基于totalCpuPercent计算q，ds
-				// beforeCpuPercent初始时设置为slopePercent，这可能是不准确的，
-				// 再有其他负载情况时，会造成起始负载较高
-				other := totalCpuPercent[cpuIndex] - beforeCpuPercent
-				if other < 0 {
-					other = 0
-				}
-				cpuPercent := slopePercent - other
-				if cpuPercent < 0 {
-					cpuPercent = 0
-				}
-				q = int64(cpuPercent/float64(100)*float64(period))
-				ds = period - q
+			// if cpuPercent > slopePercent {
+			// 	totalCpuPercent, err := cpu.Percent(0, true)
+			// 	if err != nil {
+			// 		log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
+			// 		continue
+			// 	}
+			// 	fmt.Println("sssssssssss", totalCpuPercent[cpuIndex])
+			// 	// 这里其实是一个重试策略，因为这个371行的判断其实是为了防止quota不准的
+			// 	// 如果真的进入这个判断的话有两种情况：
+			// 	// 1. 一数据不准，那么不修改q，ds，直接重试
+			// 	// 2. 确实有其他进程抢占了CPU，q，ds会通过quota修正
+			// 	if totalCpuPercent[cpuIndex] >= slopePercent {
+			// 		// 正常情况也可能跑到这里导致CPU频率下降
+			// 		fmt.Println("current CPU load is higher than slopePercent.", q, ds, cpuPercent)
+			// 		log.Debugf(ctx, "current CPU load is higher than slopePercent.")
+			// 		continue
+			// 	}
+			// 	// 此时我们认为数据可能是正常的，开始基于totalCpuPercent计算q，ds
+			// 	// beforeCpuPercent初始时设置为slopePercent，这可能是不准确的，
+			// 	// 再有其他负载情况时，会造成起始负载较高
+			// 	other := totalCpuPercent[cpuIndex] - beforeCpuPercent
+			// 	if other < 0 {
+			// 		other = 0
+			// 	}
+			// 	cpuPercent := slopePercent - other
+			// 	if cpuPercent < 0 {
+			// 		cpuPercent = 0
+			// 	}
+			// 	q = int64(cpuPercent/float64(100)*float64(period))
+			// 	ds = period - q
 
-				fmt.Println("xiufu: ", q, ds, cpuPercent, slopePercent,beforeCpuPercent, totalCpuPercent[cpuIndex])
-			}
+			// 	fmt.Println("xiufu: ", q, ds, cpuPercent, slopePercent,beforeCpuPercent, totalCpuPercent[cpuIndex])
+			// }
 			fmt.Println("------------", q, ds, cpuPercent, float64(q)/float64(q+ds)*100)
+			if cpuPercent > slopePercent {
+				// An easy fix when quota is executed multiple times before default.
+				q = int64(slopePercent/float64(100)*float64(period))
+				ds = period - q
+				fmt.Println("fixed:::::::", q, ds, cpuPercent, float64(q)/float64(q+ds)*100)
+			}
 			// 当cpuPercent为零的时候stress_cpu会跑的很快
 			stress_cpu(time.Duration(q+ds), cpuPercent)
-			beforeCpuPercent = cpuPercent
+			//beforeCpuPercent = cpuPercent
 		}
 	}
 }
@@ -418,6 +424,8 @@ func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
 	return exec.Destroy(ctx, ce.channel, "cpu fullload")
 }
 
+// TODO: Extend richer CPU burn algorithms:
+// floatconversion, gamma, gcd, gray, hamming, hyperbolic, idct...
 var cpu_methods = []StressCpuMethodInfo {
 	{ "ackermann", 	stress_cpu_ackermann,	},
 	{ "bitops",		stress_cpu_bitops,		},

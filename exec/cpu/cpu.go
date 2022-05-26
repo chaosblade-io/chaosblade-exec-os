@@ -282,7 +282,9 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	log.Debugf(ctx, "cpu counts: %d", cpuCount)
 	slopePercent := float64(cpuPercent)
 
-	var cpuIndex int
+	// 默认为零，在底下会用到
+	// 无论percpu是什么，都可以使用cpuindex作为下标
+	var cpuIndex int = 0
 	precpu := false
 	if cpuIndexStr != "" {
 		precpu = true
@@ -301,9 +303,11 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	fmt.Printf("cpucount : %d\n", cpuCount)
 	for i := 0; i < cpuCount; i++ {
 		quotas[i] = make(chan int64)
-		go burn(ctx, quotas[i], slopePercent, precpu, cpuIndex)
+		go burn(ctx, quotas[i], slopePercent, precpu, cpuIndex, cpuCount)
 	}
 
+	// percpu为true的行为是获取指定cpu的负载;percpu为false的行为是获取平均cpu的负载
+	// 把两种情况整合在一个循环中
 	for {
 		q := getQuota(ctx, slopePercent, precpu, cpuIndex)
 		for i := 0; i < cpuCount; i++ {
@@ -332,18 +336,24 @@ func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent floa
 	}
 }
 
+// 如果percpu为true证明指定了cpu-index,否则是cpu-count，
+// getused：percpu为true返回的指定index的比例；false看起来返回的是平均值
 func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex int) int64 {
 	used := getUsed(ctx, precpu, cpuIndex)
 	log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
 	dx := (slopePercent - used) / 100
 	busy := int64(dx * float64(period))
-	fmt.Println("((((((((((((", used, dx, busy, cpuIndex)
+	fmt.Println("((((((((((((", used, dx, busy, cpuIndex, precpu)
 	return busy
 }
 
 // The root cause of the complexity is that getUsed requires sleep.
-func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int) {
+func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int, cpuCount int) {
 	var beforeCpuPercent float64 = slopePercent
+	cpuNum := runtime.NumCPU()
+	if precpu {
+		cpuNum = 1
+	}
 	q := getQuota(ctx, slopePercent, precpu, cpuIndex)
 	cpu.Percent(0, false)
 	ds := period - q
@@ -353,7 +363,7 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 	fmt.Println(q, ds, slopePercent)
 	for {
 		select {
-			// 使用这quota channel有两个问题，一个是数据不准，一个是可能在default之前连续更新两次q，还都不准。
+		// 使用这quota channel有两个问题，一个是数据不准，一个是可能在default之前连续更新两次q，还都不准。
 		case offset := <-quota:
 			q = q + offset
 			fmt.Println("xxxxxxxxxxxx", q, offset)
@@ -375,7 +385,8 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 			// 1. q连续两次被quota更新，然后执行default，offset两次都是60
 			// 2. q先执行一次quota，再执行default，再执行quota，offset两次都是60
 			if cpuPercent > slopePercent {
-				totalCpuPercent, err := cpu.Percent(0, false)
+				// precpu为true，获取对应index频率；否则获取平均频率
+				totalCpuPercent, err := cpu.Percent(0, precpu)
 				if err != nil {
 					log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 					continue
@@ -394,7 +405,13 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 				// 此时我们认为数据可能是正常的，开始基于totalCpuPercent计算q，ds
 				// beforeCpuPercent初始时设置为slopePercent，这可能是不准确的，
 				// 再有其他负载情况时，会造成起始负载较高
-				other := totalCpuPercent[cpuIndex] - beforeCpuPercent
+
+				// 修正值:cpucount * beforeCpuPercent / cpu-num
+				// 上面式子的原因是在cpu-count的情况下totalCpuPercent计算有误
+				// 原本cpu-count个核心的执行被分配到cpu-num上去了
+				// beforeCpuPercent实际上应该是chaos在多核心执行的平均值
+				// notes: cpu-index始终cpuCount等于1,cpuNum始终等于1
+				other := totalCpuPercent[cpuIndex] - beforeCpuPercent*float64(cpuCount/cpuNum)
 				if other < 0 {
 					other = 0
 				}
@@ -405,7 +422,7 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 				q = int64(cpuPercent/float64(100)*float64(period))
 				ds = period - q
 
-				fmt.Println("xiufu: ", q, ds, cpuPercent, slopePercent,beforeCpuPercent, totalCpuPercent[cpuIndex])
+				fmt.Println("xiufu: ", q, ds, cpuPercent, slopePercent,beforeCpuPercent, totalCpuPercent[cpuIndex], other)
 			}
 			fmt.Println("------------", q, ds, cpuPercent, float64(q)/float64(q+ds)*100, slopePercent)
 			// if cpuPercent > slopePercent {

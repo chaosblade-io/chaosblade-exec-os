@@ -19,8 +19,6 @@ package cpu
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"os"
 	os_exec "os/exec"
 	"runtime"
@@ -29,24 +27,27 @@ import (
 	"syscall"
 	"time"
 	"math/rand"
+	"math/big"
 	"math"
 	"unsafe"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"github.com/shirou/gopsutil/cpu"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
-	_ "go.uber.org/automaxprocs/maxprocs"
+
 	"github.com/mjibson/go-dsp/fft"
+	"github.com/shirou/gopsutil/cpu"
 	"github.com/howeyc/crc16"
+	_ "go.uber.org/automaxprocs/maxprocs"
 )
 
 const BurnCpuBin = "chaos_burncpu"
 
 type StressCpuMethodInfo struct {
-	name  			string			/* human readable form of stressor */
-	stress 			func(string) 	/* the cpu method function */
+	name  			string					/* human readable form of stressor */
+	stress 			func(context.Context)	/* the cpu method function */
 }
 
 type CpuCommandModelSpec struct {
@@ -424,7 +425,7 @@ var cpu_methods = []StressCpuMethodInfo {
 	{ "crc16",		stress_cpu_crc16,		},
 	{ "factorial",	stress_cpu_factorial,	},
 	{ "fft", 		stress_cpu_fft,         },
-	//{ "pi", 		stress_cpu_pi,			}, 
+	{ "pi", 		stress_cpu_pi,			}, 
 	{ "fibonacci",	stress_cpu_fibonacci,	},
 }
 
@@ -438,15 +439,15 @@ func ackermann(m uint32, n uint32) uint32 {
 	}
 }
 
-func stress_cpu_ackermann(name string) {
-	a := ackermann(3, 7);
+func stress_cpu_ackermann(ctx context.Context) {
+	a := ackermann(3, 7)
 
 	if a != 0x3fd {
-		fmt.Printf("%s: ackermann error detected, ackermann(3,9) miscalculated\n", name);
+		log.Fatalf(ctx, "ackermann error detected, ackermann(3,9) miscalculated\n")
 	}
 }
 
-func stress_cpu_bitops(name string) {
+func stress_cpu_bitops(ctx context.Context) {
 	var i_sum uint32 = 0
 	var sum uint32 = 0x8aac0aab
 
@@ -495,11 +496,11 @@ func stress_cpu_bitops(name string) {
 		}
 	}
 	if i_sum != sum {
-		fmt.Printf("%s: bitops error detected, failed bitops operations\n", name)
+		log.Fatalf(ctx, "bitops error detected, failed bitops operations\n")
 	}
 }
 
-func stress_cpu_collatz(name string) {
+func stress_cpu_collatz(ctx context.Context) {
 	var n uint64 = 989345275647
 	var i int
 	for i = 0; n != 1; i++ {
@@ -511,11 +512,11 @@ func stress_cpu_collatz(name string) {
 	}
 
 	if i != 1348 {
-		fmt.Printf("%s: error detected, failed collatz progression\n", name)
+		log.Fatalf(ctx, "error detected, failed collatz progression\n")
 	}
 }
 
-func stress_cpu_crc16(name string) {
+func stress_cpu_crc16(ctx context.Context) {
 	var randomBuffer [4096]byte
 	rand.Read(randomBuffer[:])
 	for i := 0; i < 8; i++ {
@@ -523,7 +524,7 @@ func stress_cpu_crc16(name string) {
 	}
 }
 
-func stress_cpu_factorial(name string) {
+func stress_cpu_factorial(ctx context.Context) {
 	var f float64 = 1.0
 	var precision float64 = 1.0e-6
 
@@ -532,26 +533,24 @@ func stress_cpu_factorial(name string) {
 		fact := math.Round(math.Exp(math.Gamma(np1)))
 		var dn float64
 
-		f *= float64(n);
+		f *= float64(n)
 
 		/* Stirling */
 		if (f - fact) / fact > precision {
-			fmt.Println("%s: Stirling's approximation of factorial(%d) out of range\n",
-				name, n);
+			log.Fatalf(ctx, "Stirling's approximation of factorial(%d) out of range\n", n)
 		}
 
 		/* Ramanujan */
-		dn = float64(n);
+		dn = float64(n)
 		fact = math.SqrtPi * math.Pow((dn / float64(math.E)), dn)
-		fact *= math.Pow((((((((8 * dn) + 4)) * dn) + 1) * dn) + 1.0/30.0), (1.0/6.0));
+		fact *= math.Pow((((((((8 * dn) + 4)) * dn) + 1) * dn) + 1.0/30.0), (1.0/6.0))
 		if ((f - fact) / fact > precision) {
-			fmt.Println("%s: Ramanujan's approximation of factorial(%d) out of range\n",
-				name, n);
+			log.Fatalf(ctx, "Stirling's approximation of factorial(%d) out of range\n", n)
 		}
 	}
 }
 
-func stress_cpu_fft(name string) {
+func stress_cpu_fft(ctx context.Context) {
 	var buffer [128]float64
 	for i := 0; i < 128; i++ {
 		buffer[i] = float64(i%64)
@@ -561,7 +560,51 @@ func stress_cpu_fft(name string) {
 	}
 }
 
-func stress_cpu_fibonacci(name string) {
+// We start out by defining a high-precision arc cotangent function.  
+// This one returns the response as an integer- normally it would be 
+// a floating point number.  Here,the integer is multiplied by the 
+// "unity" that we pass in. If unity is 10, for example, and the answer 
+// should be "0.5",then the answer will come out as 5.
+// https://go.dev/play/p/hF9jklt5lp
+func stress_cpu_pi(ctx context.Context) {
+	digits := big.NewInt(1000)
+	unity := big.NewInt(0)
+	unity.Exp(big.NewInt(10), digits, nil)
+	pi := big.NewInt(0)
+	four := big.NewInt(4)
+	pi.Mul(four, pi.Sub(pi.Mul(four, arccot(5, unity)), arccot(239, unity)))
+}
+
+func arccot(x int64, unity *big.Int) *big.Int {
+	bigx := big.NewInt(x)
+	xsquared := big.NewInt(x*x)
+	sum := big.NewInt(0)
+	sum.Div(unity, bigx)
+	xpower := big.NewInt(0)
+	xpower.Set(sum)
+	n := int64(3)
+	zero := big.NewInt(0)
+	sign := false
+	
+	term := big.NewInt(0)
+	for {
+		xpower.Div(xpower, xsquared)
+		term.Div(xpower, big.NewInt(n))
+		if term.Cmp(zero) == 0 {
+			break
+		}
+		if sign {
+			sum.Add(sum, term)
+		} else {
+			sum.Sub(sum, term)
+		}
+		sign = !sign
+		n += 2
+	}
+	return sum
+}
+
+func stress_cpu_fibonacci(ctx context.Context) {
 	var fn_res uint64 = 0xa94fad42221f2702
 	var f1 uint64 = 1
 	var f2 uint64 = 1
@@ -574,10 +617,9 @@ func stress_cpu_fibonacci(name string) {
 	}
 
 	if fn_res != fn {
-		fmt.Printf("%s: fibonacci error detected, summation or assignment failure\n", name);
+		log.Fatalf(ctx, "fibonacci error detected, summation or assignment failure\n")
 	}
 }
-
 
 // Make a single CPU load rate reach cpuPercent% within the time interval.
 // This function can also be used to implement something similar to stress-ng --cpu-load.
@@ -605,7 +647,7 @@ func stress_cpu(interval time.Duration, cpuPercent float64) {
 		//fmt.Printf("delay : [%f], bias : [%f]\n", delay, bias)
 		delay -= bias
 		if delay <= 0.0 {
-			bias = 0.0;
+			bias = 0.0
 		} else {
 			startTime2 := time.Now().UnixNano()
 			time.Sleep(time.Duration(delay) * time.Nanosecond)
@@ -617,5 +659,5 @@ func stress_cpu(interval time.Duration, cpuPercent float64) {
 
 // No need to perform subscript checking.
 func stress_cpu_method(method int) {
-	cpu_methods[method].stress("lizhaolong");
+	cpu_methods[method].stress(context.Background())
 }

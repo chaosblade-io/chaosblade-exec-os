@@ -19,8 +19,6 @@ package cpu
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"os"
 	os_exec "os/exec"
 	"runtime"
@@ -28,15 +26,29 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"math/rand"
+	"math/big"
+	"math"
+	"unsafe"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+
+	"github.com/mjibson/go-dsp/fft"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/howeyc/crc16"
 	_ "go.uber.org/automaxprocs/maxprocs"
 )
 
 const BurnCpuBin = "chaos_burncpu"
+
+type StressCpuMethodInfo struct {
+	name  			string					/* human readable form of stressor */
+	stress 			func(context.Context)	/* the cpu method function */
+}
 
 type CpuCommandModelSpec struct {
 	spec.BaseExpModelCommandSpec
@@ -206,7 +218,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		}
 		cpuList = strings.Join(cores, ",")
 	} else {
-		// if cpu-list value is not empty, then the cpu-count flag is invalid
+		// if cpu-list value is not empty, then the cpu-count flag is invalid.
 		var err error
 		cpuCountStr := model.ActionFlags["cpu-count"]
 		if cpuCountStr != "" {
@@ -240,7 +252,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	return ce.start(ctx, cpuList, cpuCount, cpuPercent, climbTime, model.ActionFlags["cpu-index"])
 }
 
-// start burn cpu
+// start burn cpu.
 func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuPercent, climbTime int, cpuIndexStr string) *spec.Response {
 	ctx = context.WithValue(ctx, "cpuCount", cpuCount)
 	if cpuList != "" {
@@ -270,7 +282,9 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	log.Debugf(ctx, "cpu counts: %d", cpuCount)
 	slopePercent := float64(cpuPercent)
 
-	var cpuIndex int
+	// The default is zero. Whatever the value of percpu, the 
+	// cpuIndex can be used as a subscript for totalCpuPercent in burn.
+	var cpuIndex int = 0
 	precpu := false
 	if cpuIndexStr != "" {
 		precpu = true
@@ -284,15 +298,19 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 
 	slope(ctx, cpuPercent, climbTime, slopePercent, precpu, cpuIndex)
 
-	quota := make(chan int64, cpuCount)
+	quotas := make([]chan int64, cpuCount)
 	for i := 0; i < cpuCount; i++ {
-		go burn(ctx, quota, slopePercent, precpu, cpuIndex)
+		quotas[i] = make(chan int64)
+		go burn(ctx, quotas[i], slopePercent, precpu, cpuIndex, cpuCount)
 	}
 
+	// A percpu of true gets the load of the specified cpu; 
+	// A percpu of false gets the load of the average cpu;
+	// The two cases are combined in a single loop.
 	for {
 		q := getQuota(ctx, slopePercent, precpu, cpuIndex)
 		for i := 0; i < cpuCount; i++ {
-			quota <- q
+			quotas[i] <- q
 		}
 	}
 }
@@ -316,6 +334,8 @@ func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent floa
 	}
 }
 
+// If percpu is true, it returns the ratio of the specified cpu-index;
+// otherwise, it returns the average cpu load ratio.
 func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex int) int64 {
 	used := getUsed(ctx, precpu, cpuIndex)
 	log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
@@ -324,31 +344,74 @@ func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex i
 	return busy
 }
 
-func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int) {
+func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int, cpuCount int) {
+	var beforeCpuPercent float64 = slopePercent
+	cpuNum := runtime.NumCPU()
+	if precpu {
+		cpuNum = 1
+	}
 	q := getQuota(ctx, slopePercent, precpu, cpuIndex)
+	cpu.Percent(0, false)
 	ds := period - q
 	if ds < 0 {
 		ds = 0
 	}
-	s, _ := time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
 	for {
-		startTime := time.Now().UnixNano()
 		select {
 		case offset := <-quota:
 			q = q + offset
 			if q < 0 {
 				q = 0
 			}
-			ds := period - q
+			ds = period - q
 			if ds < 0 {
 				ds = 0
 			}
-			s, _ = time.ParseDuration(strconv.FormatInt(ds, 10) + "ns")
 		default:
-			for time.Now().UnixNano()-startTime < q {
+			cpuPercent := float64(q)/float64(q+ds)*100
+			// This loop is used to handle the update of the quota error q. 
+			// Assuming a cpu_percent of 70 and a current system load of 10%, 
+			// there is one condition that would make entering this loop:
+			// q Execute quota once, then default, then quota, and offset is 60 both times.
+			if cpuPercent > slopePercent {
+				// precpu is true, get the corresponding index frequency; 
+				// otherwise get the average frequency
+				totalCpuPercent, err := cpu.Percent(0, precpu)
+				if err != nil {
+					log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
+					continue
+				}
+				// Here is actually a retry strategy, because 
+				// `if cpuPercent > slopePercent` is actually to prevent quota from being inaccurate.
+				if totalCpuPercent[cpuIndex] >= slopePercent {
+					// 1. A quota is not inaccurate, then do not modify q, ds, directly retry.
+					// 2. There are indeed other processes that are hogging the CPU, q, ds will be corrected by quota.
+					log.Debugf(ctx, "current CPU load is higher than slopePercent.")
+					continue
+				}
+				// Start calculating q and ds based on totalCpuPercent. 
+				// beforeCpuPercent is initially set to slopePercent, 
+				// which may be inaccurate and cause a higher load 
+				// when there are other processes hogging the CPU.
+
+				// The repaired beforeCpuPercent: cpuCount * beforeCpuPercent / cpuNum
+				// beforeCpuPercent ├── cpu-count: Average of cpuCount goroutinue over cpuNum cores.
+				// 					└── cpu-index: cpuCount is always equal to 1,cpuNum is always equal to 1.
+				other := totalCpuPercent[cpuIndex] - beforeCpuPercent*float64(cpuCount/cpuNum)
+				if other < 0 {
+					other = 0
+				}
+				cpuPercent := slopePercent - other
+				if cpuPercent < 0 {
+					cpuPercent = 0
+				}
+				q = int64(cpuPercent/float64(100)*float64(period))
+				ds = period - q
 			}
-			runtime.Gosched()
-			time.Sleep(s)
+
+			// When cpuPercent is zero stress_cpu will call sleep.
+			stress_cpu(time.Duration(q+ds), cpuPercent)
+			beforeCpuPercent = cpuPercent
 		}
 	}
 }
@@ -357,4 +420,248 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
 	ctx = context.WithValue(ctx, "bin", BurnCpuBin)
 	return exec.Destroy(ctx, ce.channel, "cpu fullload")
+}
+
+// TODO: Extend richer CPU burn algorithms:
+// floatconversion, gamma, gcd, gray, hamming, hyperbolic, idct...
+var cpu_methods = []StressCpuMethodInfo {
+	{ "ackermann", 	stress_cpu_ackermann,	},
+	{ "bitops",		stress_cpu_bitops,		},
+	{ "collatz",	stress_cpu_collatz,		},
+	{ "crc16",		stress_cpu_crc16,		},
+	{ "factorial",	stress_cpu_factorial,	},
+	{ "fft", 		stress_cpu_fft,         },
+	{ "pi", 		stress_cpu_pi,			}, 
+	{ "fibonacci",	stress_cpu_fibonacci,	},
+}
+
+func ackermann(m uint32, n uint32) uint32 {
+	if m == 0 {
+		return n + 1
+	} else if n == 0 {
+		return ackermann(m - 1, 1)
+	} else {
+		return ackermann(m - 1, ackermann(m, n - 1))
+	}
+}
+
+func stress_cpu_ackermann(ctx context.Context) {
+	a := ackermann(3, 7)
+
+	if a != 0x3fd {
+		log.Fatalf(ctx, "ackermann error detected, ackermann(3,9) miscalculated\n")
+	}
+}
+
+func stress_cpu_bitops(ctx context.Context) {
+	var i_sum uint32 = 0
+	var sum uint32 = 0x8aac0aab
+
+	for i := 0; i < 16384; i++ {
+		{
+			var r uint32 = uint32(i)
+			var v uint32 = uint32(i)
+			var s uint32 = uint32((unsafe.Sizeof(v) * 8) - 1)
+			for v >>= 1; v != 0; v, s = v>>1, s-1 {
+				r <<= 1
+				r |= v & 1
+			}
+			r <<= s
+			i_sum += r
+		}
+		{
+			/* parity check */
+			var v uint32 = uint32(i)
+
+			v ^= v >> 16
+			v ^= v >> 8
+			v ^= v >> 4
+			v &= 0xf
+			i_sum += (0x6996 >> v) & 1
+		}
+		{
+			/* Brian Kernighan count bits */
+			var v uint32 = uint32(i)
+			var j uint32 = uint32(i)
+
+			for j = 0; v != 0; j++ {
+				v &= v - 1
+			}
+			i_sum += j
+		}
+		{
+			/* round up to nearest highest power of 2 */
+			var v uint32 = uint32(i - 1)
+
+			v |= v >> 1
+			v |= v >> 2
+			v |= v >> 4
+			v |= v >> 8
+			v |= v >> 16
+			i_sum += v
+		}
+	}
+	if i_sum != sum {
+		log.Fatalf(ctx, "bitops error detected, failed bitops operations\n")
+	}
+}
+
+func stress_cpu_collatz(ctx context.Context) {
+	var n uint64 = 989345275647
+	var i int
+	for i = 0; n != 1; i++ {
+		if n&1 != 0 {
+			n = (3 * n) + 1
+		} else {
+			n = n / 2
+		}
+	}
+
+	if i != 1348 {
+		log.Fatalf(ctx, "error detected, failed collatz progression\n")
+	}
+}
+
+func stress_cpu_crc16(ctx context.Context) {
+	var randomBuffer [4096]byte
+	rand.Read(randomBuffer[:])
+	for i := 0; i < 8; i++ {
+		crc16.ChecksumIBM(randomBuffer[:])
+	}
+}
+
+func stress_cpu_factorial(ctx context.Context) {
+	var f float64 = 1.0
+	var precision float64 = 1.0e-6
+
+	for n := 1; n < 150; n++ {
+		np1 := float64(n + 1)
+		fact := math.Round(math.Exp(math.Gamma(np1)))
+		var dn float64
+
+		f *= float64(n)
+
+		/* Stirling */
+		if (f - fact) / fact > precision {
+			log.Fatalf(ctx, "Stirling's approximation of factorial(%d) out of range\n", n)
+		}
+
+		/* Ramanujan */
+		dn = float64(n)
+		fact = math.SqrtPi * math.Pow((dn / float64(math.E)), dn)
+		fact *= math.Pow((((((((8 * dn) + 4)) * dn) + 1) * dn) + 1.0/30.0), (1.0/6.0))
+		if ((f - fact) / fact > precision) {
+			log.Fatalf(ctx, "Stirling's approximation of factorial(%d) out of range\n", n)
+		}
+	}
+}
+
+func stress_cpu_fft(ctx context.Context) {
+	var buffer [128]float64
+	for i := 0; i < 128; i++ {
+		buffer[i] = float64(i%64)
+	}
+	for i := 0; i < 8; i++ {
+		fft.FFTReal(buffer[:])
+	}
+}
+
+// We start out by defining a high-precision arc cotangent function.  
+// This one returns the response as an integer- normally it would be 
+// a floating point number.  Here,the integer is multiplied by the 
+// "unity" that we pass in. If unity is 10, for example, and the answer 
+// should be "0.5",then the answer will come out as 5.
+// https://go.dev/play/p/hF9jklt5lp
+func stress_cpu_pi(ctx context.Context) {
+	digits := big.NewInt(1000)
+	unity := big.NewInt(0)
+	unity.Exp(big.NewInt(10), digits, nil)
+	pi := big.NewInt(0)
+	four := big.NewInt(4)
+	pi.Mul(four, pi.Sub(pi.Mul(four, arccot(5, unity)), arccot(239, unity)))
+}
+
+func arccot(x int64, unity *big.Int) *big.Int {
+	bigx := big.NewInt(x)
+	xsquared := big.NewInt(x*x)
+	sum := big.NewInt(0)
+	sum.Div(unity, bigx)
+	xpower := big.NewInt(0)
+	xpower.Set(sum)
+	n := int64(3)
+	zero := big.NewInt(0)
+	sign := false
+	
+	term := big.NewInt(0)
+	for {
+		xpower.Div(xpower, xsquared)
+		term.Div(xpower, big.NewInt(n))
+		if term.Cmp(zero) == 0 {
+			break
+		}
+		if sign {
+			sum.Add(sum, term)
+		} else {
+			sum.Sub(sum, term)
+		}
+		sign = !sign
+		n += 2
+	}
+	return sum
+}
+
+func stress_cpu_fibonacci(ctx context.Context) {
+	var fn_res uint64 = 0xa94fad42221f2702
+	var f1 uint64 = 1
+	var f2 uint64 = 1
+	var fn uint64 = 1
+
+	for !(fn & 0x8000000000000000 != 0) {
+		fn = f1 + f2
+		f1 = f2
+		f2 = fn
+	}
+
+	if fn_res != fn {
+		log.Fatalf(ctx, "fibonacci error detected, summation or assignment failure\n")
+	}
+}
+
+// Make a single CPU load rate reach cpuPercent% within the time interval.
+// This function can also be used to implement something similar to stress-ng --cpu-load.
+func stress_cpu(interval time.Duration, cpuPercent float64) {
+	if cpuPercent == 0 {
+		time.Sleep(time.Duration(interval)*time.Nanosecond)
+		return
+	}
+	bias := 0.0
+	startTime := time.Now().UnixNano()
+	nanoInterval := int64(interval/time.Nanosecond)
+	for {
+		if time.Now().UnixNano() - startTime > nanoInterval {
+			break
+		}
+
+		startTime1 := time.Now().UnixNano()
+		// TODO: The total number of loops and the method can be specified later.
+		for i := 0; i < len(cpu_methods); i++ {
+			stress_cpu_method(i)
+		}
+		endTime1 := time.Now().UnixNano()
+		delay := ((100 - cpuPercent) * float64(endTime1 - startTime1) / cpuPercent)
+		delay -= bias
+		if delay <= 0.0 {
+			bias = 0.0
+		} else {
+			startTime2 := time.Now().UnixNano()
+			time.Sleep(time.Duration(delay) * time.Nanosecond)
+			endTime2 := time.Now().UnixNano()
+			bias = float64(endTime2 - startTime2) - delay
+		}
+	}
+}
+
+// No need to perform subscript checking.
+func stress_cpu_method(method int) {
+	cpu_methods[method].stress(context.Background())
 }

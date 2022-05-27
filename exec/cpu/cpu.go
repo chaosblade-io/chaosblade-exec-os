@@ -218,7 +218,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		}
 		cpuList = strings.Join(cores, ",")
 	} else {
-		// if cpu-list value is not empty, then the cpu-count flag is invalid
+		// if cpu-list value is not empty, then the cpu-count flag is invalid.
 		var err error
 		cpuCountStr := model.ActionFlags["cpu-count"]
 		if cpuCountStr != "" {
@@ -252,7 +252,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	return ce.start(ctx, cpuList, cpuCount, cpuPercent, climbTime, model.ActionFlags["cpu-index"])
 }
 
-// start burn cpu
+// start burn cpu.
 func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuPercent, climbTime int, cpuIndexStr string) *spec.Response {
 	ctx = context.WithValue(ctx, "cpuCount", cpuCount)
 	if cpuList != "" {
@@ -282,8 +282,8 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	log.Debugf(ctx, "cpu counts: %d", cpuCount)
 	slopePercent := float64(cpuPercent)
 
-	// 默认为零，在底下会用到
-	// 无论percpu是什么，都可以使用cpuindex作为下标
+	// The default is zero. Whatever the value of percpu, the 
+	// cpuIndex can be used as a subscript for totalCpuPercent in burn.
 	var cpuIndex int = 0
 	precpu := false
 	if cpuIndexStr != "" {
@@ -298,21 +298,19 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 
 	slope(ctx, cpuPercent, climbTime, slopePercent, precpu, cpuIndex)
 
-	//quota := make(chan int64, cpuCount)
 	quotas := make([]chan int64, cpuCount)
-	fmt.Printf("cpucount : %d\n", cpuCount)
 	for i := 0; i < cpuCount; i++ {
 		quotas[i] = make(chan int64)
 		go burn(ctx, quotas[i], slopePercent, precpu, cpuIndex, cpuCount)
 	}
 
-	// percpu为true的行为是获取指定cpu的负载;percpu为false的行为是获取平均cpu的负载
-	// 把两种情况整合在一个循环中
+	// A percpu of true gets the load of the specified cpu; 
+	// A percpu of false gets the load of the average cpu;
+	// The two cases are combined in a single loop.
 	for {
 		q := getQuota(ctx, slopePercent, precpu, cpuIndex)
 		for i := 0; i < cpuCount; i++ {
 			quotas[i] <- q
-			//quota <- q
 		}
 	}
 }
@@ -336,18 +334,16 @@ func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent floa
 	}
 }
 
-// 如果percpu为true证明指定了cpu-index,否则是cpu-count，
-// getused：percpu为true返回的指定index的比例；false看起来返回的是平均值
+// If percpu is true, it returns the ratio of the specified cpu-index;
+// otherwise, it returns the average cpu load ratio.
 func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex int) int64 {
 	used := getUsed(ctx, precpu, cpuIndex)
 	log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
 	dx := (slopePercent - used) / 100
 	busy := int64(dx * float64(period))
-	fmt.Println("((((((((((((", used, dx, busy, cpuIndex, precpu)
 	return busy
 }
 
-// The root cause of the complexity is that getUsed requires sleep.
 func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int, cpuCount int) {
 	var beforeCpuPercent float64 = slopePercent
 	cpuNum := runtime.NumCPU()
@@ -360,57 +356,47 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 	if ds < 0 {
 		ds = 0
 	}
-	fmt.Println(q, ds, slopePercent)
 	for {
 		select {
-		// 使用这quota channel有两个问题，一个是数据不准，一个是可能在default之前连续更新两次q，还都不准。
 		case offset := <-quota:
 			q = q + offset
-			fmt.Println("xxxxxxxxxxxx", q, offset)
 			if q < 0 {
 				q = 0
 			}
 			ds = period - q
-			fmt.Println("////////////", q, ds, offset)
 			if ds < 0 {
 				ds = 0
 			}
 		default:
 			cpuPercent := float64(q)/float64(q+ds)*100
-			// When the first case executes with a lag, it causes q 
-			// to be increased by multiple offsets, resulting in a 
-			// higher CPU load than expectedPercent.
-			fmt.Println("+++++++++++", cpuPercent)
-			// 这个循环是为了处理quota错误的更新q的，假设cpu_percent为70，目前系统负载10%，有两种情况会使得进入此循环
-			// 1. q连续两次被quota更新，然后执行default，offset两次都是60
-			// 2. q先执行一次quota，再执行default，再执行quota，offset两次都是60
+			// This loop is used to handle the update of the quota error q. 
+			// Assuming a cpu_percent of 70 and a current system load of 10%, 
+			// there is one condition that would make entering this loop:
+			// q Execute quota once, then default, then quota, and offset is 60 both times.
 			if cpuPercent > slopePercent {
-				// precpu为true，获取对应index频率；否则获取平均频率
+				// precpu is true, get the corresponding index frequency; 
+				// otherwise get the average frequency
 				totalCpuPercent, err := cpu.Percent(0, precpu)
 				if err != nil {
 					log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 					continue
 				}
-				fmt.Println("sssssssssss", totalCpuPercent[cpuIndex])
-				// 这里其实是一个重试策略，因为这个371行的判断其实是为了防止quota不准的
-				// 如果真的进入这个判断的话有两种情况：
-				// 1. 一数据不准，那么不修改q，ds，直接重试
-				// 2. 确实有其他进程抢占了CPU，q，ds会通过quota修正
+				// Here is actually a retry strategy, because 
+				// `if cpuPercent > slopePercent` is actually to prevent quota from being inaccurate.
 				if totalCpuPercent[cpuIndex] >= slopePercent {
-					// 正常情况也可能跑到这里导致CPU频率下降
-					fmt.Println("current CPU load is higher than slopePercent.", q, ds, cpuPercent)
+					// 1. A quota is not inaccurate, then do not modify q, ds, directly retry.
+					// 2. There are indeed other processes that are hogging the CPU, q, ds will be corrected by quota.
 					log.Debugf(ctx, "current CPU load is higher than slopePercent.")
 					continue
 				}
-				// 此时我们认为数据可能是正常的，开始基于totalCpuPercent计算q，ds
-				// beforeCpuPercent初始时设置为slopePercent，这可能是不准确的，
-				// 再有其他负载情况时，会造成起始负载较高
+				// Start calculating q and ds based on totalCpuPercent. 
+				// beforeCpuPercent is initially set to slopePercent, 
+				// which may be inaccurate and cause a higher load 
+				// when there are other processes hogging the CPU.
 
-				// 修正值:cpucount * beforeCpuPercent / cpu-num
-				// 上面式子的原因是在cpu-count的情况下totalCpuPercent计算有误
-				// 原本cpu-count个核心的执行被分配到cpu-num上去了
-				// beforeCpuPercent实际上应该是chaos在多核心执行的平均值
-				// notes: cpu-index始终cpuCount等于1,cpuNum始终等于1
+				// The repaired beforeCpuPercent: cpuCount * beforeCpuPercent / cpuNum
+				// beforeCpuPercent ├── cpu-count: Average of cpuCount goroutinue over cpuNum cores.
+				// 					└── cpu-index: cpuCount is always equal to 1,cpuNum is always equal to 1.
 				other := totalCpuPercent[cpuIndex] - beforeCpuPercent*float64(cpuCount/cpuNum)
 				if other < 0 {
 					other = 0
@@ -421,17 +407,9 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 				}
 				q = int64(cpuPercent/float64(100)*float64(period))
 				ds = period - q
-
-				fmt.Println("xiufu: ", q, ds, cpuPercent, slopePercent,beforeCpuPercent, totalCpuPercent[cpuIndex], other)
 			}
-			fmt.Println("------------", q, ds, cpuPercent, float64(q)/float64(q+ds)*100, slopePercent)
-			// if cpuPercent > slopePercent {
-			// 	// An easy fix when quota is executed multiple times before default.
-			// 	q = int64(slopePercent/float64(100)*float64(period))
-			// 	ds = period - q
-			// 	fmt.Println("fixed:::::::", q, ds, cpuPercent, float64(q)/float64(q+ds)*100)
-			// }
-			// 当cpuPercent为零的时候stress_cpu会跑的很快
+
+			// When cpuPercent is zero stress_cpu will call sleep.
 			stress_cpu(time.Duration(q+ds), cpuPercent)
 			beforeCpuPercent = cpuPercent
 		}
@@ -665,14 +643,12 @@ func stress_cpu(interval time.Duration, cpuPercent float64) {
 		}
 
 		startTime1 := time.Now().UnixNano()
-		// Loops and methods may be specified later.
+		// TODO: The total number of loops and the method can be specified later.
 		for i := 0; i < len(cpu_methods); i++ {
 			stress_cpu_method(i)
 		}
 		endTime1 := time.Now().UnixNano()
-		//fmt.Println(startTime1, endTime1, cpuPercent)
 		delay := ((100 - cpuPercent) * float64(endTime1 - startTime1) / cpuPercent)
-		//fmt.Printf("delay : [%f], bias : [%f]\n", delay, bias)
 		delay -= bias
 		if delay <= 0.0 {
 			bias = 0.0

@@ -5,7 +5,7 @@ BLADE_SRC_ROOT=$(shell pwd)
 GO_ENV=CGO_ENABLED=1
 GO_MODULE=GO111MODULE=on
 GO=env $(GO_ENV) $(GO_MODULE) go
-GO_FLAGS=-ldflags=""
+GO_FLAGS=-ldflags="-s -w"
 
 UNAME := $(shell uname)
 
@@ -26,7 +26,7 @@ OS_YAML_FILE_NAME=chaosblade-os-spec-$(BLADE_VERSION).yaml
 OS_YAML_FILE_PATH=$(BUILD_TARGET_YAML)/$(OS_YAML_FILE_NAME)
 
 ifeq ($(GOOS), linux)
-	GO_FLAGS=-ldflags="-compressdwarf=false  -linkmode external -extldflags -static" -gcflags="all=-N -l"
+	GO_FLAGS=-ldflags="-linkmode external -extldflags -static -s -w"
 endif
 
 # build os

@@ -30,6 +30,7 @@ func NewNetworkCommandSpec() spec.ExpModelCommandSpec {
 				NewPingActionSpec(),
 				NewListenActionSpec(),
 				NewSendActionSpec(),
+				NewCurlActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},

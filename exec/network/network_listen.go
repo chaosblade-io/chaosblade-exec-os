@@ -275,11 +275,11 @@ func startCapture(ctx context.Context, dev string, listenType string, direction 
 		return spec.ReturnFail(spec.OsCmdExecFailed, "Set BPF filter failed")
 	}
 
-	go doCapture(ctx, handle, listenType, ipv4Addr)
+	go doCapture(ctx, handle, listenType, ipv4Addr, direction)
 	return spec.Success()
 }
 
-func doCapture(ctx context.Context, handle *pcap.Handle, listenType string, ip string) {
+func doCapture(ctx context.Context, handle *pcap.Handle, listenType string, ip string, direction string) {
 	// 抓包
 	defer handle.Close()
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
@@ -294,11 +294,11 @@ func doCapture(ctx context.Context, handle *pcap.Handle, listenType string, ip s
 	case tc.Corrupt:
 		onCorrupt(ctx, packetSource, ip)
 	case tc.Delay:
-		onDelay(ctx, packetSource, ip)
+		onDelay(ctx, packetSource, ip, direction)
 	}
 }
 
-func onDelay(ctx context.Context, packetSource *gopacket.PacketSource, ipAddr string) {
+func onDelay(ctx context.Context, packetSource *gopacket.PacketSource, ipAddr string, direction string) {
 	// Ack number 2 timestamp
 	expectedAck2Time := make(map[string]int64)
 
@@ -311,18 +311,36 @@ func onDelay(ctx context.Context, packetSource *gopacket.PacketSource, ipAddr st
 		ip := packet.NetworkLayer().(*layers.IPv4)
 		tcp := packet.TransportLayer().(*layers.TCP)
 
-		if ip.SrcIP.String() != ipAddr {
-			expectedAck := tcp.Seq + uint32(len(tcp.Payload))
-			if tcp.SYN || tcp.FIN {
-				expectedAck += 1
+		if direction == Local {
+			if ip.SrcIP.String() != ipAddr {
+				expectedAck := tcp.Seq + uint32(len(tcp.Payload))
+				if tcp.SYN || tcp.FIN {
+					expectedAck += 1
+				}
+				expectedAck2Time[ip.SrcIP.String()+strconv.FormatUint(uint64(expectedAck), 10)] = time.Now().UnixNano() / 1000000
+			} else {
+				if tcp.ACK {
+					receiveTime := expectedAck2Time[ip.DstIP.String()+strconv.FormatUint(uint64(tcp.Ack), 10)]
+					if receiveTime > 0 {
+						delay := time.Now().UnixNano()/1000000 - receiveTime
+						listenValue.x += int(delay)
+						listenValue.y++
+					}
+				}
 			}
-			expectedAck2Time[ip.SrcIP.String()+strconv.FormatUint(uint64(expectedAck), 10)] = time.Now().UnixNano() / 1000000
 		} else {
-			if tcp.ACK {
-				receiveTime := expectedAck2Time[ip.DstIP.String()+strconv.FormatUint(uint64(tcp.Ack), 10)]
-				if receiveTime > 0 {
-					delay := time.Now().UnixNano()/1000000 - receiveTime
-					listenValue.x += int(delay)
+			if ip.SrcIP.String() != ipAddr {
+				continue
+			} else {
+				payload := strings.TrimSpace(fmt.Sprintf("%s", tcp.Payload))
+				if strings.HasPrefix(payload, "chaos") {
+					sendTime, err := strconv.ParseInt(strings.Split(payload, ":")[1], 10, 64)
+					if err != nil {
+						continue
+					}
+					realSendTime := time.Now().UnixNano() / 1000000
+					delayTime := int(realSendTime - sendTime)
+					listenValue.x += delayTime
 					listenValue.y++
 				}
 			}

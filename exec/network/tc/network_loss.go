@@ -94,7 +94,7 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 	var dev = ""
 	if netInterface, ok := model.ActionFlags["interface"]; ok {
 		if netInterface == "" {
-			log.Errorf(ctx,"interface is nil")
+			log.Errorf(ctx, "interface is nil")
 			return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 		}
 		dev = netInterface
@@ -121,7 +121,6 @@ func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, exclu
 	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
 	classRule := fmt.Sprintf("netem loss %s%%", percent)
 	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, nle.channel)
-
 }
 
 func (nle *NetworkLossExecutor) stop(netInterface string, ctx context.Context) *spec.Response {

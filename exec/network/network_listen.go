@@ -196,7 +196,7 @@ func (nle *NetworkListenExecutor) Exec(uid string, ctx context.Context, model *s
 		}
 	} else {
 		if httpPort, err = strconv.Atoi(httpPortStr); err != nil {
-			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "http-port", httpPortStr, "cpu-percent is illegal, it must be a positive integer")
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "http-port", httpPortStr, "http-port is illegal, it must be a positive integer")
 		}
 	}
 
@@ -208,7 +208,7 @@ func fillFlags(dev string, localPort int, destinationIp string, remotePort int, 
 	if direction == Local {
 		flags = flags + fmt.Sprintf(" --local-port %v >/dev/null 2>&1 &", localPort)
 	} else {
-		flags = flags + fmt.Sprintf(" --remotePort %v --destinationIp %s >/dev/null 2>&1 &", remotePort, destinationIp)
+		flags = flags + fmt.Sprintf(" --remote-port %v --destination-ip %s >/dev/null 2>&1 &", remotePort, destinationIp)
 	}
 	return flags
 }
@@ -229,14 +229,24 @@ func (nle *NetworkListenExecutor) start(ctx context.Context, dev string, listenT
 func startHttpServer(ctx context.Context, httpPort int) *spec.Response {
 	http.HandleFunc("/result", func(writer http.ResponseWriter, request *http.Request) {
 		marshal, _ := json.Marshal(map[string]int{"x": listenValue.x, "y": listenValue.y})
-		_, err := fmt.Fprintf(writer, fmt.Sprintf("%s", string(marshal)))
+		response, _ := json.Marshal(spec.Response{Code: 200, Success: true, Result: string(marshal)})
+		_, err := fmt.Fprintf(writer, fmt.Sprintf("%s", response))
 		if err != nil {
 			log.Errorf(ctx, err.Error())
 			return
 		}
 	})
 	http.HandleFunc("/stop", func(writer http.ResponseWriter, request *http.Request) {
-		os.Exit(0)
+		response, _ := json.Marshal(spec.Response{Code: 200, Success: true})
+		_, err := fmt.Fprintf(writer, fmt.Sprintf("%s", response))
+		if err != nil {
+			log.Errorf(ctx, err.Error())
+			return
+		}
+		go func() {
+			time.Sleep(3 * time.Second)
+			os.Exit(0)
+		}()
 	})
 	err := http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil)
 	if err != nil {
@@ -301,6 +311,8 @@ func doCapture(ctx context.Context, handle *pcap.Handle, listenType string, ip s
 func onDelay(ctx context.Context, packetSource *gopacket.PacketSource, ipAddr string, direction string) {
 	// Ack number 2 timestamp
 	expectedAck2Time := make(map[string]int64)
+	localSeqTimesMap := make(map[string]int)
+	remoteSeqTimesMap := make(map[string]int)
 
 	for packet := range packetSource.Packets() {
 		if packet.NetworkLayer() == nil || packet.TransportLayer() == nil || packet.TransportLayer().LayerType() != layers.LayerTypeTCP {
@@ -310,6 +322,7 @@ func onDelay(ctx context.Context, packetSource *gopacket.PacketSource, ipAddr st
 
 		ip := packet.NetworkLayer().(*layers.IPv4)
 		tcp := packet.TransportLayer().(*layers.TCP)
+		var mapKey string
 
 		if direction == Local {
 			if ip.SrcIP.String() != ipAddr {
@@ -317,10 +330,26 @@ func onDelay(ctx context.Context, packetSource *gopacket.PacketSource, ipAddr st
 				if tcp.SYN || tcp.FIN {
 					expectedAck += 1
 				}
-				expectedAck2Time[ip.SrcIP.String()+strconv.FormatUint(uint64(expectedAck), 10)] = time.Now().UnixNano() / 1000000
+				sequence := ip.SrcIP.String() + strconv.FormatUint(uint64(expectedAck), 10)
+				if number, ok := localSeqTimesMap[sequence]; ok {
+					mapKey = sequence + strconv.Itoa(number)
+					localSeqTimesMap[sequence] = localSeqTimesMap[sequence] + 1
+				} else {
+					mapKey = sequence + strconv.Itoa(0)
+					localSeqTimesMap[sequence] = 1
+				}
+				expectedAck2Time[mapKey] = time.Now().UnixNano() / 1000000
 			} else {
 				if tcp.ACK {
-					receiveTime := expectedAck2Time[ip.DstIP.String()+strconv.FormatUint(uint64(tcp.Ack), 10)]
+					sequence := ip.DstIP.String() + strconv.FormatUint(uint64(tcp.Ack), 10)
+					if number, ok := remoteSeqTimesMap[sequence]; ok {
+						mapKey = sequence + strconv.Itoa(number)
+						remoteSeqTimesMap[sequence] = remoteSeqTimesMap[sequence] + 1
+					} else {
+						mapKey = sequence + strconv.Itoa(0)
+						remoteSeqTimesMap[sequence] = 1
+					}
+					receiveTime := expectedAck2Time[mapKey]
 					if receiveTime > 0 {
 						delay := time.Now().UnixNano()/1000000 - receiveTime
 						listenValue.x += int(delay)

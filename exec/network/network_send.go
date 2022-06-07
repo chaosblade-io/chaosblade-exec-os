@@ -33,7 +33,8 @@ func (t *TCPClient) Send(ctx context.Context, str string) bool {
 }
 
 func NewTCPClient(addr string) (*TCPClient, error) {
-	conn, err := net.Dial("tcp", addr)
+	dialer := net.Dialer{Timeout: 20 * time.Second}
+	conn, err := dialer.Dial("tcp", addr)
 	return &TCPClient{conn: conn}, err
 }
 

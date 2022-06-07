@@ -93,7 +93,7 @@ func (nce *NetworkCurlExecutor) Exec(uid string, ctx context.Context, model *spe
 }
 
 func (nce *NetworkCurlExecutor) verify(ctx context.Context, url string) *spec.Response {
-	response := nce.channel.Run(ctx, "curl", fmt.Sprintf(`%s`, url))
+	response := nce.channel.Run(ctx, "curl", fmt.Sprintf(`-s %s`, url))
 	if !response.Success {
 		return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, "curl", response.Err)
 	}

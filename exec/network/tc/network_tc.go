@@ -55,53 +55,30 @@ var commFlags = []spec.ExpFlagSpec{
 }
 
 const delimiter = ","
-const (
-	Delay     = "delay"
-	Loss      = "loss"
-	Duplicate = "duplicate"
-	Corrupt   = "corrupt"
-	Reorder   = "reorder"
-)
 
-func getCommArgs(localPort, remotePort, excludePort, destinationIp, excludeIp string,
-	args string, ignorePeerPort, force bool) (string, *spec.Response) {
+func startNet(ctx context.Context, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string, force, ignorePeerPorts bool, cl spec.Channel) *spec.Response {
 	if localPort != "" {
 		localPorts, err := util.ParseIntegerListToStringSlice("local-port", localPort)
 		if err != nil {
-			return "", spec.ResponseFailWithFlags(spec.ParameterIllegal, "local-port", localPort, err)
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "local-port", localPort, err)
 		}
-		args = fmt.Sprintf("%s --local-port %s", args, strings.Join(localPorts, ","))
+		localPort = strings.Join(localPorts, ",")
 	}
 	if remotePort != "" {
 		remotePorts, err := util.ParseIntegerListToStringSlice("remote-port", remotePort)
 		if err != nil {
-			return "", spec.ResponseFailWithFlags(spec.ParameterIllegal, "remote-port", remotePort, err)
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "remote-port", remotePort, err)
 		}
-		args = fmt.Sprintf("%s --remote-port %s", args, strings.Join(remotePorts, ","))
+		remotePort = strings.Join(remotePorts, ",")
 	}
 	if excludePort != "" {
 		excludePorts, err := util.ParseIntegerListToStringSlice("exclude-port", excludePort)
 		if err != nil {
-			return "", spec.ResponseFailWithFlags(spec.ParameterIllegal, "exclude-port", excludePort, err)
+			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "exclude-port", excludePort, err)
 		}
-		args = fmt.Sprintf("%s --exclude-port %s", args, strings.Join(excludePorts, ","))
+		excludePort = strings.Join(excludePorts, ",")
 	}
-	if destinationIp != "" {
-		args = fmt.Sprintf("%s --destination-ip %s", args, destinationIp)
-	}
-	if excludeIp != "" {
-		args = fmt.Sprintf("%s --exclude-ip %s", args, excludeIp)
-	}
-	if ignorePeerPort {
-		args = fmt.Sprintf("%s --ignore-peer-port", args)
-	}
-	if force {
-		args = fmt.Sprintf("%s --force", args)
-	}
-	return args, spec.ReturnSuccess("success")
-}
 
-func startNet(ctx context.Context, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string, force, ignorePeerPorts bool, cl spec.Channel) *spec.Response {
 	// check device txqueuelen size, if the size is zero, then set the value to 1000
 	response := preHandleTxqueue(ctx, netInterface, cl)
 	if !response.Success {

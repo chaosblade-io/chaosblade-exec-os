@@ -296,12 +296,12 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 	// adjust process oom_score_adj to avoid being killed
 	if avoidBeingKilled {
 		scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
-		if _, err := os.Stat(scoreAdjFile); os.IsExist(err) {
+		if _, err := os.Stat(scoreAdjFile); err == nil || os.IsExist(err)  {
 			if err := ioutil.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil {
-				log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj", burnMemMode)
+				log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj, %v", burnMemMode, err)
 			}
 		} else {
-			log.Errorf(ctx, "score adjust file: %s not exists", scoreAdjFile)
+			log.Errorf(ctx, "score adjust file: %s not exists, %v", scoreAdjFile, err)
 		}
 	}
 

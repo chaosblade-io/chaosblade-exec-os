@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-func getUsed(ctx context.Context, precpu bool, cpuIndex int) float64 {
+func getUsed(ctx context.Context, percpu bool, cpuIndex int) float64 {
 
 	pid := ctx.Value(channel.NSTargetFlagName)
 	cpuCount := ctx.Value("cpuCount").(int)
@@ -66,12 +66,12 @@ func getUsed(ctx context.Context, precpu bool, cpuIndex int) float64 {
 		}
 	}
 
-	totalCpuPercent, err := cpu.Percent(time.Second, precpu)
+	totalCpuPercent, err := cpu.Percent(time.Second, percpu)
 	if err != nil {
 		log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 	}
-	if precpu {
-		if cpuIndex > len(totalCpuPercent){
+	if percpu {
+		if cpuIndex > len(totalCpuPercent) {
 			log.Fatalf(ctx, "illegal cpu index %d", cpuIndex)
 		}
 		return totalCpuPercent[cpuIndex]

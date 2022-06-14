@@ -271,9 +271,9 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	slopePercent := float64(cpuPercent)
 
 	var cpuIndex int
-	precpu := false
+	percpu := false
 	if cpuIndexStr != "" {
-		precpu = true
+		percpu = true
 		var err error
 		cpuIndex, err = strconv.Atoi(cpuIndexStr)
 		if err != nil {
@@ -288,11 +288,11 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 
 	quota := make(chan int64, cpuCount)
 	for i := 0; i < cpuCount; i++ {
-		go burn(ctx, quota, slopePercent, precpu, cpuIndex)
+		go burn(ctx, quota, slopePercent, percpu, cpuIndex)
 	}
 
 	for {
-		q := getQuota(ctx, slopePercent, precpu, cpuIndex)
+		q := getQuota(ctx, slopePercent, percpu, cpuIndex)
 		for i := 0; i < cpuCount; i++ {
 			quota <- q
 		}
@@ -318,16 +318,16 @@ func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent *flo
 	}
 }
 
-func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex int) int64 {
-	used := getUsed(ctx, precpu, cpuIndex)
-	log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
+func getQuota(ctx context.Context, slopePercent float64, percpu bool, cpuIndex int) int64 {
+	used := getUsed(ctx, percpu, cpuIndex)
+	log.Debugf(ctx, "cpu usage: %f , percpu: %v, cpuIndex %d", used, percpu, cpuIndex)
 	dx := (slopePercent - used) / 100
 	busy := int64(dx * float64(period))
 	return busy
 }
 
-func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu bool, cpuIndex int) {
-	q := getQuota(ctx, slopePercent, precpu, cpuIndex)
+func burn(ctx context.Context, quota <-chan int64, slopePercent float64, percpu bool, cpuIndex int) {
+	q := getQuota(ctx, slopePercent, percpu, cpuIndex)
 	ds := period - q
 	if ds < 0 {
 		ds = 0

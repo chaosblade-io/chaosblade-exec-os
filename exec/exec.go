@@ -30,9 +30,9 @@ var cl = channel.NewLocalChannel()
 // stop hang process
 func Destroy(ctx context.Context, c spec.Channel, action string) *spec.Response {
 	suid := ctx.Value(spec.Uid)
-	/* If suid is specified, it will be deleted exactly 
+	/* If suid is specified, it will be deleted exactly
 	 * according to suid, otherwise it will be based on action. */
-	if suid != nil && suid != spec.UnknownUid {
+	if suid != nil && suid != spec.UnknownUid && suid != "" {
 		ctx = context.WithValue(ctx, channel.ProcessKey, suid)
 	} else {
 		ctx = context.WithValue(ctx, channel.ProcessKey, action)

@@ -106,13 +106,14 @@ func main() {
 		}
 
 		uid := expModel.ActionFlags[model.UidFlag.Name]
-		if uid == "" {
-			uid, _ = util.GenerateUid()
-		}
 
 		ctx = context.WithValue(ctx, spec.Uid, uid)
 		if mode == spec.Destroy {
 			ctx = spec.SetDestroyFlag(ctx, uid)
+		} else {
+			if uid == "" {
+				uid, _ = util.GenerateUid()
+			}
 		}
 
 		if expModel.ActionFlags[model.DebugFlag.Name] == spec.True {

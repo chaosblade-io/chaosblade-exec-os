@@ -295,7 +295,7 @@ func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, 
 func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool, avoidBeingKilled bool, cl spec.Channel) {
 	// adjust process oom_score_adj to avoid being killed
 	if avoidBeingKilled {
-		scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
+		scoreAdjFile := fmt.Sprintf(processOOMAdj, strconv.Itoa(os.Getpid()))
 		if _, err := os.Stat(scoreAdjFile); os.IsExist(err) {
 			if err := ioutil.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil {
 				log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj", burnMemMode)

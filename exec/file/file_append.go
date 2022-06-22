@@ -241,16 +241,16 @@ func parseRandom(content string) *spec.Response {
 		split := strings.Split(text[1], "-")
 		begin, err := strconv.Atoi(split[0])
 		if err != nil {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%s illegal parameter", begin))
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%d illegal parameter", begin))
 		}
 
 		end, err := strconv.Atoi(split[1])
 		if err != nil {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%s illegal parameter", end))
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%d illegal parameter", end))
 		}
 
 		if end <= begin {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("run append file %s failed, begin must < end"))
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("run append file %d, failed, begin must < end", end))
 		}
 		content = strings.Replace(content, text[0], strconv.Itoa(rand.Intn(end-begin)+begin), 1)
 	}

@@ -216,7 +216,7 @@ func preHandleTxqueue(ctx context.Context, netInterface string, cl spec.Channel)
 				if len > 0 {
 					return response
 				} else {
-					log.Infof(ctx,"the tx_queue_len value for %s is %s", netInterface, txlen)
+					log.Infof(ctx, "the tx_queue_len value for %s is %s", netInterface, txlen)
 				}
 			}
 		}
@@ -376,8 +376,12 @@ func getPeerPorts(ctx context.Context, port string, cl spec.Channel) ([]string, 
 			}
 			ipPort := strings.Split(f, ":")
 			if len(ipPort) != 2 {
-				log.Warnf(ctx, "illegal socket address: %s", f)
-				continue
+				// for ipv6 address
+				ipPort = strings.Split(f, "]:")
+				if len(ipPort) != 2 {
+					log.Warnf(ctx, "illegal socket address: %s", f)
+					continue
+				}
 			}
 			mappingPorts = append(mappingPorts, ipPort[1])
 		}

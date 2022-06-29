@@ -337,10 +337,12 @@ func stopNet(ctx context.Context, netInterface string, cl spec.Channel) *spec.Re
 	if os.Getuid() != 0 {
 		return spec.ReturnFail(spec.Forbidden, fmt.Sprintf("tc no permission"))
 	}
-
-	resposne := cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
-	if !resposne.Success {
-		return resposne
+	response := cl.Run(ctx, "tc", fmt.Sprintf(`filter show dev %s parent 1: prio 4`, netInterface))
+	if response.Success && response.Result != "" {
+		response = cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+		if !response.Success {
+			log.Errorf(ctx, "tc del filter err, %s", response.Err)
+		}
 	}
 	return cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
 }

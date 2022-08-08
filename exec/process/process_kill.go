@@ -58,6 +58,10 @@ func NewKillProcessActionCommandSpec() spec.ExpActionCommandSpec {
 					Name: "exclude-process",
 					Desc: "Exclude process",
 				},
+				&spec.ExpFlag{
+					Name: "pid",
+					Desc: "pid",
+				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &KillProcessExecutor{},

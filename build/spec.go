@@ -17,6 +17,7 @@
 package main
 
 import (
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/aliyun"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/cpu"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/disk"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/file"
@@ -57,6 +58,7 @@ func getModels() *spec.Models {
 		file.NewFileCommandSpec(),
 		kernel.NewKernelInjectCommandSpec(),
 		systemd.NewSystemdCommandModelSpec(),
+		aliyun.NewAliyunCommandSpec(),
 	}
 	specModels := make([]*spec.Models, 0)
 	for _, modeSpec := range modelCommandSpecs {

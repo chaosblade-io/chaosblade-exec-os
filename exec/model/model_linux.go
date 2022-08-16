@@ -26,6 +26,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/process"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/script"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/systemd"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/time"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
@@ -42,5 +43,6 @@ func GetAllExpModels() []spec.ExpModelCommandSpec {
 		file.NewFileCommandSpec(),
 		kernel.NewKernelInjectCommandSpec(),
 		systemd.NewSystemdCommandModelSpec(),
+		time.NewTimeCommandSpec(),
 	}
 }

@@ -14,18 +14,35 @@
  * limitations under the License.
  */
 
-package category
+package time
 
-const (
-	System        = "system"
-	SystemCpu     = "system_cpu"
-	SystemMem     = "system_mem"
-	SystemDisk    = "system_disk"
-	SystemNetwork = "system_network"
-	SystemProcess = "system_process"
-	SystemScript  = "system_script"
-	SystemFile    = "system_file"
-	SystemKernel  = "system_kernel"
-	SystemSystemd = "system_systemd"
-	SystemTime    = "system_time"
+import (
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
+
+type TimeCommandSpec struct {
+	spec.BaseExpModelCommandSpec
+}
+
+func NewTimeCommandSpec() spec.ExpModelCommandSpec {
+	return &TimeCommandSpec{
+		spec.BaseExpModelCommandSpec{
+			ExpFlags: []spec.ExpFlagSpec{},
+			ExpActions: []spec.ExpActionCommandSpec{
+				NewTravelTimeActionCommandSpec(),
+			},
+		},
+	}
+}
+
+func (*TimeCommandSpec) Name() string {
+	return "time"
+}
+
+func (*TimeCommandSpec) ShortDesc() string {
+	return "Time experiment"
+}
+
+func (*TimeCommandSpec) LongDesc() string {
+	return "Time experiment"
+}

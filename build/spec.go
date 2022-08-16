@@ -27,6 +27,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/process"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/script"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/systemd"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/time"
 	"log"
 	"os"
 
@@ -57,6 +58,7 @@ func getModels() *spec.Models {
 		file.NewFileCommandSpec(),
 		kernel.NewKernelInjectCommandSpec(),
 		systemd.NewSystemdCommandModelSpec(),
+		time.NewTimeCommandSpec(),
 	}
 	specModels := make([]*spec.Models, 0)
 	for _, modeSpec := range modelCommandSpecs {

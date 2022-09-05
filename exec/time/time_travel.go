@@ -39,7 +39,7 @@ func NewTravelTimeActionCommandSpec() spec.ExpActionCommandSpec {
 			ActionFlags: []spec.ExpFlagSpec{
 				&spec.ExpFlag{
 					Name: "offset",
-					Desc: "Travel time offset, for example: -1d2h3m50s",
+					Desc: "Travel time offset, for example: -2h3m50s",
 				},
 				&spec.ExpFlag{
 					Name: "disableNtp",

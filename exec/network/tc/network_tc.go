@@ -48,6 +48,10 @@ var commFlags = []spec.ExpFlagSpec{
 		Desc: "Exclude ips. Support for using mask to specify the ip range such as 92.168.1.0/24 or comma separated multiple ips, for example 10.0.0.1,11.0.0.1",
 	},
 	&spec.ExpFlag{
+		Name: "protocol",
+		Desc: "specify protocol for example tcp udp icmp ",
+	},
+	&spec.ExpFlag{
 		Name:   "force",
 		Desc:   "Forcibly overwrites the original rules",
 		NoArgs: true,
@@ -56,7 +60,19 @@ var commFlags = []spec.ExpFlagSpec{
 
 const delimiter = ","
 
-func startNet(ctx context.Context, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string, force, ignorePeerPorts bool, cl spec.Channel) *spec.Response {
+func startNet(ctx context.Context, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp string, force, ignorePeerPorts bool, protocol string, cl spec.Channel) *spec.Response {
+	if protocol != "" {
+		switch protocol {
+		case "tcp":
+			protocol = "6"
+		case "udp":
+			protocol = "17"
+		case "icmp":
+			protocol = "1"
+		default:
+			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "protocol", protocol, "unsupport protocol")
+		}
+	}
 	if localPort != "" {
 		localPorts, err := util.ParseIntegerListToStringSlice("local-port", localPort)
 		if err != nil {
@@ -97,7 +113,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 		stopNet(ctx, netInterface, cl)
 	}
 	// Only interface flag
-	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" {
+	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" && protocol == ""{
 		return cl.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
 	}
 
@@ -113,7 +129,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 	}
 
 	// only contains excludePort or excludeIP
-	if localPort == "" && remotePort == "" && destIp == "" {
+	if localPort == "" && remotePort == "" && destIp == "" && protocol == ""{
 		// Add class rule to 1,2,3 band, exclude port and exclude ip are added to 4 band
 		args := buildNetemToDefaultBandsArgs(netInterface, classRule)
 		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts, excludeIp)
@@ -127,7 +143,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 	excludeIpRules := getIpRules(excludeIp)
 	// local port or remote port
 	return executeTargetPortAndIpWithExclude(ctx, cl, netInterface, classRule, localPort, remotePort, destIpRules,
-		excludePorts, excludeIpRules)
+		excludePorts, excludeIpRules, protocol)
 }
 
 func getExcludePorts(ctx context.Context, excludePort string, ignorePeerPorts bool, cl spec.Channel) ([]string, error) {
@@ -249,9 +265,9 @@ func getIpRules(targetIp string) []string {
 
 // executeTargetPortAndIpWithExclude creates class rule in 1:4 queue and add filter to the queue
 func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel,
-	netInterface, classRule, localPort, remotePort string, destIpRules, excludePorts, excludeIpRules []string) *spec.Response {
+	netInterface, classRule, localPort, remotePort string, destIpRules, excludePorts, excludeIpRules []string, protocol string) *spec.Response {
 	args := fmt.Sprintf(`qdisc add dev %s parent 1:4 handle 40: %s`, netInterface, classRule)
-	args = buildTargetFilterPortAndIp(localPort, remotePort, destIpRules, excludePorts, excludeIpRules, args, netInterface)
+	args = buildTargetFilterPortAndIp(localPort, remotePort, destIpRules, excludePorts, excludeIpRules, args, netInterface, protocol)
 	response := channel.Run(ctx, "tc", args)
 	if !response.Success {
 		stopNet(ctx, netInterface, channel)
@@ -260,7 +276,20 @@ func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel
 	return response
 }
 
-func buildTargetFilterPortAndIp(localPort, remotePort string, destIpRules, excludePorts, excludeIpRules []string, args string, netInterface string) string {
+func buildTargetFilterPortAndIp(localPort, remotePort string, destIpRules, excludePorts, excludeIpRules []string, args string, netInterface, protocol string) string {
+	protocolrule := ""
+	if protocol != "" {
+		if localPort == "" && remotePort == "" && len(destIpRules) == 0 && len(excludePorts) == 0 && len(excludeIpRules) == 0 {
+			args = fmt.Sprintf(
+				`%s && \
+                tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip protocol %s 0xff flowid 1:4`,
+								args, netInterface, protocol)
+			return args
+		} else {
+			protocolrule = fmt.Sprintf(` \
+                                         match ip protocol %s 0xff`, protocol)
+		}
+	}
 	if localPort != "" {
 		ports := strings.Split(localPort, delimiter)
 		for _, port := range ports {
@@ -268,14 +297,14 @@ func buildTargetFilterPortAndIp(localPort, remotePort string, destIpRules, exclu
 				for _, ipRule := range destIpRules {
 					args = fmt.Sprintf(
 						`%s && \
-						tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip sport %s 0xffff flowid 1:4`,
-						args, netInterface, ipRule, port)
+						tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip sport %s 0xffff %s flowid 1:4`,
+						args, netInterface, ipRule, port, protocolrule)
 				}
 			} else {
 				args = fmt.Sprintf(
 					`%s && \
-					tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %s 0xffff flowid 1:4`,
-					args, netInterface, port)
+					tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %s 0xffff %s flowid 1:4`,
+					args, netInterface, port, protocolrule)
 			}
 		}
 	}
@@ -286,14 +315,14 @@ func buildTargetFilterPortAndIp(localPort, remotePort string, destIpRules, exclu
 				for _, ipRule := range destIpRules {
 					args = fmt.Sprintf(
 						`%s && \
-						tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip dport %s 0xffff flowid 1:4`,
-						args, netInterface, ipRule, port)
+						tc filter add dev %s parent 1: prio 4 protocol ip u32 %s match ip dport %s 0xffff %s flowid 1:4`,
+						args, netInterface, ipRule, port, protocolrule)
 				}
 			} else {
 				args = fmt.Sprintf(
 					`%s && \
-					tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip dport %s 0xffff flowid 1:4`,
-					args, netInterface, port)
+					tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip dport %s 0xffff %s flowid 1:4`,
+					args, netInterface, port, protocolrule)
 			}
 		}
 	}
@@ -302,25 +331,25 @@ func buildTargetFilterPortAndIp(localPort, remotePort string, destIpRules, exclu
 		for _, ipRule := range destIpRules {
 			args = fmt.Sprintf(
 				`%s && \
-				tc filter add dev %s parent 1: prio 4 protocol ip u32 %s flowid 1:4`,
-				args, netInterface, ipRule)
+				tc filter add dev %s parent 1: prio 4 protocol ip u32 %s %s flowid 1:4`,
+				args, netInterface, ipRule, protocolrule)
 		}
 	}
 	if len(excludeIpRules) > 0 {
 		for _, ipRule := range excludeIpRules {
 			args = fmt.Sprintf(
 				`%s && \
-				tc filter add dev %s parent 1: prio 3 protocol ip u32 %s flowid 1:3`,
-				args, netInterface, ipRule)
+				tc filter add dev %s parent 1: prio 3 protocol ip u32 %s %s flowid 1:3`,
+				args, netInterface, ipRule, protocolrule)
 		}
 	}
 	if len(excludePorts) > 0 {
 		for _, port := range excludePorts {
 			args = fmt.Sprintf(
 				`%s && \
-				tc filter add dev %s parent 1: prio 3 protocol ip u32 match ip dport %s 0xffff flowid 1:3 && \
-				tc filter add dev %s parent 1: prio 3 protocol ip u32 match ip sport %s 0xffff flowid 1:3`,
-				args, netInterface, port, netInterface, port)
+				tc filter add dev %s parent 1: prio 3 protocol ip u32 match ip dport %s 0xffff %s flowid 1:3 && \
+				tc filter add dev %s parent 1: prio 3 protocol ip u32 match ip sport %s 0xffff %s flowid 1:3`,
+				args, netInterface, port, protocolrule, netInterface, port, protocolrule)
 		}
 	}
 	return args

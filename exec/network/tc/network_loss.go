@@ -113,14 +113,15 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 	destIp := model.ActionFlags["destination-ip"]
 	excludeIp := model.ActionFlags["exclude-ip"]
 	ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
+	protocol := model.ActionFlags["protocol"]
 	force := model.ActionFlags["force"] == "true"
-	return nle.start(dev, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, force, ctx)
+	return nle.start(dev, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, force, protocol, ctx)
 }
 
 func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
-	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
+	ignorePeerPort, force bool, protocol string, ctx context.Context) *spec.Response {
 	classRule := fmt.Sprintf("netem loss %s%%", percent)
-	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, nle.channel)
+	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, protocol, nle.channel)
 
 }
 

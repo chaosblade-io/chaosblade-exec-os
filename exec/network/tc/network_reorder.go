@@ -124,14 +124,15 @@ func (ce *NetworkReorderExecutor) Exec(uid string, ctx context.Context, model *s
 		destIp := model.ActionFlags["destination-ip"]
 		excludeIp := model.ActionFlags["exclude-ip"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
+		protocol := model.ActionFlags["protocol"]
 		force := model.ActionFlags["force"] == "true"
 		return ce.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent,
-			ignorePeerPort, gap, time, correlation, force, ctx)
+			ignorePeerPort, gap, time, correlation, force, protocol, ctx)
 	}
 }
 
 func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
-	ignorePeerPort bool, gap, time, correlation string, force bool, ctx context.Context) *spec.Response {
+	ignorePeerPort bool, gap, time, correlation string, force bool, protocol string, ctx context.Context) *spec.Response {
 
 	classRule := fmt.Sprintf("netem reorder %s%% %s%%", percent, correlation)
 	if gap != "" {
@@ -139,7 +140,7 @@ func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, exc
 	}
 	classRule = fmt.Sprintf("%s delay %sms", classRule, time)
 
-	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, ce.channel)
+	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, protocol, ce.channel)
 
 }
 

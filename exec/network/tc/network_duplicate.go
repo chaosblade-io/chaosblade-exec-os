@@ -101,17 +101,18 @@ func (de *NetworkDuplicateExecutor) Exec(uid string, ctx context.Context, model 
 		destIp := model.ActionFlags["destination-ip"]
 		excludeIp := model.ActionFlags["exclude-ip"]
 		ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
+		protocol := model.ActionFlags["protocol"]
 		force := model.ActionFlags["force"] == "true"
-		return de.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, force, ctx)
+		return de.start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, force, protocol, ctx)
 	}
 }
 
 func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
-	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
+	ignorePeerPort, force bool, protocol string, ctx context.Context) *spec.Response {
 
 	classRule := fmt.Sprintf("netem duplicate %s%%", percent)
 
-	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, de.channel)
+	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, protocol, de.channel)
 
 }
 

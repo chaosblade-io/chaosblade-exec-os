@@ -27,7 +27,10 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
-const MoveFileBin = "chaos_movefile"
+const (
+	MoveFileBin = "chaos_movefile"
+	suffix      = ".chaos-blade-backup"
+)
 
 type FileMoveActionSpec struct {
 	spec.BaseExpActionCommandSpec
@@ -120,7 +123,7 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	if !force {
 		targetFile := path.Join(target, "/", path.Base(filepath))
 		if exec.CheckFilepathExists(ctx, f.channel, targetFile) {
-			log.Errorf(ctx,"`%s`: target file does not exist", targetFile)
+			log.Errorf(ctx, "`%s`: target file does not exist", targetFile)
 			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", targetFile, "the target file does not exist")
 		}
 	}
@@ -138,6 +141,10 @@ func (f *FileMoveActionExecutor) start(filepath, target string, force, autoCreat
 	}
 
 	if force {
+		// backup
+		_ = f.channel.Run(ctx, "cp", fmt.Sprintf(`"%s" "%s"`, path.Join(target, path.Base(filepath)),
+			path.Join(target, path.Base(filepath)+suffix)))
+
 		response = f.channel.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, filepath, target))
 	} else {
 		response = f.channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))
@@ -147,7 +154,13 @@ func (f *FileMoveActionExecutor) start(filepath, target string, force, autoCreat
 
 func (f *FileMoveActionExecutor) stop(filepath, target string, ctx context.Context) *spec.Response {
 	origin := path.Join(target, "/", path.Base(filepath))
-	return f.channel.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, origin, path.Dir(filepath)))
+	response := f.channel.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, origin, path.Dir(filepath)))
+	if response.Success {
+		// restore backup
+		_ = f.channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, path.Join(target, path.Base(filepath)+suffix),
+			path.Join(target, path.Base(filepath))))
+	}
+	return response
 }
 
 func (f *FileMoveActionExecutor) SetChannel(channel spec.Channel) {

@@ -133,11 +133,8 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("illegal parameter ports, %v", err))
 		}
 	} else if pid != "" {
-		if strings.Contains(pid, ",") {
-			pids = strings.Split(pid, ",")
-		} else {
-			pids = append(pids, pid)
-		}
+		tempPidList := strings.Split(pid, ",")
+		pids = append(pids, tempPidList...)
 	}
 	if pids == nil || len(pids) == 0 {
 		if ignoreProcessNotFound {

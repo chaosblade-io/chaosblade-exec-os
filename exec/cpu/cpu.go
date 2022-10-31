@@ -282,7 +282,9 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 		}
 	}
 
-	slope(ctx, cpuPercent, climbTime, slopePercent, percpu, cpuIndex)
+	// make CPU slowly climb to some level, to simulate slow resource competition 
+	// which system faults cannot be quickly noticed by monitoring system.
+	slope(ctx, cpuPercent, climbTime, &slopePercent, precpu, cpuIndex)
 
 	quota := make(chan int64, cpuCount)
 	for i := 0; i < cpuCount; i++ {
@@ -299,17 +301,17 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 
 const period = int64(1000000000)
 
-func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent float64, percpu bool, cpuIndex int) {
+func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent *float64, precpu bool, cpuIndex int) {
 	if climbTime != 0 {
 		var ticker = time.NewTicker(time.Second)
-		slopePercent = getUsed(ctx, percpu, cpuIndex)
-		var startPercent = float64(cpuPercent) - slopePercent
+		*slopePercent = getUsed(ctx, precpu, cpuIndex)
+		var startPercent = float64(cpuPercent) - *slopePercent
 		go func() {
 			for range ticker.C {
-				if slopePercent < float64(cpuPercent) {
-					slopePercent += startPercent / float64(climbTime)
-				} else if slopePercent > float64(cpuPercent) {
-					slopePercent -= startPercent / float64(climbTime)
+				if *slopePercent < float64(cpuPercent) {
+					*slopePercent += startPercent / float64(climbTime)
+				} else if *slopePercent > float64(cpuPercent) {
+					*slopePercent -= startPercent / float64(climbTime)
 				}
 			}
 		}()

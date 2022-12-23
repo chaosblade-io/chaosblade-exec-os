@@ -91,14 +91,13 @@ func (sse *StopSystemdExecutor) Exec(uid string, ctx context.Context, model *spe
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "service")
 	}
 
-	flags := fmt.Sprintf("--service %s", service)
 	if _, ok := spec.IsDestroy(ctx); ok {
 		return sse.startService(service, ctx)
 	} else {
 		if response := checkServiceInvalid(uid, service, ctx, sse.channel); response != nil {
 			return response
 		}
-		return sse.channel.Run(ctx, path.Join(sse.channel.GetScriptPath(), StopSystemdBin), flags)
+		return sse.channel.Run(ctx, "systemctl", fmt.Sprintf("stop %s", service))
 	}
 }
 

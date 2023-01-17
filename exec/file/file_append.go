@@ -54,7 +54,7 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 				},
 				&spec.ExpFlag{
 					Name: "interval",
-					Desc: "append interval, must be a positive integer, default 1s",
+					Desc: "append interval, must be a positive integer",
 				},
 				&spec.ExpFlag{
 					Name:   "escape",
@@ -137,8 +137,8 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 
 	// default 1
 	count := 1
-	// 1000 ms
-	interval := 1
+	// default 0
+	interval := 0
 
 	content := model.ActionFlags["content"]
 	countStr := model.ActionFlags["count"]
@@ -172,7 +172,10 @@ func (f *FileAppendActionExecutor) start(filepath string, content string, count 
 	if !response.Success {
 		return response
 	}
-
+	// Without interval, it will not be executed regularly.
+	if interval < 1 {
+		return nil
+	}
 	ticker := time.NewTicker(time.Second * time.Duration(interval))
 	for range ticker.C {
 		response := appendFile(f.channel, count, ctx, content, filepath, escape, enableBase64)

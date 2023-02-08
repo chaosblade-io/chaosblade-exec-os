@@ -113,7 +113,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 		stopNet(ctx, netInterface, cl)
 	}
 	// Only interface flag
-	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" && protocol == ""{
+	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" && protocol == "" {
 		return cl.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
 	}
 
@@ -129,7 +129,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 	}
 
 	// only contains excludePort or excludeIP
-	if localPort == "" && remotePort == "" && destIp == "" && protocol == ""{
+	if localPort == "" && remotePort == "" && destIp == "" && protocol == "" {
 		// Add class rule to 1,2,3 band, exclude port and exclude ip are added to 4 band
 		args := buildNetemToDefaultBandsArgs(netInterface, classRule)
 		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePorts, excludeIp)
@@ -194,7 +194,7 @@ func buildExcludeFilterToNewBand(netInterface string, excludePorts []string, exc
 		}
 		args = fmt.Sprintf(
 			`%s && \
-			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip dport %s 0xffff flowid 1:4 && \,
+			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip dport %s 0xffff flowid 1:4 && \
 			tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %s 0xffff flowid 1:4`,
 			args, netInterface, port, netInterface, port)
 	}
@@ -283,7 +283,7 @@ func buildTargetFilterPortAndIp(localPort, remotePort string, destIpRules, exclu
 			args = fmt.Sprintf(
 				`%s && \
                 tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip protocol %s 0xff flowid 1:4`,
-								args, netInterface, protocol)
+				args, netInterface, protocol)
 			return args
 		} else {
 			protocolrule = fmt.Sprintf(` \

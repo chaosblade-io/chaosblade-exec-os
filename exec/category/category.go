@@ -28,4 +28,5 @@ const (
 	SystemKernel  = "system_kernel"
 	SystemSystemd = "system_systemd"
 	SystemTime    = "system_time"
+	SystemHttp    = "system_http"
 )

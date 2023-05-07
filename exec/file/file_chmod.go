@@ -19,12 +19,11 @@ package file
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"os"
-	"regexp"
-	"strconv"
-	"strings"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -85,7 +84,7 @@ func (*FileChmodActionExecutor) Name() string {
 const tmpFileChmod = "/tmp/chaos-file-chmod.tmp"
 
 func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	commands := []string{"chmod", "grep", "echo", "rm", "awk", "cat"}
+	commands := []string{"chmod", "grep", "echo", "rm", "awk", "cat", "stat"}
 	if response, ok := f.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}
@@ -111,11 +110,14 @@ func (f *FileChmodActionExecutor) Exec(uid string, ctx context.Context, model *s
 		log.Errorf(ctx, "%s is already being experimented", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "filepath", filepath, "already being experimented")
 	}
+	response = f.channel.Run(ctx, "stat", fmt.Sprintf(`-c "%%a" %s`, filepath))
+	if !response.Success {
+		log.Errorf(ctx, "`%s`: can't get file's origin mark", filepath)
+		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "filepath", filepath, "can't get file's mark")
+	}
+	originMark := response.Result.(string)
 
-	fileInfo, _ := os.Stat(filepath)
-	originMark := strconv.FormatInt(int64(fileInfo.Mode().Perm()), 8)
-
-	response = f.channel.Run(ctx, "echo", fmt.Sprintf(`%s:%s >> %s`, filepath, originMark, tmpFileChmod))
+	response = f.channel.Run(ctx, "echo", fmt.Sprintf(`'%s:%s' >> %s`, filepath, originMark, tmpFileChmod))
 	if !response.Success {
 		return response
 	}

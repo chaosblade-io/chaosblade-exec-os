@@ -28,6 +28,7 @@ func NewNetworkCommandSpec() spec.ExpModelCommandSpec {
 				tc.NewDelayActionSpec(),
 				NewDropActionSpec(),
 				NewDnsActionSpec(),
+				NewDnsDownActionSpec(),
 				tc.NewLossActionSpec(),
 				tc.NewDuplicateActionSpec(),
 				tc.NewCorruptActionSpec(),

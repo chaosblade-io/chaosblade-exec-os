@@ -1,6 +1,7 @@
 package tc
 
 import (
+	"math/rand"
 	"testing"
 )
 
@@ -46,4 +47,38 @@ func TestBuildTargetFilterPortAndIp(t *testing.T) {
 			t.Errorf("unexpected result: %s, expected: %s", returnargs, tt.expect)
 		}
 	}
+}
+
+func TestBuildMaskForRange(t *testing.T) {
+	start := rand.Int31n(65535)
+	end := rand.Int31n(65535)
+	if start > end {
+		temp := start
+		start = end
+		end = temp
+	}
+	masks := buildMaskForRange(int(start), int(end))
+	for i := 1; i <= 65535; i++ {
+		if i < int(start) || i > int(end) {
+			if isMatch(masks, uint16(i)) {
+				t.Errorf("unexpected result: %d matched mask for [%d, %d]", i, start, end)
+			}
+		} else {
+			if !isMatch(masks, uint16(i)) {
+				t.Errorf("unexpected result: %d not matched mask for [%d, %d]", i, start, end)
+			}
+		}
+	}
+}
+
+func isMatch(masks [][]uint16, target uint16) bool {
+
+	for _, mask := range masks {
+		v := mask[0]
+		m := mask[1]
+		if (target & m) == v {
+			return true
+		}
+	}
+	return false
 }

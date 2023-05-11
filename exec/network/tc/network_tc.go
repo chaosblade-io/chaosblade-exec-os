@@ -187,12 +187,11 @@ func buildExcludeFilterToNewBand(netInterface string, excludePortRanges [][]int,
 	for _, portRange := range excludePortRanges {
 		masks := buildMaskForRange(portRange[0], portRange[1])
 		for _, mask := range masks {
-			args = fmt.Sprintf(
-				`%s && \
-                tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip dport %d %#x flowid 1:4 && \,
-                tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %d %#x flowid 1:4`,
-				args, netInterface, mask[0], mask[1], netInterface, mask[0], mask[1])
-		}
+		  args = fmt.Sprintf(
+			  `%s && \
+			  tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip dport %s 0xffff flowid 1:4 && \
+			  tc filter add dev %s parent 1: prio 4 protocol ip u32 match ip sport %s 0xffff flowid 1:4`,
+			  args, netInterface, port, netInterface, port)
 	}
 	return args
 }

@@ -91,7 +91,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "remote-port", remotePort, err)
 		}
 	}
-	if excludePort != "" {
+	if excludePort != "" { 
 		excludePortRanges, err = getExcludePortRanges(ctx, excludePort, ignorePeerPorts, cl)
 		if err != nil {
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "exclude-port", excludePort, err)

@@ -112,19 +112,14 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 		return f.stop(filepath, target, ctx)
 	}
 
-	if !exec.CheckFilepathExists(ctx, f.channel, target) {
-		log.Errorf(ctx, "`%s`: target dir does not exist", filepath)
-		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", target, "the file does not exist")
-	}
-
 	force := model.ActionFlags["force"] == "true"
 	autoCreateDir := model.ActionFlags["auto-create-dir"] == "true"
 
 	if !force {
 		targetFile := path.Join(target, "/", path.Base(filepath))
 		if exec.CheckFilepathExists(ctx, f.channel, targetFile) {
-			log.Errorf(ctx, "`%s`: target file does not exist", targetFile)
-			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", targetFile, "the target file does not exist")
+			log.Errorf(ctx, "`%s`: target file already exists", targetFile)
+			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", targetFile, "the target file already exists")
 		}
 	}
 	return f.start(filepath, target, force, autoCreateDir, ctx)

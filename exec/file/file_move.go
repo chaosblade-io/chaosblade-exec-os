@@ -19,12 +19,12 @@ package file
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"path"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const (
@@ -95,7 +95,7 @@ type FileMoveActionExecutor struct {
 }
 
 func (*FileMoveActionExecutor) Name() string {
-	return "chmod"
+	return "move"
 }
 
 func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {

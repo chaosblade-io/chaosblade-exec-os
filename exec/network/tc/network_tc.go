@@ -484,7 +484,7 @@ func portSetToPortRanges(portSet map[int]interface{}) [][]int {
 		for ; j < len(list) && list[j] == list[j-1]+1; j++ {
 		}
 		curRange[1] = list[j-1]
-		i = j + 1
+		i = j
 		ranges = append(ranges, curRange)
 	}
 	return ranges

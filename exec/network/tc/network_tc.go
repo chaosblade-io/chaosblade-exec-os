@@ -91,7 +91,7 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "remote-port", remotePort, err)
 		}
 	}
-	if excludePort != "" { 
+	if excludePort != "" {
 		excludePortRanges, err = getExcludePortRanges(ctx, excludePort, ignorePeerPorts, cl)
 		if err != nil {
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "exclude-port", excludePort, err)
@@ -484,7 +484,7 @@ func portSetToPortRanges(portSet map[int]interface{}) [][]int {
 		for ; j < len(list) && list[j] == list[j-1]+1; j++ {
 		}
 		curRange[1] = list[j-1]
-		i = j + 1
+		i = j
 		ranges = append(ranges, curRange)
 	}
 	return ranges

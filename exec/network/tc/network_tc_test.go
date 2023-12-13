@@ -2,6 +2,7 @@ package tc
 
 import (
 	"math/rand"
+	"reflect"
 	"testing"
 )
 
@@ -68,6 +69,56 @@ func TestBuildMaskForRange(t *testing.T) {
 				t.Errorf("unexpected result: %d not matched mask for [%d, %d]", i, start, end)
 			}
 		}
+	}
+}
+
+func Test_portSetToPortRanges(t *testing.T) {
+	type args struct {
+		portSet map[int]interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]int
+	}{
+		{
+			name: "one",
+			args: args{
+				portSet: map[int]interface{}{
+					22: struct{}{},
+				},
+			},
+			want: [][]int{{22, 22}},
+		},
+		{
+			name: "two",
+			args: args{
+				portSet: map[int]interface{}{
+					22:    struct{}{},
+					19527: struct{}{},
+				},
+			},
+			want: [][]int{{22, 22}, {19527, 19527}},
+		},
+		{
+			name: "range",
+			args: args{
+				portSet: map[int]interface{}{
+					22:   struct{}{},
+					8000: struct{}{},
+					8001: struct{}{},
+					8002: struct{}{},
+				},
+			},
+			want: [][]int{{22, 22}, {8000, 8002}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := portSetToPortRanges(tt.args.portSet); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("portSetToPortRanges() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

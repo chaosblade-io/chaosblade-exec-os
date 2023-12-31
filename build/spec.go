@@ -17,6 +17,10 @@
 package main
 
 import (
+	"log"
+	"os"
+	"runtime"
+
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/cpu"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/disk"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/file"
@@ -27,9 +31,6 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/process"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/script"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/systemd"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/time"
-	"log"
-	"os"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
@@ -48,18 +49,43 @@ func main() {
 
 // getModels returns experiment models in the project
 func getModels() *spec.Models {
-	modelCommandSpecs := []spec.ExpModelCommandSpec{
-		cpu.NewCpuCommandModelSpec(),
-		mem.NewMemCommandModelSpec(),
-		process.NewProcessCommandModelSpec(),
-		network.NewNetworkCommandSpec(),
-		disk.NewDiskCommandSpec(),
-		script.NewScriptCommandModelSpec(),
-		file.NewFileCommandSpec(),
-		kernel.NewKernelInjectCommandSpec(),
-		systemd.NewSystemdCommandModelSpec(),
-		time.NewTimeCommandSpec(),
+
+	var modelCommandSpecs []spec.ExpModelCommandSpec
+
+	if runtime.GOOS == spec.OS_WINDOWS {
+		modelCommandSpecs = []spec.ExpModelCommandSpec{
+			cpu.NewCpuCommandModelSpec(),
+			network.NewNetworkCommandSpec(),
+			mem.NewMemCommandModelSpec(),
+			process.NewProcessCommandModelSpec(),
+			file.NewFileCommandSpec(),
+			disk.NewDiskCommandSpec(),
+		}
+	} else if runtime.GOOS == spec.OS_DARWIN {
+		modelCommandSpecs = []spec.ExpModelCommandSpec{
+			cpu.NewCpuCommandModelSpec(),
+			mem.NewMemCommandModelSpec(),
+			process.NewProcessCommandModelSpec(),
+			network.NewNetworkCommandSpec(),
+			disk.NewDiskCommandSpec(),
+			script.NewScriptCommandModelSpec(),
+			file.NewFileCommandSpec(),
+		}
+	} else {
+		modelCommandSpecs = []spec.ExpModelCommandSpec{
+			cpu.NewCpuCommandModelSpec(),
+			mem.NewMemCommandModelSpec(),
+			process.NewProcessCommandModelSpec(),
+			network.NewNetworkCommandSpec(),
+			disk.NewDiskCommandSpec(),
+			script.NewScriptCommandModelSpec(),
+			file.NewFileCommandSpec(),
+			kernel.NewKernelInjectCommandSpec(),
+			systemd.NewSystemdCommandModelSpec(),
+			stressng.NewStressModelSpec(),
+		}
 	}
+
 	specModels := make([]*spec.Models, 0)
 	for _, modeSpec := range modelCommandSpecs {
 		flagSpecs := append(modeSpec.Flags(), model.GetSSHExpFlags()...)

@@ -19,13 +19,14 @@ package exec
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/version"
 
@@ -284,7 +285,7 @@ func (c *SSHClient) connect() error {
 	if c.Key == "" {
 		auth = append(auth, ssh.Password(c.Password))
 	} else {
-		pemBytes, err := ioutil.ReadFile(c.Key)
+		pemBytes, err := os.ReadFile(c.Key)
 		if err != nil {
 			return err
 		}

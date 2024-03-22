@@ -19,14 +19,14 @@ package mem
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
 	"strconv"
 	"time"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
@@ -209,7 +209,7 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		var err error
 		memPercent, err = strconv.Atoi(memPercentStr)
 		if err != nil {
-			log.Errorf(ctx,"`%s`: mem-percent  must be a positive integer", memPercentStr)
+			log.Errorf(ctx, "`%s`: mem-percent  must be a positive integer", memPercentStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "mem-percent", memPercentStr, "it must be a positive integer")
 		}
 		if memPercent > 100 || memPercent < 0 {
@@ -296,8 +296,8 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 	// adjust process oom_score_adj to avoid being killed
 	if avoidBeingKilled {
 		scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
-		if _, err := os.Stat(scoreAdjFile); err == nil || os.IsExist(err)  {
-			if err := ioutil.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil {
+		if _, err := os.Stat(scoreAdjFile); err == nil || os.IsExist(err) {
+			if err := os.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil {
 				log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj, %v", burnMemMode, err)
 			}
 		} else {
@@ -348,6 +348,6 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 
 // stop burn mem
 func (ce *memExecutor) stop(ctx context.Context, burnMemMode string) *spec.Response {
-	ctx = context.WithValue(ctx,"bin", BurnMemBin)
+	ctx = context.WithValue(ctx, "bin", BurnMemBin)
 	return exec.Destroy(ctx, ce.channel, "mem load")
 }

@@ -19,8 +19,6 @@ package cpu
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"os"
 	os_exec "os/exec"
 	"runtime"
@@ -28,6 +26,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
@@ -187,7 +188,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer")
 		}
 		if cpuPercent > 100 || cpuPercent < 0 {
-			log.Errorf(ctx, "`%s`: cpu-list is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr)
+			log.Errorf(ctx, "`%s`: cpu-percent is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer and not bigger than 100")
 		}
 	} else {
@@ -282,7 +283,7 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 		}
 	}
 
-	// make CPU slowly climb to some level, to simulate slow resource competition 
+	// make CPU slowly climb to some level, to simulate slow resource competition
 	// which system faults cannot be quickly noticed by monitoring system.
 	slope(ctx, cpuPercent, climbTime, &slopePercent, percpu, cpuIndex)
 

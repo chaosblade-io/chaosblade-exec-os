@@ -55,6 +55,13 @@ build_linux:
 		-w /chaosblade-exec-os \
 		chaosblade-os-build-musl:latest
 
+build_arm64:
+	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	docker run --rm \
+		-v $(shell echo -n ${GOPATH}):/go \
+		-v $(BLADE_SRC_ROOT):/chaosblade-exec-os \
+		-w /chaosblade-exec-os \
+		chaosbladeio/chaosblade-os-build-arm:latest
 # test
 test:
 	go test -race -coverprofile=coverage.txt -covermode=atomic ./...

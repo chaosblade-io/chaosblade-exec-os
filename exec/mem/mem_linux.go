@@ -17,61 +17,99 @@
 package mem
 
 import (
-    "context"
-    "fmt"
-    "github.com/chaosblade-io/chaosblade-exec-os/exec"
-    "github.com/chaosblade-io/chaosblade-spec-go/channel"
-    "github.com/chaosblade-io/chaosblade-spec-go/log"
-    "github.com/containerd/cgroups"
-    "github.com/shirou/gopsutil/mem"
-    "strconv"
+	"context"
+	"fmt"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/shirou/gopsutil/mem"
+	"os"
+	"strconv"
 )
 
 func getAvailableAndTotal(ctx context.Context, burnMemMode string, includeBufferCache bool) (int64, int64, error) {
 
-    pid := ctx.Value(channel.NSTargetFlagName)
-    total := int64(0)
-    available := int64(0)
+	pid := ctx.Value(channel.NSTargetFlagName)
+	total := int64(0)
+	available := int64(0)
 
-    if pid != nil {
-        p, err := strconv.Atoi(pid.(string))
-        if err != nil {
-            return 0, 0, fmt.Errorf("load cgroup error, %v", err)
-        }
+	if pid != nil {
+		p, err := strconv.Atoi(pid.(string))
+		if err != nil {
+			return 0, 0, fmt.Errorf("load cgroup error, %v", err)
+		}
 
-        cgroupRoot := ctx.Value("cgroup-root")
-        if cgroupRoot == "" {
-            cgroupRoot = "/sys/fs/cgroup/"
-        }
+		cgroupRoot := ctx.Value("cgroup-root")
+		if cgroupRoot == "" {
+			cgroupRoot = "/sys/fs/cgroup/"
+		}
 
-        log.Debugf(ctx, "get mem useage by cgroup, root path: %s", cgroupRoot)
+		log.Debugf(ctx, "get mem useage by cgroup, root path: %s", cgroupRoot)
 
-        cgroup, err := cgroups.Load(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p))
-        if err != nil {
-            return 0, 0, fmt.Errorf("load cgroup error, %v", err)
-        }
-        stats, err := cgroup.Stat(cgroups.IgnoreNotExist)
-        if err != nil {
-            return 0, 0, fmt.Errorf("load cgroup stat error, %v", err)
-        }
-        if stats != nil && stats.Memory.Usage.Limit < PageCounterMax {
-            total = int64(stats.Memory.Usage.Limit)
-            available = total - int64(stats.Memory.Usage.Usage)
-            if burnMemMode == "ram" && !includeBufferCache {
-                available = available + int64(stats.Memory.Cache)
-            }
-            return total, available, nil
-        }
-    }
+		v2 := isCGroupV2(cgroupRoot.(string))
+		if v2 {
+			g, err := cgroupsv2.PidGroupPath(p)
+			if err != nil {
+				sprintf := fmt.Sprintf("loading cgroup2 for %d, err ", pid, err.Error())
+				log.Fatalf(ctx, "get cpu usage fail, %s", sprintf)
+			}
+			cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup/", g)
+			if err != nil {
+				if err != cgroupsv2.ErrCgroupDeleted {
+					sprintf := fmt.Sprintf("cgroups V2 load failed, %s", err.Error())
+					return 0, 0, fmt.Errorf("load cgroup error, %v", sprintf)
+				}
+				if cg, err = cgroupsv2.NewManager("/sys/fs/cgroup", cgroupRoot.(string), nil); err != nil {
+					sprintf := fmt.Sprintf("cgroups V2 new manager failed, %s", err.Error())
+					return 0, 0, fmt.Errorf("load cgroup error, %v", sprintf)
+				}
+			}
+			stats, err := cg.Stat()
+			if err != nil {
+				return 0, 0, fmt.Errorf("load cgroup stats error, %v", err)
+			}
+			if stats.Memory.UsageLimit < PageCounterMax {
+				total = int64(stats.Memory.UsageLimit)
+				available = total - int64(stats.Memory.Usage)
+				return total, available, nil
+			}
+		} else {
+			cgroup, err := cgroups.Load(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p))
+			if err != nil {
+				return 0, 0, fmt.Errorf("load cgroup error, %v", err)
+			}
+			stats, err := cgroup.Stat(cgroups.IgnoreNotExist)
+			if err != nil {
+				return 0, 0, fmt.Errorf("load cgroup stat error, %v", err)
+			}
+			if stats != nil && stats.Memory.Usage.Limit < PageCounterMax {
+				total = int64(stats.Memory.Usage.Limit)
+				available = total - int64(stats.Memory.Usage.Usage)
+				if burnMemMode == "ram" && !includeBufferCache {
+					available = available + int64(stats.Memory.Cache)
+				}
+				return total, available, nil
+			}
+		}
+	}
 
-    virtualMemory, err := mem.VirtualMemory()
-    if err != nil {
-        return 0, 0, err
-    }
-    total = int64(virtualMemory.Total)
-    available = int64(virtualMemory.Free)
-    if burnMemMode == "ram" && !includeBufferCache {
-        available = available + int64(virtualMemory.Buffers+virtualMemory.Cached)
-    }
-    return total, available, nil
+	virtualMemory, err := mem.VirtualMemory()
+	if err != nil {
+		return 0, 0, err
+	}
+	total = int64(virtualMemory.Total)
+	available = int64(virtualMemory.Free)
+	if burnMemMode == "ram" && !includeBufferCache {
+		available = available + int64(virtualMemory.Buffers+virtualMemory.Cached)
+	}
+	return total, available, nil
+}
+
+func isCGroupV2(cgroupRoot string) bool {
+	if _, err := os.Stat(fmt.Sprintf("%s/cgroup.controllers", cgroupRoot)); err == nil {
+		return true
+	}
+	return false
 }

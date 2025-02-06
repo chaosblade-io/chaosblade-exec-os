@@ -25,12 +25,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
-
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -295,13 +295,18 @@ func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, 
 func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool, avoidBeingKilled bool, cl spec.Channel) {
 	// adjust process oom_score_adj to avoid being killed
 	if avoidBeingKilled {
-		scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
-		if _, err := os.Stat(scoreAdjFile); err == nil || os.IsExist(err) {
-			if err := os.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil {
-				log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj, %v", burnMemMode, err)
+		// not works for the channel.NSExecChannel
+		if _, ok := cl.(*channel.NSExecChannel); !ok {
+			scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
+			if _, err := os.Stat(scoreAdjFile); err == nil || os.IsExist(err) {
+				if err := os.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil { //nolint:gosec
+					log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj, %v", burnMemMode, err)
+				} else {
+					log.Infof(ctx, "write oom_adj %s to %s", oomMinAdj, scoreAdjFile)
+				}
+			} else {
+				log.Errorf(ctx, "score adjust file: %s not exists, %v", scoreAdjFile, err)
 			}
-		} else {
-			log.Errorf(ctx, "score adjust file: %s not exists, %v", scoreAdjFile, err)
 		}
 	}
 

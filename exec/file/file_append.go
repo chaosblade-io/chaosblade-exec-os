@@ -20,13 +20,14 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -71,7 +72,7 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 					Desc:     "cgroup root path, default value /sys/fs/cgroup",
 					NoArgs:   false,
 					Required: false,
-					Default: "/sys/fs/cgroup",
+					Default:  "/sys/fs/cgroup",
 				},
 			},
 			ActionExecutor: &FileAppendActionExecutor{},
@@ -131,7 +132,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 	}
 
 	if !exec.CheckFilepathExists(ctx, f.channel, filepath) {
-		log.Errorf(ctx,"`%s`: file does not exist", filepath)
+		log.Errorf(ctx, "`%s`: file does not exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 
@@ -147,7 +148,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		var err error
 		count, err = strconv.Atoi(countStr)
 		if err != nil || count < 1 {
-			log.Errorf(ctx,"`%s` value must be a positive integer", "count")
+			log.Errorf(ctx, "`%s` value must be a positive integer", "count")
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", count, "it must be a positive integer")
 		}
 	}
@@ -187,7 +188,7 @@ func (f *FileAppendActionExecutor) start(filepath string, content string, count 
 }
 
 func (f *FileAppendActionExecutor) stop(filepath string, ctx context.Context) *spec.Response {
-	ctx = context.WithValue(ctx,"bin", AppendFileBin)
+	ctx = context.WithValue(ctx, "bin", AppendFileBin)
 	return exec.Destroy(ctx, f.channel, "file append")
 }
 
@@ -244,16 +245,16 @@ func parseRandom(content string) *spec.Response {
 		split := strings.Split(text[1], "-")
 		begin, err := strconv.Atoi(split[0])
 		if err != nil {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%s illegal parameter", begin))
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%d illegal parameter", begin))
 		}
 
 		end, err := strconv.Atoi(split[1])
 		if err != nil {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%s illegal parameter", end))
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%d illegal parameter", end))
 		}
 
 		if end <= begin {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("run append file %s failed, begin must < end"))
+			return spec.ReturnFail(spec.ParameterIllegal, "run append file failed, begin must < end")
 		}
 		content = strings.Replace(content, text[0], strconv.Itoa(rand.Intn(end-begin)+begin), 1)
 	}

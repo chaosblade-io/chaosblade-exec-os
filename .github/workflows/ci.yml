@@ -41,7 +41,7 @@ jobs:
           go-version: '1.20'
       
       - name: Cache Go modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -150,7 +150,7 @@ jobs:
       
       - name: Upload artifacts
         if: steps.version.outputs.is_release == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: chaosblade-exec-os-${{ steps.version.outputs.version }}-${{ matrix.platform }}
           path: target/chaosblade-${{ steps.version.outputs.version }}-${{ matrix.platform }}/
@@ -168,7 +168,7 @@ jobs:
           go-version: '1.20'
       
       - name: Cache Go modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
@@ -181,7 +181,7 @@ jobs:
         run: make test
       
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./coverage.txt
           flags: unittests

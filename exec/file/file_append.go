@@ -208,20 +208,48 @@ func (f *FileAppendActionExecutor) start(filepath string, content string, count 
 	if interval < 1 {
 		return nil
 	}
+
+	// For interval-based operations, we need to run in a loop
+	// This will be managed by the chaos_os process
 	ticker := time.NewTicker(time.Second * time.Duration(interval))
-	for range ticker.C {
-		response := appendFile(f.channel, count, ctx, content, filepath, escape, enableBase64)
-		if !response.Success {
-			return response
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			response := appendFile(f.channel, count, ctx, content, filepath, escape, enableBase64)
+			if !response.Success {
+				log.Errorf(ctx, "Failed to append file content: %s", response.Err)
+				// Continue running even if one append fails
+			}
+		case <-ctx.Done():
+			// Context cancelled, stop the ticker
+			log.Infof(ctx, "File append interval operation stopped")
+			return nil
 		}
 	}
-	return nil
 }
 
 func (f *FileAppendActionExecutor) stop(filepath string, enableBackup bool, ctx context.Context) *spec.Response {
-	// For file append operation, we need to remove the appended content instead of killing processes
-	// Since file append is a one-time operation, there are no running processes to terminate
+	// For file append operation, we need to handle both one-time and interval-based operations
+	// If it's an interval-based operation, we need to stop the chaos_os process first
 
+	// Check if this is an interval-based operation by looking for the process
+	ctx = context.WithValue(ctx, "bin", AppendFileBin)
+	response := exec.Destroy(ctx, f.channel, "file append")
+
+	// If the destroy operation failed (no process found), it might be a one-time operation
+	// In that case, we handle file restoration/deletion based on backup settings
+	if !response.Success {
+		log.Infof(ctx, "No running process found, treating as one-time operation")
+		return f.handleOneTimeOperation(filepath, enableBackup, ctx)
+	}
+
+	// For interval-based operations, we also need to handle file restoration/deletion
+	return f.handleOneTimeOperation(filepath, enableBackup, ctx)
+}
+
+func (f *FileAppendActionExecutor) handleOneTimeOperation(filepath string, enableBackup bool, ctx context.Context) *spec.Response {
 	if !enableBackup {
 		// If backup is disabled, just return success without restoring
 		log.Infof(ctx, "File append destroy operation completed for file: %s (backup disabled, no restore)", filepath)

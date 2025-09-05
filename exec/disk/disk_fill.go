@@ -19,8 +19,6 @@ package disk
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"math"
 	"os"
 	"path"
@@ -28,10 +26,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const FillDiskBin = "chaos_filldisk"
@@ -118,7 +117,7 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 		directory = path
 	}
 	if !util.IsDir(directory) {
-		log.Errorf(ctx,"`%s`: path is illegal, is not a directory", directory)
+		log.Errorf(ctx, "`%s`: path is illegal, is not a directory", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "path", directory, "it must be a directory")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -135,21 +134,21 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 				}
 				_, err := strconv.Atoi(size)
 				if err != nil {
-					log.Errorf(ctx,"`%s`: size is illegal, it must be positive integer", size)
+					log.Errorf(ctx, "`%s`: size is illegal, it must be positive integer", size)
 					return spec.ResponseFailWithFlags(spec.ParameterIllegal, "size", size, "it must be positive integer")
 				}
 				return fae.start(uid, directory, size, percent, reserve, retainHandle, ctx)
 			}
 			_, err := strconv.Atoi(reserve)
 			if err != nil {
-				log.Errorf(ctx,"`%s`: reserve is illegal, it must be positive integer", reserve)
+				log.Errorf(ctx, "`%s`: reserve is illegal, it must be positive integer", reserve)
 				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "reserve", reserve, "it must be positive integer")
 			}
 			return fae.start(uid, directory, "", percent, reserve, retainHandle, ctx)
 		}
 		_, err := strconv.Atoi(percent)
 		if err != nil {
-			log.Errorf(ctx,"`%s`: percent is illegal, it must be positive integer", percent)
+			log.Errorf(ctx, "`%s`: percent is illegal, it must be positive integer", percent)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "percent", percent, "it must be positive integer")
 		}
 		return fae.start(uid, directory, "", percent, "", retainHandle, ctx)
@@ -191,7 +190,7 @@ func startFill(ctx context.Context, uid, directory, size, percent, reserve strin
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "directory is nil")
 	}
 	if size == "" && percent == "" && reserve == "" {
-		log.Errorf(ctx,"`%s`: less --size or --percent or --reserve flag", directory)
+		log.Errorf(ctx, "`%s`: less --size or --percent or --reserve flag", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "less --size or --percent or --reserve flag")
 	}
 	dataFile := path.Join(directory, fillDataFile)
@@ -252,7 +251,14 @@ func calculateFileSize(ctx context.Context, directory, size, percent, reserve st
 		}
 		remainderPercentage := expectedPercentage - usedPercentage
 		log.Debugf(ctx, "remainderPercentage: %f", remainderPercentage)
-		expectSize := math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
+
+		var expectSize float64
+		if remainderPercentage*float64(allBytes) > float64(availableBytes) {
+			expectSize = math.Floor(float64(availableBytes) / (1024.0 * 1024.0))
+		} else {
+			expectSize = math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
+		}
+
 		return fmt.Sprintf("%.f", expectSize), nil
 	} else {
 		r, err := strconv.ParseFloat(reserve, 64)

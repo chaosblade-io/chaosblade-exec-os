@@ -46,7 +46,7 @@ func Destroy(ctx context.Context, c spec.Channel, action string) *spec.Response 
 		pids = append(pids, originalPids...)
 	}
 
-	ps, _ := cl.GetPidsByProcessName("chaos_os", ctx)
+	ps, _ := cl.GetPidsByProcessName(spec.ChaosOsBin, ctx)
 	pids = append(ps, pids...)
 	if pids == nil || len(pids) == 0 {
 		sprintf := fmt.Sprintf("destory experiment failed, cannot get the chaos_os program")

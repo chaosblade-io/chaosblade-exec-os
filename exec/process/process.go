@@ -44,6 +44,7 @@ func NewProcessCommandModelSpec() spec.ExpModelCommandSpec {
 			ExpActions: []spec.ExpActionCommandSpec{
 				NewKillProcessActionCommandSpec(),
 				NewStopProcessActionCommandSpec(),
+				NewProcessLoadActionCommandSpec(),
 			},
 		},
 	}

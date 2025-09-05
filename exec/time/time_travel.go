@@ -77,7 +77,7 @@ func (k *TravelTimeActionCommandSpec) LongDesc() string {
 }
 
 func (*TravelTimeActionCommandSpec) Categories() []string {
-	return []string{category.SystemProcess}
+	return []string{category.SystemTime}
 }
 
 type TravelTimeExecutor struct {
@@ -116,11 +116,11 @@ func (tte *TravelTimeExecutor) SetChannel(channel spec.Channel) {
 }
 
 func (tte *TravelTimeExecutor) stop(ctx context.Context) *spec.Response {
-	response := tte.channel.Run(ctx, "timedatectl", fmt.Sprintf(`set-ntp true`))
+	response := tte.channel.Run(ctx, "timedatectl", `set-ntp true`)
 	if !response.Success {
 		return response
 	}
-	return tte.channel.Run(ctx, "hwclock", fmt.Sprintf(`--hctosys`))
+	return tte.channel.Run(ctx, "hwclock", `--hctosys`)
 }
 
 func (tte *TravelTimeExecutor) start(ctx context.Context, timeOffsetStr string, disableNtp bool) *spec.Response {
@@ -132,7 +132,7 @@ func (tte *TravelTimeExecutor) start(ctx context.Context, timeOffsetStr string, 
 	targetTime := time.Now().Add(duration).Format("01/02/2006 15:04:05")
 
 	if disableNtp {
-		response := tte.channel.Run(ctx, "timedatectl", fmt.Sprintf(`set-ntp false`))
+		response := tte.channel.Run(ctx, "timedatectl", `set-ntp false`)
 		if !response.Success {
 			return response
 		}

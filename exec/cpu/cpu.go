@@ -19,20 +19,23 @@ package cpu
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"os"
-	os_exec "os/exec"
+	osexec "os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-exec-os/pkg/automaxprocs"
+
 	_ "go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -187,7 +190,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer")
 		}
 		if cpuPercent > 100 || cpuPercent < 0 {
-			log.Errorf(ctx, "`%s`: cpu-list is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr)
+			log.Errorf(ctx, "`%s`: cpu-percent is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer and not bigger than 100")
 		}
 	} else {
@@ -216,8 +219,21 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-count", cpuCountStr, "it must be a positive integer")
 			}
 		}
-		if cpuCount <= 0 || cpuCount > runtime.NumCPU() {
-			cpuCount = runtime.NumCPU()
+
+		tmpCpuCnt := runtime.NumCPU()
+		if _, ok := ce.channel.(*channel.NSExecChannel); ok {
+			tmpCpuCnt, err = automaxprocs.GetCPUCntByPidForCgroups1(
+				ctx,
+				model.ActionFlags["cgroup-root"],
+				model.ActionFlags[channel.NSTargetFlagName],
+			)
+			if err != nil {
+				log.Errorf(ctx, "get cpu count by pid failed, %v", err)
+			}
+		}
+
+		if cpuCount <= 0 || cpuCount > tmpCpuCnt {
+			cpuCount = tmpCpuCnt
 		}
 	}
 
@@ -256,7 +272,7 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 
 			args = fmt.Sprintf("-c %s %s", core, args)
 			argsArray := strings.Split(args, " ")
-			command := os_exec.CommandContext(ctx, "taskset", argsArray...)
+			command := osexec.CommandContext(ctx, "taskset", argsArray...)
 			command.SysProcAttr = &syscall.SysProcAttr{}
 
 			if err := command.Start(); err != nil {
@@ -282,7 +298,7 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 		}
 	}
 
-	// make CPU slowly climb to some level, to simulate slow resource competition 
+	// make CPU slowly climb to some level, to simulate slow resource competition
 	// which system faults cannot be quickly noticed by monitoring system.
 	slope(ctx, cpuPercent, climbTime, &slopePercent, percpu, cpuIndex)
 

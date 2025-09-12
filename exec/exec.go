@@ -19,9 +19,10 @@ package exec
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
-	"strings"
 )
 
 // todo
@@ -48,9 +49,10 @@ func Destroy(ctx context.Context, c spec.Channel, action string) *spec.Response 
 
 	ps, _ := cl.GetPidsByProcessName(spec.ChaosOsBin, ctx)
 	pids = append(ps, pids...)
-	if pids == nil || len(pids) == 0 {
-		sprintf := fmt.Sprintf("destory experiment failed, cannot get the chaos_os program")
-		return spec.ReturnFail(spec.OsCmdExecFailed, sprintf)
+	if len(pids) == 0 {
+		// If no processes found, consider the destroy operation successful
+		// This can happen when processes have already been cleaned up or never existed
+		return spec.ReturnSuccess("no processes found to destroy")
 	}
 	return cl.Run(ctx, "kill", fmt.Sprintf(`-9 %s`, strings.Join(pids, " ")))
 }

@@ -222,7 +222,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 
 		tmpCpuCnt := runtime.NumCPU()
 		if _, ok := ce.channel.(*channel.NSExecChannel); ok {
-			tmpCpuCnt, err = automaxprocs.GetCPUCntByPidForCgroups1(
+			tmpCpuCnt, err = automaxprocs.GetCPUCntByPid(
 				ctx,
 				model.ActionFlags["cgroup-root"],
 				model.ActionFlags[channel.NSTargetFlagName],

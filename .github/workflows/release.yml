@@ -40,7 +40,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.20'
-          architecture: ${{ matrix.runner_arch }}
       
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -48,16 +47,16 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-${{ matrix.runner_arch }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.runner_arch }}-go-
+            ${{ runner.os }}-go-
       
       - name: Get version info
         id: version
         run: |
-          # Get version from Git Tag, remove v prefix
+          # Get version from Git Tag, remove v prefix and Git description info (same as Makefile logic)
           VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION#v}  # Remove v prefix
+          VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]*-[a-z0-9]*.*//')
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           
           echo "=== Version Information ==="

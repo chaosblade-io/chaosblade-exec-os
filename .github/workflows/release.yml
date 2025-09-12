@@ -1,0 +1,210 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+jobs:
+  build-matrix:
+    name: Build on ${{ matrix.os }} (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            platform: linux_amd64
+            runner_arch: x64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            platform: linux_arm64
+            runner_arch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            platform: darwin_amd64
+            runner_arch: x64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            platform: darwin_arm64
+            runner_arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full Git history for version information
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.20'
+          architecture: ${{ matrix.runner_arch }}
+      
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-${{ matrix.runner_arch }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.runner_arch }}-go-
+      
+      - name: Get version info
+        id: version
+        run: |
+          # Get version from Git Tag, remove v prefix
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}  # Remove v prefix
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          
+          echo "=== Version Information ==="
+          echo "Version: ${VERSION}"
+      
+      - name: Build for ${{ matrix.platform }}
+        run: |
+          # Use Makefile to build for specific platform
+          echo "🔨 Building for ${{ matrix.platform }} using Makefile..."
+          echo "  Target: ${{ matrix.goos }}/${{ matrix.goarch }}"
+          echo "  Runner: ${{ matrix.os }} (${{ matrix.runner_arch }})"
+          echo "  Version: ${{ steps.version.outputs.version }}"
+          
+          make ${{ matrix.platform }}
+          
+          # Display version information
+          echo "📋 Version information:"
+          make version
+      
+      - name: Verify build artifacts
+        run: |
+          # Use version from GitHub context
+          VERSION=${{ steps.version.outputs.version }}
+          PLATFORM_DIR="target/chaosblade-${VERSION}-${{ matrix.platform }}"
+          
+          echo "=== Build artifacts for ${{ matrix.platform }} ==="
+          echo "Version: ${VERSION}"
+          echo "Platform directory: ${PLATFORM_DIR}"
+          
+          # Check if directory exists
+          if [ ! -d "$PLATFORM_DIR" ]; then
+            echo "❌ Platform directory not found: $PLATFORM_DIR"
+            echo "Available directories in target/:"
+            ls -la target/ || echo "target/ directory does not exist"
+            exit 1
+          fi
+          
+          echo "Directory structure:"
+          find "$PLATFORM_DIR" -type f | sort
+          echo ""
+          echo "Binary file size:"
+          ls -lh "$PLATFORM_DIR/bin/chaos_os"
+          echo ""
+          echo "YAML file size:"
+          ls -lh "$PLATFORM_DIR/yaml/chaosblade-os-spec-${VERSION}.yaml"
+          
+          # Verify binary file
+          if [ -f "$PLATFORM_DIR/bin/chaos_os" ]; then
+            echo "✅ Binary file exists and is executable"
+            file "$PLATFORM_DIR/bin/chaos_os"
+            
+            # Verify version information (if supported)
+            if command -v strings >/dev/null 2>&1; then
+              echo "Version info in binary:"
+              strings "$PLATFORM_DIR/bin/chaos_os" | grep -E "(chaosblade-exec-os|version|git)" | head -5
+            fi
+          else
+            echo "❌ Binary file not found!"
+            exit 1
+          fi
+      
+      - name: Create archive
+        id: archive
+        run: |
+          # Use version from GitHub context
+          VERSION=${{ steps.version.outputs.version }}
+          PLATFORM_DIR="target/chaosblade-${VERSION}-${{ matrix.platform }}"
+          ARCHIVE_NAME="chaosblade-exec-os-${VERSION}-${{ matrix.platform }}"
+          
+          echo "Creating archive for version: ${VERSION}"
+          echo "Platform directory: ${PLATFORM_DIR}"
+          
+          # Check if directory exists
+          if [ ! -d "$PLATFORM_DIR" ]; then
+            echo "❌ Platform directory not found: $PLATFORM_DIR"
+            echo "Available directories in target/:"
+            ls -la target/ || echo "target/ directory does not exist"
+            exit 1
+          fi
+          
+          # Create archive
+          tar -czf "${ARCHIVE_NAME}.tar.gz" -C target "chaosblade-${VERSION}-${{ matrix.platform }}"
+          echo "archive_name=${ARCHIVE_NAME}.tar.gz" >> $GITHUB_OUTPUT
+          
+          echo "📦 Archive created: ${ARCHIVE_NAME}.tar.gz"
+          ls -lh "${ARCHIVE_NAME}.tar.gz"
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: ${{ steps.archive.outputs.archive_name }}
+          retention-days: 30
+
+  release:
+    name: Create Release
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+      
+      - name: List all artifacts
+        run: |
+          echo "=== Downloaded artifacts ==="
+          find ./artifacts -type f -name "*.tar.gz" | sort
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ChaosBlade Exec OS ${{ github.ref_name }}
+          body: |
+            ## ChaosBlade Exec OS ${{ github.ref_name }}
+            
+            ### Download Files
+            
+            | Platform | Architecture | Download Link |
+            |----------|--------------|---------------|
+            | Linux | amd64 | [chaosblade-exec-os-${{ github.ref_name }}-linux_amd64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/chaosblade-exec-os-${{ github.ref_name }}-linux_amd64.tar.gz) |
+            | Linux | arm64 | [chaosblade-exec-os-${{ github.ref_name }}-linux_arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/chaosblade-exec-os-${{ github.ref_name }}-linux_arm64.tar.gz) |
+            | macOS | amd64 | [chaosblade-exec-os-${{ github.ref_name }}-darwin_amd64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/chaosblade-exec-os-${{ github.ref_name }}-darwin_amd64.tar.gz) |
+            | macOS | arm64 | [chaosblade-exec-os-${{ github.ref_name }}-darwin_arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/chaosblade-exec-os-${{ github.ref_name }}-darwin_arm64.tar.gz) |
+            
+            ### Installation Instructions
+            
+            1. Download the archive for your platform
+            2. Extract to target directory
+            3. Add `bin/chaos_os` to your PATH environment variable
+            
+            ### Package Contents
+            
+            Each archive contains:
+            - `bin/chaos_os` - Main executable file
+            - `bin/strace` - strace tool (if available)
+            - `yaml/chaosblade-os-spec-${{ github.ref_name }}.yaml` - Configuration file
+            
+            ### Version Information
+            
+            - Version: ${{ github.ref_name }}
+            - Build Time: ${{ github.event.head_commit.timestamp }}
+            - Git Commit: ${{ github.sha }}
+          files: |
+            ./artifacts/*/chaosblade-exec-os-*.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

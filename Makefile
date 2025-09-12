@@ -61,6 +61,7 @@ define build_for_platform
 	@GOOS=$(word 1,$(subst _, ,$(1))) GOARCH=$(word 2,$(subst _, ,$(1))) \
 	$(GO) build $(GO_FLAGS) -o $(call get_platform_bin_dir,$(1))/chaos_os main.go
 	@cp extra/strace $(call get_platform_bin_dir,$(1))/ 2>/dev/null || true
+	@GOOS=$(CURRENT_OS) GOARCH=$(CURRENT_ARCH) $(GO) run build/spec.go $(call get_platform_yaml_dir,$(1))/$(OS_YAML_FILE_NAME)
 	@echo "✓ Build completed for $(1)"
 	@echo "  Binary: $(call get_platform_bin_dir,$(1))/chaos_os"
 	@echo "  Version: $(BLADE_VERSION) (commit: $(GIT_COMMIT_SHORT))"

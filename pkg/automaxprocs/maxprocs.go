@@ -78,6 +78,9 @@ func GetCPUCntByPid(ctx context.Context, actualCGRoot, pid string) (int, error) 
 	case cgroups.CGroupV1:
 		log.Infof(ctx, "detected cgroup v1, using v1 implementation")
 		return GetCPUCntByPidForCgroups1(ctx, actualCGRoot, pid)
+	case cgroups.CGroupUnknown:
+		log.Warnf(ctx, "cgroup not available (e.g., on Darwin), using runtime.NumCPU()")
+		return runtime.NumCPU(), nil
 	default:
 		log.Warnf(ctx, "unknown cgroup version, falling back to v1 implementation")
 		return GetCPUCntByPidForCgroups1(ctx, actualCGRoot, pid)

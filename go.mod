@@ -1,6 +1,6 @@
 module github.com/chaosblade-io/chaosblade-exec-os
 
-go 1.21
+go 1.25
 
 require (
 	github.com/chaosblade-io/chaosblade-spec-go v1.7.5

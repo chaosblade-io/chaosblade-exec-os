@@ -38,12 +38,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # 获取完整的 Git 历史用于版本信息
-      
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.20'
-      
+          go-version: '1.25'
+
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -53,7 +53,7 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      
+
       - name: Get version info
         id: version
         run: |
@@ -71,11 +71,11 @@ jobs:
             echo "version=${VERSION}" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
           fi
-          
+
           echo "=== Version Information ==="
           echo "Version: ${VERSION}"
           echo "Is Release: ${{ steps.version.outputs.is_release }}"
-      
+
       - name: Build for ${{ matrix.platform }}
         run: |
           # 使用 Makefile 编译指定平台
@@ -83,23 +83,23 @@ jobs:
           echo "  Target: ${{ matrix.goos }}/${{ matrix.goarch }}"
           echo "  Runner: ${{ matrix.os }} (${{ matrix.runner_arch }})"
           echo "  Version: ${{ steps.version.outputs.version }}"
-          
+
           make ${{ matrix.platform }}
-          
+
           # 显示版本信息
           echo "📋 Version information:"
           make version
-      
+
       - name: Verify build artifacts
         run: |
           # Use version from GitHub context
           VERSION=${{ steps.version.outputs.version }}
           PLATFORM_DIR="target/chaosblade-${VERSION}-${{ matrix.platform }}"
-          
+
           echo "=== Build artifacts for ${{ matrix.platform }} ==="
           echo "Version: ${VERSION}"
           echo "Platform directory: ${PLATFORM_DIR}"
-          
+
           # Check if directory exists
           if [ ! -d "$PLATFORM_DIR" ]; then
             echo "❌ Platform directory not found: $PLATFORM_DIR"
@@ -107,7 +107,7 @@ jobs:
             ls -la target/ || echo "target/ directory does not exist"
             exit 1
           fi
-          
+
           echo "Directory structure:"
           find "$PLATFORM_DIR" -type f | sort
           echo ""
@@ -116,12 +116,12 @@ jobs:
           echo ""
           echo "YAML file size:"
           ls -lh "$PLATFORM_DIR/yaml/chaosblade-os-spec-${VERSION}.yaml"
-          
+
           # Verify binary file
           if [ -f "$PLATFORM_DIR/bin/chaos_os" ]; then
             echo "✅ Binary file exists and is executable"
             file "$PLATFORM_DIR/bin/chaos_os"
-            
+
             # Verify version information (if supported)
             if command -v strings >/dev/null 2>&1; then
               echo "Version info in binary:"
@@ -131,7 +131,7 @@ jobs:
             echo "❌ Binary file not found!"
             exit 1
           fi
-      
+
       - name: Upload artifacts
         if: steps.version.outputs.is_release == 'true'
         uses: actions/upload-artifact@v4
@@ -145,12 +145,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.20'
-      
+          go-version: '1.25'
+
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -160,10 +160,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      
+
       - name: Run tests
         run: make test
-      
+
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
         with:

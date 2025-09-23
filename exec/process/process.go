@@ -19,12 +19,13 @@ package process
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"strconv"
-	"strings"
 )
 
 type ProcessCommandModelSpec struct {
@@ -73,7 +74,7 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 	excludeProcess := model.ActionFlags["exclude-process"]
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
 	if process == "" && processCmd == "" && localPorts == "" && pid == "" {
-		log.Errorf(ctx, "pid、less process、process-cmd and local-port, less process matcher")
+		log.Errorf(ctx, "%s", "pid、less process、process-cmd and local-port, less process matcher")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "pid|process|process-cmd|local-port")
 	}
 
@@ -88,7 +89,7 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 	if countValue != "" {
 		count, err := strconv.Atoi(countValue)
 		if err != nil {
-			log.Errorf(ctx, spec.ParameterIllegal.Sprintf("count", countValue, err))
+			log.Errorf(ctx, "%s", spec.ParameterIllegal.Sprintf("count", countValue, err))
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", countValue, err)
 		}
 		flags = fmt.Sprintf("%s --count %d", flags, count)
@@ -160,7 +161,7 @@ func checkProcessInvalid(ctx context.Context, process, processCmd, localPorts, p
 	if process != "" {
 		pids, err = cl.GetPidsByProcessName(process, ctx)
 		if err != nil {
-			log.Errorf(ctx, spec.ProcessIdByNameFailed.Sprintf(process, err))
+			log.Errorf(ctx, "%s", spec.ProcessIdByNameFailed.Sprintf(process, err))
 			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, process, err)
 		}
 		killProcessName = process
@@ -168,7 +169,7 @@ func checkProcessInvalid(ctx context.Context, process, processCmd, localPorts, p
 	} else if processCmd != "" {
 		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
-			log.Errorf(ctx, spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
+			log.Errorf(ctx, "%s", spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
 			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, processCmd, err)
 		}
 		killProcessName = processCmd

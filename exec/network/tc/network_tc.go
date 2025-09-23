@@ -2,6 +2,7 @@ package tc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/bits"
@@ -159,7 +160,7 @@ func getExcludePortRanges(ctx context.Context, excludePort string, ignorePeerPor
 				if err != nil {
 					log.Warnf(ctx, "get peer ports for %d err, %v", p, err)
 					errMsg := fmt.Sprintf("get peer ports for %d err, %v, please solve the problem or skip to exclude peer ports by --ignore-peer-port flag", p, err)
-					return nil, fmt.Errorf(errMsg)
+					return nil, errors.New(errMsg)
 				}
 				log.Infof(ctx, "peer ports for %d: %v", p, peerPorts)
 				for _, mp := range peerPorts {
@@ -385,11 +386,11 @@ func stopNet(ctx context.Context, netInterface string, cl spec.Channel) *spec.Re
 // getPeerPorts returns all ports communicating with the port
 func getPeerPorts(ctx context.Context, port string, cl spec.Channel) ([]int, error) {
 	if !cl.IsCommandAvailable(ctx, "ss") {
-		return nil, fmt.Errorf(spec.CommandSsNotFound.Msg)
+		return nil, errors.New(spec.CommandSsNotFound.Msg)
 	}
 	response := cl.Run(ctx, "ss", fmt.Sprintf("-n sport = %s or dport = %s", port, port))
 	if !response.Success {
-		return nil, fmt.Errorf(response.Err)
+		return nil, errors.New(response.Err)
 	}
 	if util.IsNil(response.Result) {
 		return []int{}, nil
@@ -442,26 +443,26 @@ func parseIntegerListToPortRanges(flagName string, flagValue string) ([][]int, e
 		if !strings.Contains(value, "-") {
 			intValue, err := strconv.Atoi(value)
 			if err != nil {
-				return nil, fmt.Errorf(spec.ParameterIllegal.Sprintf(flagName, flagValue, err))
+				return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue, err))
 			}
 			dedup[intValue] = struct{}{}
 			continue
 		}
 		ranges := strings.Split(value, "-")
 		if len(ranges) != 2 {
-			return nil, fmt.Errorf(spec.ParameterIllegal.Sprintf(flagName, flagValue,
+			return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue,
 				"Does not conform to the data format, a connector is required"))
 		}
 		startIndex, err := strconv.Atoi(strings.TrimSpace(ranges[0]))
 		if err != nil {
-			return nil, fmt.Errorf(spec.ParameterIllegal.Sprintf(flagName, flagValue, err))
+			return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue, err))
 		}
 		endIndex, err := strconv.Atoi(strings.TrimSpace(ranges[1]))
 		if err != nil {
-			return nil, fmt.Errorf(spec.ParameterIllegal.Sprintf(flagName, flagValue, err))
+			return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue, err))
 		}
 		if startIndex <= 0 || startIndex > math.MaxUint16 || endIndex <= 0 || endIndex >= math.MaxUint16 || endIndex < startIndex {
-			return nil, fmt.Errorf(spec.ParameterIllegal.Sprintf(flagName, flagValue, "Illegal port range"))
+			return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue, "Illegal port range"))
 		}
 		for i := startIndex; i <= endIndex; i++ {
 			dedup[i] = struct{}{}

@@ -226,7 +226,7 @@ type SSHClient struct {
 func (c SSHClient) RunCommandWithResponse(ctx context.Context, cmd string) (*spec.Response, bool) {
 	buf, err := c.RunCommand(cmd)
 	if err != nil {
-		log.Errorf(ctx, spec.OsCmdExecFailed.Sprintf(cmd, err))
+		log.Errorf(ctx, "%s", spec.OsCmdExecFailed.Sprintf(cmd, err))
 		if buf != nil {
 			return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, cmd, fmt.Sprintf("buf is %s, %v", string(buf), err)), false
 		}
@@ -257,12 +257,12 @@ func ConvertOutputToResponse(ctx context.Context, output string, err error, defa
 			return response
 		}
 		output = strings.TrimSpace(output)
-		log.Errorf(ctx, spec.SshExecFailed.Sprintf(output, err))
+		log.Errorf(ctx, "%s", spec.SshExecFailed.Sprintf(output, err))
 		return spec.ResponseFailWithFlags(spec.SshExecFailed, output, err)
 	}
 	output = strings.TrimSpace(output)
 	if output == "" {
-		log.Errorf(ctx, spec.SshExecNothing.Msg)
+		log.Errorf(ctx, "%s", spec.SshExecNothing.Msg)
 		return spec.ResponseFailWithFlags(spec.SshExecNothing)
 	}
 	response := spec.Decode(output, defaultResponse)

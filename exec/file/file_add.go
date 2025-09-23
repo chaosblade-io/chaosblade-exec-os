@@ -20,9 +20,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"path"
+
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"path"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -143,7 +144,7 @@ func (f *FileAddActionExecutor) start(cl spec.Channel, filepath, content string,
 		} else {
 			if enableBase64 {
 				if decodeBytes, err := base64.StdEncoding.DecodeString(content); err != nil {
-					log.Errorf(ctx, err.Error())
+					log.Errorf(ctx, "%s", err.Error())
 					return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the path is exist")
 				} else {
 					content = string(decodeBytes)

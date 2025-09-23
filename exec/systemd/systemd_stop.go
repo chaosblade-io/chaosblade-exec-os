@@ -19,6 +19,7 @@ package systemd
 import (
 	"context"
 	"fmt"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
@@ -86,7 +87,7 @@ func (sse *StopSystemdExecutor) Exec(uid string, ctx context.Context, model *spe
 
 	service := model.ActionFlags["service"]
 	if service == "" {
-		log.Errorf(ctx, "less service name")
+		log.Errorf(ctx, "%s", "less service name")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "service")
 	}
 
@@ -102,12 +103,12 @@ func (sse *StopSystemdExecutor) Exec(uid string, ctx context.Context, model *spe
 
 func checkServiceInvalid(uid, service string, ctx context.Context, cl spec.Channel) *spec.Response {
 	if !cl.IsCommandAvailable(ctx, "systemctl") {
-		log.Errorf(ctx, spec.CommandSystemctlNotFound.Msg)
+		log.Errorf(ctx, "%s", spec.CommandSystemctlNotFound.Msg)
 		return spec.ResponseFailWithFlags(spec.CommandSystemctlNotFound)
 	}
 	response := cl.Run(ctx, "systemctl", fmt.Sprintf(`status "%s" | grep 'Active' | grep 'running'`, service))
 	if !response.Success {
-		log.Errorf(ctx, spec.SystemdNotFound.Sprintf("service", response.Err))
+		log.Errorf(ctx, "%s", spec.SystemdNotFound.Sprintf("service", response.Err))
 		return spec.ResponseFailWithFlags(spec.SystemdNotFound, service, response.Err)
 	}
 	return nil

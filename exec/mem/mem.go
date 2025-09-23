@@ -189,7 +189,7 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	}
 
 	if ce.channel == nil {
-		log.Errorf(ctx, spec.ChannelNil.Msg)
+		log.Errorf(ctx, "%s", spec.ChannelNil.Msg)
 		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {

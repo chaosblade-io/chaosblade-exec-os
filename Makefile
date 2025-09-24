@@ -147,16 +147,19 @@ clean:
 	rm -rf $(BUILD_TARGET)
 	rm -rf bin
 
+.PHONY: format
 format:
 	@echo "Running goimports and gofumpt to format Go code..."
 	@./hack/update-imports.sh
 	@./hack/update-gofmt.sh
 
+.PHONY: verify
 verify:
 	@echo "Verifying Go code formatting and import order..."
 	@./hack/verify-gofmt.sh
 	@./hack/verify-imports.sh
 
+.PHONY: help
 help:
 	@echo "Available commands:"
 	@echo "  make build           # Build current platform version ($(CURRENT_PLATFORM))"

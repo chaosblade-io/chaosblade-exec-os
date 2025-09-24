@@ -19,15 +19,15 @@ package disk
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"path"
 	"strings"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -93,6 +93,7 @@ func (*BurnActionSpec) Name() string {
 func (*BurnActionSpec) Aliases() []string {
 	return []string{}
 }
+
 func (*BurnActionSpec) ShortDesc() string {
 	return "Increase disk read and write io load"
 }
@@ -182,8 +183,10 @@ func (be *BurnIOExecutor) SetChannel(channel spec.Channel) {
 	be.channel = channel
 }
 
-var readFile = "chaos_burnio.read"
-var writeFile = "chaos_burnio.write"
+var (
+	readFile  = "chaos_burnio.read"
+	writeFile = "chaos_burnio.write"
+)
 
 const count = 100
 
@@ -214,7 +217,7 @@ func burnRead(ctx context.Context, directory, size string, cl spec.Channel) {
 
 	for {
 		args := fmt.Sprintf(ddRunningReadArg, tmpFileForRead, size, count)
-		//run with local channel
+		// run with local channel
 		response := localChannel.Run(ctx, "dd", args)
 		if !response.Success {
 			log.Errorf(ctx, "disk burn read, run dd err: %s", response.Err)
@@ -233,7 +236,7 @@ func getArgs(ctx context.Context, cl spec.Channel) (string, string, string) {
 		return createArgs, runningReadArgs, runningWriteArgs
 	}
 	if response.Result != nil && strings.Contains(strings.ToUpper(response.Result.(string)), "ID=ALPINE") {
-		//alpine linux
+		// alpine linux
 		createArgs = "if=/dev/zero of=%s bs=%dM count=%d oflag=append"
 		runningReadArgs = "if=%s of=/dev/null bs=%sM count=%d iflag=fullblock oflag=append"
 		runningWriteArgs = "if=/dev/zero of=%s bs=%sM count=%d oflag=append"

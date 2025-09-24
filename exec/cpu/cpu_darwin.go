@@ -18,9 +18,10 @@ package cpu
 
 import (
 	"context"
+	"time"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/shirou/gopsutil/cpu"
-	"time"
 )
 
 func getUsed(ctx context.Context, percpu bool, cpuIndex int) float64 {

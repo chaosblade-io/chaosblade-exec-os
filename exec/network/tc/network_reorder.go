@@ -19,9 +19,11 @@ package tc
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type ReorderActionSpec struct {
@@ -132,8 +134,8 @@ func (ce *NetworkReorderExecutor) Exec(uid string, ctx context.Context, model *s
 }
 
 func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
-	ignorePeerPort bool, gap, time, correlation string, force bool, protocol string, ctx context.Context) *spec.Response {
-
+	ignorePeerPort bool, gap, time, correlation string, force bool, protocol string, ctx context.Context,
+) *spec.Response {
 	classRule := fmt.Sprintf("netem reorder %s%% %s%%", percent, correlation)
 	if gap != "" {
 		classRule = fmt.Sprintf("%s gap %s", classRule, gap)
@@ -141,7 +143,6 @@ func (ce *NetworkReorderExecutor) start(netInterface, localPort, remotePort, exc
 	classRule = fmt.Sprintf("%s delay %sms", classRule, time)
 
 	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, protocol, ce.channel)
-
 }
 
 func (ce *NetworkReorderExecutor) stop(netInterface string, ctx context.Context) *spec.Response {

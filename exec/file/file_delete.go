@@ -21,11 +21,12 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"path"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -99,7 +100,7 @@ func (f *FileRemoveActionExecutor) Exec(uid string, ctx context.Context, model *
 	}
 
 	if !exec.CheckFilepathExists(ctx, f.channel, filepath) {
-		log.Errorf(ctx,"`%s`: file does not exist", filepath)
+		log.Errorf(ctx, "`%s`: file does not exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 
@@ -115,7 +116,6 @@ func md5Hex(s string) string {
 func (f *FileRemoveActionExecutor) start(filepath string, force bool, ctx context.Context) *spec.Response {
 	if force {
 		return f.channel.Run(ctx, "rm", fmt.Sprintf(`-rf "%s"`, filepath))
-
 	} else {
 		target := path.Join(path.Dir(filepath), "."+md5Hex(path.Base(filepath)))
 		return f.channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))

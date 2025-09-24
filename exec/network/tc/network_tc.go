@@ -11,10 +11,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 )
 
 // TcNetworkBin for network delay, loss, duplicate, reorder and corrupt experiments
@@ -280,7 +281,8 @@ func getExcludeIpRules(excludeIp string) []string {
 
 // executeTargetPortAndIpWithExclude creates class rule in 1:4 queue and add filter to the queue
 func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel,
-	netInterface, classRule string, localPortRanges, remotePortRanges [][]int, destIpRules []string, excludePorts [][]int, excludeIpRules []string, protocol string) *spec.Response {
+	netInterface, classRule string, localPortRanges, remotePortRanges [][]int, destIpRules []string, excludePorts [][]int, excludeIpRules []string, protocol string,
+) *spec.Response {
 	args := fmt.Sprintf(`qdisc add dev %s parent 1:4 handle 40: %s`, netInterface, classRule)
 	args = buildTargetFilterPortAndIp(localPortRanges, remotePortRanges, destIpRules, excludePorts, excludeIpRules, args, netInterface, protocol)
 	response := channel.Run(ctx, "tc", args)
@@ -292,7 +294,8 @@ func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel
 }
 
 func buildTargetFilterPortAndIp(localPortRanges, remotePortRanges [][]int, destIpRules []string, excludePortRanges [][]int,
-	excludeIpRules []string, args string, netInterface string, protocol string) string {
+	excludeIpRules []string, args string, netInterface string, protocol string,
+) string {
 	protocolrule := ""
 	if protocol != "" {
 		if len(localPortRanges) == 0 && len(remotePortRanges) == 0 && len(destIpRules) == 0 && len(excludePortRanges) == 0 && len(excludeIpRules) == 0 {

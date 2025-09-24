@@ -118,7 +118,6 @@ func NewMountPointFromLine(line, actualCGRoot string) (*MountPoint, error) {
 // If the absPath is not within the MountPoint's root, it returns an error.
 func (mp *MountPoint) CustomTranslate(absPath string) (string, error) {
 	relPath, err := filepath.Rel(mp.Root, absPath)
-
 	if err != nil {
 		return "", err
 	}

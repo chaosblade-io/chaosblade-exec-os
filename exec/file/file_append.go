@@ -27,11 +27,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
-
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const AppendFileBin = "chaos_appendfile"
@@ -161,7 +161,6 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 	// File append operation supports creating new files if they don't exist
 	// The echo command with >> redirection will automatically create the file
 
-
 	// default 1
 	count := 1
 	// default 0
@@ -248,7 +247,6 @@ func (f *FileAppendActionExecutor) start(filepath string, content string, count 
 		}
 	}
 }
-
 
 func (f *FileAppendActionExecutor) stop(filepath string, enableBackup bool, deleteFile bool, ctx context.Context) *spec.Response {
 	// For file append operation, we need to handle both one-time and interval-based operations

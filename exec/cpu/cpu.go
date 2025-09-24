@@ -319,9 +319,9 @@ const period = int64(1000000000)
 
 func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent *float64, percpu bool, cpuIndex int) {
 	if climbTime != 0 {
-		var ticker = time.NewTicker(time.Second)
+		ticker := time.NewTicker(time.Second)
 		*slopePercent = getUsed(ctx, percpu, cpuIndex)
-		var startPercent = float64(cpuPercent) - *slopePercent
+		startPercent := float64(cpuPercent) - *slopePercent
 		go func() {
 			for range ticker.C {
 				if *slopePercent < float64(cpuPercent) {

@@ -19,14 +19,14 @@ package kernel
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"path"
 	"strings"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -50,7 +50,7 @@ func NewStraceErrorActionSpec() spec.ExpActionCommandSpec {
 					Desc:     "cgroup root path, default value /sys/fs/cgroup",
 					NoArgs:   false,
 					Required: false,
-					Default: "/sys/fs/cgroup",
+					Default:  "/sys/fs/cgroup",
 				},
 			},
 			ActionFlags: []spec.ExpFlagSpec{
@@ -81,8 +81,8 @@ func NewStraceErrorActionSpec() spec.ExpActionCommandSpec {
 			ActionExample: `
 # Create a strace error experiment to the process
 blade create strace error --pid 1 --syscall-name mmap --return-value XX --delay-loc enter --first=1`,
-			ActionPrograms:   []string{StraceErrorBin},
-			ActionCategories: []string{category.SystemKernel},
+			ActionPrograms:    []string{StraceErrorBin},
+			ActionCategories:  []string{category.SystemKernel},
 			ActionProcessHang: true,
 		},
 	}
@@ -120,7 +120,6 @@ func (*StraceErrorActionExecutor) Name() string {
 }
 
 func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-
 	var pidList string
 	var first_flag string
 	var end_flag string
@@ -136,12 +135,12 @@ func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, mode
 	}
 	return_value := model.ActionFlags["return-value"]
 	if return_value == "" {
-		log.Errorf(ctx,"return-value is nil")
+		log.Errorf(ctx, "return-value is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "return-value")
 	}
 	syscallName := model.ActionFlags["syscall-name"]
 	if syscallName == "" {
-		log.Errorf(ctx,"syscall-name is nil")
+		log.Errorf(ctx, "syscall-name is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "syscall-name")
 	}
 
@@ -157,7 +156,7 @@ func (dae *StraceErrorActionExecutor) Exec(uid string, ctx context.Context, mode
 	return dae.start(ctx, pidList, return_value, syscallName, first_flag, end_flag, step)
 }
 
-//start strace Error
+// start strace Error
 func (dae *StraceErrorActionExecutor) start(ctx context.Context, pidList string, returnValue string, syscallName string, first string, end string, step string) *spec.Response {
 	if pidList != "" {
 		pids := strings.Split(pidList, ",")

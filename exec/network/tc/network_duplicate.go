@@ -19,9 +19,11 @@ package tc
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type DuplicateActionSpec struct {
@@ -108,12 +110,11 @@ func (de *NetworkDuplicateExecutor) Exec(uid string, ctx context.Context, model 
 }
 
 func (de *NetworkDuplicateExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
-	ignorePeerPort, force bool, protocol string, ctx context.Context) *spec.Response {
-
+	ignorePeerPort, force bool, protocol string, ctx context.Context,
+) *spec.Response {
 	classRule := fmt.Sprintf("netem duplicate %s%%", percent)
 
 	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, protocol, de.channel)
-
 }
 
 func (de *NetworkDuplicateExecutor) stop(netInterface string, ctx context.Context) *spec.Response {

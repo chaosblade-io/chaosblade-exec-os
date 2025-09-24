@@ -26,11 +26,12 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const FillDiskBin = "chaos_filldisk"
@@ -184,7 +185,6 @@ func retainFileHandle(ctx context.Context, cl spec.Channel, fillDiskDirectory st
 const diskFillErrorMessage = "No space left on device"
 
 func startFill(ctx context.Context, uid, directory, size, percent, reserve string, retainHandle bool, cl spec.Channel) *spec.Response {
-
 	if directory == "" {
 		log.Errorf(ctx, "`%s`: directory is nil", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "directory is nil")
@@ -303,7 +303,6 @@ func fillDiskByDD(ctx context.Context, dataFile string, directory string, size s
 
 // stopFill contains kill the filldisk process and delete the temp file actions
 func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Response {
-
 	if directory == "" {
 		log.Errorf(ctx, "`%s`: directory is nil", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "directory is nil")
@@ -315,8 +314,8 @@ func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Resp
 		log.Errorf(ctx, "kill fallocate process err: %s", resp.Err)
 	}
 	// kill daemon process
-	//todo
-	//ctx = context.WithValue(ctx, channel.ProcessKey, fillDiskBin)
+	// todo
+	// ctx = context.WithValue(ctx, channel.ProcessKey, fillDiskBin)
 	pids, _ = cl.GetPidsByProcessName("disk fill", ctx)
 	if pids != nil && len(pids) >= 0 {
 		resp := cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))

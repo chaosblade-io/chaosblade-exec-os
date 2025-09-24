@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/containerd/cgroups"
 	"github.com/shirou/gopsutil/mem"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	cgroupsv2 "github.com/chaosblade-io/chaosblade-exec-os/pkg/automaxprocs/cgroups"
 )
 

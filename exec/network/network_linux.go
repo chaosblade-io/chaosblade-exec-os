@@ -17,8 +17,9 @@
 package network
 
 import (
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/network/tc"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/network/tc"
 )
 
 func NewNetworkCommandSpec() spec.ExpModelCommandSpec {

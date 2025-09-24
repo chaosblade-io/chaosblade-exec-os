@@ -25,12 +25,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-exec-os/pkg/automaxprocs/cgroups"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	containerdCgroups "github.com/containerd/cgroups"
 	"github.com/shirou/gopsutil/cpu"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/pkg/automaxprocs/cgroups"
 )
 
 // getCGroupV2CPUUsage 获取 cgroup v2 环境下的 CPU 使用率
@@ -140,7 +141,6 @@ func getCGroupV2CPUUsage(ctx context.Context, cgroupPath string, cpuCount int) (
 }
 
 func getUsed(ctx context.Context, percpu bool, cpuIndex int) float64 {
-
 	pid := ctx.Value(channel.NSTargetFlagName)
 	cpuCount := ctx.Value("cpuCount").(int)
 

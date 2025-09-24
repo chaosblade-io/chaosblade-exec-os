@@ -23,7 +23,7 @@ func Test_replaceApplier_e2e(t *testing.T) {
 			t.Errorf("create temp file error: %v", err)
 			return nil, err
 		}
-		if err := os.WriteFile(temp.Name(), []byte(originHosts), 0644); err != nil {
+		if err := os.WriteFile(temp.Name(), []byte(originHosts), 0o644); err != nil {
 			t.Errorf("write temp file error: %v", err)
 			return nil, err
 		}
@@ -188,7 +188,7 @@ func Test_defaultApplier_e2e(t *testing.T) {
 			t.Errorf("create temp file error: %v", err)
 			return nil, err
 		}
-		if err := os.WriteFile(temp.Name(), []byte(originHosts), 0644); err != nil {
+		if err := os.WriteFile(temp.Name(), []byte(originHosts), 0o644); err != nil {
 			t.Errorf("write temp file error: %v", err)
 			return nil, err
 		}

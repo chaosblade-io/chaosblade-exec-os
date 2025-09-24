@@ -19,9 +19,11 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"strings"
+
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type DnsDownActionSpec struct {

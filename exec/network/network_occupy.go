@@ -19,13 +19,14 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"net/http"
 	osutil "os"
 	"strings"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -56,7 +57,7 @@ func NewOccupyActionSpec() spec.ExpActionCommandSpec {
 					Desc:     "cgroup root path, default value /sys/fs/cgroup",
 					NoArgs:   false,
 					Required: false,
-					Default: "/sys/fs/cgroup",
+					Default:  "/sys/fs/cgroup",
 				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
@@ -102,7 +103,6 @@ func (*OccupyActionExecutor) Name() string {
 }
 
 func (oae *OccupyActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-
 	// check reboot permission
 	if osutil.Geteuid() != 0 {
 		// not root
@@ -110,7 +110,7 @@ func (oae *OccupyActionExecutor) Exec(uid string, ctx context.Context, model *sp
 	}
 	port := model.ActionFlags["port"]
 	if port == "" {
-		log.Errorf(ctx,"port is nil")
+		log.Errorf(ctx, "port is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "port")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -153,7 +153,7 @@ func (oae *OccupyActionExecutor) start(port string, ctx context.Context) *spec.R
 }
 
 func (oae *OccupyActionExecutor) stop(port string, ctx context.Context) *spec.Response {
-	ctx = context.WithValue(ctx,"bin", OccupyNetworkBin)
+	ctx = context.WithValue(ctx, "bin", OccupyNetworkBin)
 	return exec.Destroy(ctx, oae.channel, "network occupy")
 }
 

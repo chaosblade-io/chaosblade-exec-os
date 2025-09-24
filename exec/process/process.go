@@ -64,7 +64,6 @@ func (*ProcessCommandModelSpec) LongDesc() string {
 }
 
 func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid string) *spec.Response {
-
 	countValue := model.ActionFlags["count"]
 	process := model.ActionFlags["process"]
 	processCmd := model.ActionFlags["process-cmd"]
@@ -78,7 +77,7 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "pid|process|process-cmd|local-port")
 	}
 
-	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
+	excludeProcessValue := fmt.Sprintf("blade,%s", excludeProcess)
 	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
 	if !ignoreProcessNotFound {
 		if response := checkProcessInvalid(ctx, process, processCmd, localPorts, pid, cl); response != nil {

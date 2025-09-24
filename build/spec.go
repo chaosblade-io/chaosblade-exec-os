@@ -17,6 +17,9 @@
 package main
 
 import (
+	"log"
+	"os"
+
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/cpu"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/disk"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/file"
@@ -28,8 +31,6 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/script"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/systemd"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/time"
-	"log"
-	"os"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"

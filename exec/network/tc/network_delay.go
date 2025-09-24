@@ -19,9 +19,11 @@ package tc
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type DelayActionSpec struct {
@@ -122,11 +124,10 @@ func (de *NetworkDelayExecutor) Exec(uid string, ctx context.Context, model *spe
 }
 
 func (de *NetworkDelayExecutor) start(localPort, remotePort, excludePort, destIp, excludeIp, time, offset, netInterface string,
-	ignorePeerPort, force bool, protocol string, ctx context.Context) *spec.Response {
-
+	ignorePeerPort, force bool, protocol string, ctx context.Context,
+) *spec.Response {
 	classRule := fmt.Sprintf("netem delay %sms %sms", time, offset)
 	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, protocol, de.channel)
-
 }
 
 func (de *NetworkDelayExecutor) stop(netInterface string, ctx context.Context) *spec.Response {

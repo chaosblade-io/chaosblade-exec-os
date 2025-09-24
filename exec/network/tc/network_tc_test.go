@@ -42,7 +42,7 @@ func TestBuildTargetFilterPortAndIp(t *testing.T) {
 	tests = append(tests, test1, test2)
 
 	for _, tt := range tests {
-		//localPort, remotePort string, destIpRules, excludePorts, excludeIpRules []string, args string, netInterface, protocol string
+		// localPort, remotePort string, destIpRules, excludePorts, excludeIpRules []string, args string, netInterface, protocol string
 		returnargs := buildTargetFilterPortAndIp(tt.input.localPortRanges, tt.input.remotePortRanges, tt.input.destIpRules, tt.input.excludePortRanges, tt.input.excludeIpRules, tt.input.args, tt.input.netInterface, tt.input.protocol)
 		if returnargs != tt.expect {
 			t.Errorf("unexpected result: %s, expected: %s", returnargs, tt.expect)
@@ -123,7 +123,6 @@ func Test_portSetToPortRanges(t *testing.T) {
 }
 
 func isMatch(masks [][]uint16, target uint16) bool {
-
 	for _, mask := range masks {
 		v := mask[0]
 		m := mask[1]

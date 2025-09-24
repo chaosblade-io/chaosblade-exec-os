@@ -23,16 +23,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/network/tc"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/goodhosts/hostsfile"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/network/tc"
 )
 
-var (
-	hosts = hostsfile.HostsFilePath
-)
+var hosts = hostsfile.HostsFilePath
 
 const (
 	tmpHosts = "/tmp/chaos-hosts.tmp"
@@ -235,7 +234,7 @@ func (m *replaceApplier) Start(ctx context.Context, uid, domainArg, ip string) *
 		_ = os.Remove(name)
 	}(temp.Name())
 
-	if err := os.WriteFile(temp.Name(), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(temp.Name(), []byte(content), 0o644); err != nil {
 		log.Errorf(ctx, "write temp file failed, %v, uid: %s", err, uid)
 		return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, "write temp file failed for dns infusion")
 	}

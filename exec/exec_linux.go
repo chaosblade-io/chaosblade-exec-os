@@ -19,8 +19,9 @@ package exec
 import (
 	"errors"
 	"fmt"
-	"github.com/containerd/cgroups"
 	"os"
+
+	"github.com/containerd/cgroups"
 )
 
 func PidPath(pid int) cgroups.Path {
@@ -38,7 +39,6 @@ func PidPath(pid int) cgroups.Path {
 			if root, ok = paths["name="+string(name)]; !ok {
 				return "", errors.New("controller is not supported")
 			}
-
 		}
 		return root, nil
 	}

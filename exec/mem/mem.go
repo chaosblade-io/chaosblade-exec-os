@@ -176,8 +176,8 @@ func (ce *memExecutor) SetChannel(channel spec.Channel) {
 }
 
 const (
-	//processOOMScoreAdj = "/proc/%s/oom_score_adj"
-	//oomMinScore        = "-1000"
+	// processOOMScoreAdj = "/proc/%s/oom_score_adj"
+	// oomMinScore        = "-1000"
 	processOOMAdj = "/proc/%d/oom_adj"
 	oomMinAdj     = "-17"
 )
@@ -242,7 +242,6 @@ type Block [32 * 1024]int32
 const PageCounterMax uint64 = 9223372036854770000
 
 func calculateMemSize(ctx context.Context, burnMemMode string, percent, reserve int, includeBufferCache bool) (int64, int64, error) {
-
 	total, available, err := getAvailableAndTotal(ctx, burnMemMode, includeBufferCache)
 	if err != nil {
 		return 0, 0, err
@@ -310,7 +309,7 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 		if _, ok := cl.(*channel.NSExecChannel); !ok {
 			scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
 			if _, err := os.Stat(scoreAdjFile); err == nil || os.IsExist(err) {
-				if err := os.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil { //nolint:gosec
+				if err := os.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0o644); err != nil { //nolint:gosec
 					log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj, %v", burnMemMode, err)
 				} else {
 					log.Infof(ctx, "write oom_adj %s to %s", oomMinAdj, scoreAdjFile)
@@ -326,8 +325,8 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 		return
 	}
 	tick := time.Tick(time.Second)
-	var cache = make(map[int][]Block, 1)
-	var count = 1
+	cache := make(map[int][]Block, 1)
+	count := 1
 	cache[count] = make([]Block, 0)
 	if memRate <= 0 {
 		memRate = 100

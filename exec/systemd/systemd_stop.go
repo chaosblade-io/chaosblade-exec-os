@@ -21,9 +21,9 @@ import (
 	"fmt"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 )
 
 const StopSystemdBin = "chaos_stopsystemd"
@@ -84,7 +84,6 @@ func (sse *StopSystemdExecutor) Name() string {
 }
 
 func (sse *StopSystemdExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-
 	service := model.ActionFlags["service"]
 	if service == "" {
 		log.Errorf(ctx, "%s", "less service name")

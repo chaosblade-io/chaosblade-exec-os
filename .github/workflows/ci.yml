@@ -161,6 +161,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Run code style and import order verification
+        run: make verify
+
       - name: Run tests
         run: make test
 

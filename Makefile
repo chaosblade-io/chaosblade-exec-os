@@ -147,6 +147,16 @@ clean:
 	rm -rf $(BUILD_TARGET)
 	rm -rf bin
 
+format:
+	@echo "Running goimports and gofumpt to format Go code..."
+	@./hack/update-imports.sh
+	@./hack/update-gofmt.sh
+
+verify:
+	@echo "Verifying Go code formatting and import order..."
+	@./hack/verify-gofmt.sh
+	@./hack/verify-imports.sh
+
 help:
 	@echo "Available commands:"
 	@echo "  make build           # Build current platform version ($(CURRENT_PLATFORM))"
@@ -160,6 +170,8 @@ help:
 	@echo "  make version         # Display version information"
 	@echo "  make version_tool    # Build version tool"
 	@echo "  make test_version_injection # Test version injection"
+	@echo "  make format          # Format Go code using goimports and gofumpt"
+	@echo "  make verify          # Verify Go code formatting and import order"
 	@echo "  make help            # Display help information"
 	@echo ""
 	@echo "Current Platform: $(CURRENT_PLATFORM)"

@@ -25,11 +25,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const FileLoadBin = "chaos_fileload"
@@ -53,7 +54,8 @@ func NewFileLoadActionSpec() spec.ExpActionCommandSpec {
 					Name:   "force",
 					Desc:   "use --force flag mean the experiment cannot automatically recover due to exceeding the file handle limit.",
 					NoArgs: true,
-				}},
+				},
+			},
 			ActionExecutor: &FileLoadExecutor{},
 			ActionExample: `
 # open /home/logs/nginx.log 10 times
@@ -199,7 +201,7 @@ func (pl *FileLoadExecutor) start(ctx context.Context, filepath string, count in
 		if response := pl.channel.Run(ctx, "echo", fmt.Sprintf(`%s >> %s`, filepath, filepath)); !response.Success {
 			return response
 		}
-		//return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
+		// return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 	if count == 0 {
 		log.Infof(ctx, "create loop file: %s", filepath)
@@ -242,7 +244,7 @@ func (pl *FileLoadExecutor) stop(ctx context.Context, filepath string) *spec.Res
 	simpleProc(ctx, fmt.Sprintf("lsof %s | awk '{print $2}' | xargs kill -9", filepath))
 	if filepath == DefaultFilePath && exec.CheckFilepathExists(ctx, pl.channel, filepath) {
 		os.Remove(filepath)
-		//return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
+		// return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 	ctx = context.WithValue(ctx, "bin", FileLoadBin)
 	return exec.Destroy(ctx, pl.channel, "file load")

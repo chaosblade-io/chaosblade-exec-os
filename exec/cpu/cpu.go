@@ -263,7 +263,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	// Apply quota ratio to adjust the target percent
 	// Example: quota=0.6 cores, cpuCount=1, ratio=0.6
 	// User wants 80% load, effective target = 80% * 0.6 = 48%
-	// percent should not be bigger than 100%
+	// percent should not exceed 100%
 	effectivePercent := int(math.Min(math.Round(float64(cpuPercent)*quotaRatio), 100))
 	if effectivePercent != cpuPercent {
 		log.Infof(ctx, "adjusted cpu percent from %d%% to %d%% based on quota ratio %f",

@@ -8,7 +8,7 @@ require (
 	github.com/goodhosts/hostsfile v0.1.6
 	github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	go.uber.org/automaxprocs v1.3.0
+	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 )
 

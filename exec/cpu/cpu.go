@@ -176,11 +176,13 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		return ce.stop(ctx)
 	}
 
-	var cpuCount int
-	var quotaRatio float64 = 1.0
-	var cpuList string
-	var cpuPercent int
-	var climbTime int
+	var (
+		cpuCount   int
+		cpuList    string
+		cpuPercent int
+		climbTime  int
+		quotaRatio = 1.0
+	)
 
 	cpuPercentStr := model.ActionFlags["cpu-percent"]
 	if cpuPercentStr != "" {
@@ -223,7 +225,6 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 
 		tmpCpuCnt := runtime.NumCPU()
 		tmpQuotaRatio := 1.0
-		quotaRatio = 1.0
 		if _, ok := ce.channel.(*channel.NSExecChannel); ok {
 			tmpCpuCnt, tmpQuotaRatio, err = automaxprocs.GetCPUCntByPid(
 				ctx,

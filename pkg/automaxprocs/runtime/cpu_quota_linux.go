@@ -11,12 +11,12 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/pkg/automaxprocs/cgroups"
 )
 
-// GetCPUQuotaToCPUCntByPidFroCgroups1 converts the CPU quota applied to the calling process
+// GetCPUQuotaToCPUCntByPidForCgroups1 converts the CPU quota applied to the calling process
 // to a valid CPU cnt value. The quota is converted from float to int using round.
 // If round == nil, DefaultRoundFunc is used.
 // Only support cgroups1!
 // Returns: cpuCount, quotaRatio (actual quota / cpuCount), status, error
-func GetCPUQuotaToCPUCntByPidFroCgroups1(
+func GetCPUQuotaToCPUCntByPidForCgroups1(
 	ctx context.Context,
 	actualCGRoot string,
 	pid string,

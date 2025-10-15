@@ -13,7 +13,7 @@ import (
 // GetCPUCntByPidForCgroups1 actualCGRoot 用于调整 mountinfo 下的挂载点 cgroup 路径
 // 返回: cpuCount, quotaRatio (实际quota/cpuCount的比值), error
 func GetCPUCntByPidForCgroups1(ctx context.Context, actualCGRoot, pid string) (int, float64, error) {
-	cnt, ratio, status, err := iruntime.GetCPUQuotaToCPUCntByPidFroCgroups1(
+	cnt, ratio, status, err := iruntime.GetCPUQuotaToCPUCntByPidForCgroups1(
 		ctx,
 		actualCGRoot,
 		pid,
@@ -22,7 +22,7 @@ func GetCPUCntByPidForCgroups1(ctx context.Context, actualCGRoot, pid string) (i
 	)
 	numCPU := runtime.NumCPU()
 	if err != nil {
-		log.Errorf(ctx, "error on GetCPUQuotaToCPUCntByPidFroCgroups1, err: %v, use NumCPU instead", err)
+		log.Errorf(ctx, "error on GetCPUQuotaToCPUCntByPidForCgroups1, err: %v, use NumCPU instead", err)
 		return numCPU, 1.0, err
 	}
 

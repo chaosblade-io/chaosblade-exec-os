@@ -264,7 +264,8 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	// Example: quota=0.6 cores, cpuCount=1, ratio=0.6
 	// User wants 80% load, effective target = 80% * 0.6 = 48%
 	// percent should not exceed 100%
-	effectivePercent := int(math.Min(math.Round(float64(cpuPercent)*quotaRatio), 100))
+	// percent should not be less than 1%, otherwise the cpu burn program will not work
+	effectivePercent := int(math.Min(math.Max(float64(cpuPercent)*quotaRatio, 1), 100))
 	if effectivePercent != cpuPercent {
 		log.Infof(ctx, "adjusted cpu percent from %d%% to %d%% based on quota ratio %f",
 			cpuPercent, effectivePercent, quotaRatio)

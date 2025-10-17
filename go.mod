@@ -7,6 +7,8 @@ require (
 	github.com/containerd/cgroups v1.0.2-0.20210605143700-23b51209bf7b
 	github.com/goodhosts/hostsfile v0.1.6
 	github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c
+  github.com/howeyc/crc16 v0.0.0-20171223171357-2b2a61e366a6
+  github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97

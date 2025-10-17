@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/big"
+	"math/rand"
 	"os"
 	osexec "os/exec"
 	"runtime"
@@ -27,9 +29,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"math/rand"
-	"math/big"
-	"math"
 	"unsafe"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
@@ -40,10 +39,10 @@ import (
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-exec-os/pkg/automaxprocs"
-  
-  "github.com/mjibson/go-dsp/fft"
-	"github.com/shirou/gopsutil/cpu"
+
 	"github.com/howeyc/crc16"
+	"github.com/mjibson/go-dsp/fft"
+	"github.com/shirou/gopsutil/cpu"
 
 	_ "go.uber.org/automaxprocs/maxprocs"
 )
@@ -51,8 +50,8 @@ import (
 const BurnCpuBin = "chaos_burncpu"
 
 type StressCpuMethodInfo struct {
-	name  			string					/* human readable form of stressor */
-	stress 			func(context.Context)	/* the cpu method function */
+	name   string                /* human readable form of stressor */
+	stress func(context.Context) /* the cpu method function */
 }
 
 type CpuCommandModelSpec struct {
@@ -336,10 +335,10 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	quotas := make([]chan int64, cpuCount)
 	for i := 0; i < cpuCount; i++ {
 		quotas[i] = make(chan int64)
-		go burn(ctx, quotas[i], slopePercent, precpu, cpuIndex, cpuCount)
+		go burn(ctx, quotas[i], slopePercent, percpu, cpuIndex, cpuCount)
 	}
 
-	// A percpu of true gets the load of the specified cpu; 
+	// A percpu of true gets the load of the specified cpu;
 	// A percpu of false gets the load of the average cpu;
 	// The two cases are combined in a single loop.
 	for {
@@ -401,20 +400,20 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 				ds = 0
 			}
 		default:
-			cpuPercent := float64(q)/float64(q+ds)*100
-			// This loop is used to handle the update of the quota error q. 
-			// Assuming a cpu_percent of 70 and a current system load of 10%, 
+			cpuPercent := float64(q) / float64(q+ds) * 100
+			// This loop is used to handle the update of the quota error q.
+			// Assuming a cpu_percent of 70 and a current system load of 10%,
 			// there is one condition that would make entering this loop:
 			// q Execute quota once, then default, then quota, and offset is 60 both times.
 			if cpuPercent > slopePercent {
-				// precpu is true, get the corresponding index frequency; 
+				// precpu is true, get the corresponding index frequency;
 				// otherwise get the average frequency
 				totalCpuPercent, err := cpu.Percent(0, precpu)
 				if err != nil {
 					log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 					continue
 				}
-				// Here is actually a retry strategy, because 
+				// Here is actually a retry strategy, because
 				// `if cpuPercent > slopePercent` is actually to prevent quota from being inaccurate.
 				if totalCpuPercent[cpuIndex] >= slopePercent {
 					// 1. A quota is not inaccurate, then do not modify q, ds, directly retry.
@@ -422,9 +421,9 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 					log.Debugf(ctx, "current CPU load is higher than slopePercent.")
 					continue
 				}
-				// Start calculating q and ds based on totalCpuPercent. 
-				// beforeCpuPercent is initially set to slopePercent, 
-				// which may be inaccurate and cause a higher load 
+				// Start calculating q and ds based on totalCpuPercent.
+				// beforeCpuPercent is initially set to slopePercent,
+				// which may be inaccurate and cause a higher load
 				// when there are other processes hogging the CPU.
 
 				// The repaired beforeCpuPercent: cpuCount * beforeCpuPercent / cpuNum
@@ -438,7 +437,7 @@ func burn(ctx context.Context, quota <-chan int64, slopePercent float64, precpu 
 				if cpuPercent < 0 {
 					cpuPercent = 0
 				}
-				q = int64(cpuPercent/float64(100)*float64(period))
+				q = int64(cpuPercent / float64(100) * float64(period))
 				ds = period - q
 			}
 
@@ -457,24 +456,24 @@ func (ce *cpuExecutor) stop(ctx context.Context) *spec.Response {
 
 // TODO: Extend richer CPU burn algorithms:
 // floatconversion, gamma, gcd, gray, hamming, hyperbolic, idct...
-var cpu_methods = []StressCpuMethodInfo {
-	{ "ackermann", 	stress_cpu_ackermann,	},
-	{ "bitops",		stress_cpu_bitops,		},
-	{ "collatz",	stress_cpu_collatz,		},
-	{ "crc16",		stress_cpu_crc16,		},
-	{ "factorial",	stress_cpu_factorial,	},
-	{ "fft", 		stress_cpu_fft,         },
-	{ "pi", 		stress_cpu_pi,			}, 
-	{ "fibonacci",	stress_cpu_fibonacci,	},
+var cpu_methods = []StressCpuMethodInfo{
+	{"ackermann", stress_cpu_ackermann},
+	{"bitops", stress_cpu_bitops},
+	{"collatz", stress_cpu_collatz},
+	{"crc16", stress_cpu_crc16},
+	{"factorial", stress_cpu_factorial},
+	{"fft", stress_cpu_fft},
+	{"pi", stress_cpu_pi},
+	{"fibonacci", stress_cpu_fibonacci},
 }
 
 func ackermann(m uint32, n uint32) uint32 {
 	if m == 0 {
 		return n + 1
 	} else if n == 0 {
-		return ackermann(m - 1, 1)
+		return ackermann(m-1, 1)
 	} else {
-		return ackermann(m - 1, ackermann(m, n - 1))
+		return ackermann(m-1, ackermann(m, n-1))
 	}
 }
 
@@ -575,15 +574,15 @@ func stress_cpu_factorial(ctx context.Context) {
 		f *= float64(n)
 
 		/* Stirling */
-		if (f - fact) / fact > precision {
+		if (f-fact)/fact > precision {
 			log.Fatalf(ctx, "Stirling's approximation of factorial(%d) out of range\n", n)
 		}
 
 		/* Ramanujan */
 		dn = float64(n)
-		fact = math.SqrtPi * math.Pow((dn / float64(math.E)), dn)
-		fact *= math.Pow((((((((8 * dn) + 4)) * dn) + 1) * dn) + 1.0/30.0), (1.0/6.0))
-		if ((f - fact) / fact > precision) {
+		fact = math.SqrtPi * math.Pow((dn/float64(math.E)), dn)
+		fact *= math.Pow(((((((8 * dn) + 4) * dn) + 1) * dn) + 1.0/30.0), (1.0 / 6.0))
+		if (f-fact)/fact > precision {
 			log.Fatalf(ctx, "Stirling's approximation of factorial(%d) out of range\n", n)
 		}
 	}
@@ -592,17 +591,17 @@ func stress_cpu_factorial(ctx context.Context) {
 func stress_cpu_fft(ctx context.Context) {
 	var buffer [128]float64
 	for i := 0; i < 128; i++ {
-		buffer[i] = float64(i%64)
+		buffer[i] = float64(i % 64)
 	}
 	for i := 0; i < 8; i++ {
 		fft.FFTReal(buffer[:])
 	}
 }
 
-// We start out by defining a high-precision arc cotangent function.  
-// This one returns the response as an integer- normally it would be 
-// a floating point number.  Here,the integer is multiplied by the 
-// "unity" that we pass in. If unity is 10, for example, and the answer 
+// We start out by defining a high-precision arc cotangent function.
+// This one returns the response as an integer- normally it would be
+// a floating point number.  Here,the integer is multiplied by the
+// "unity" that we pass in. If unity is 10, for example, and the answer
 // should be "0.5",then the answer will come out as 5.
 // https://go.dev/play/p/hF9jklt5lp
 func stress_cpu_pi(ctx context.Context) {
@@ -616,7 +615,7 @@ func stress_cpu_pi(ctx context.Context) {
 
 func arccot(x int64, unity *big.Int) *big.Int {
 	bigx := big.NewInt(x)
-	xsquared := big.NewInt(x*x)
+	xsquared := big.NewInt(x * x)
 	sum := big.NewInt(0)
 	sum.Div(unity, bigx)
 	xpower := big.NewInt(0)
@@ -624,7 +623,7 @@ func arccot(x int64, unity *big.Int) *big.Int {
 	n := int64(3)
 	zero := big.NewInt(0)
 	sign := false
-	
+
 	term := big.NewInt(0)
 	for {
 		xpower.Div(xpower, xsquared)
@@ -649,7 +648,7 @@ func stress_cpu_fibonacci(ctx context.Context) {
 	var f2 uint64 = 1
 	var fn uint64 = 1
 
-	for !(fn & 0x8000000000000000 != 0) {
+	for !(fn&0x8000000000000000 != 0) {
 		fn = f1 + f2
 		f1 = f2
 		f2 = fn
@@ -664,14 +663,14 @@ func stress_cpu_fibonacci(ctx context.Context) {
 // This function can also be used to implement something similar to stress-ng --cpu-load.
 func stress_cpu(interval time.Duration, cpuPercent float64) {
 	if cpuPercent == 0 {
-		time.Sleep(time.Duration(interval)*time.Nanosecond)
+		time.Sleep(time.Duration(interval) * time.Nanosecond)
 		return
 	}
 	bias := 0.0
 	startTime := time.Now().UnixNano()
-	nanoInterval := int64(interval/time.Nanosecond)
+	nanoInterval := int64(interval / time.Nanosecond)
 	for {
-		if time.Now().UnixNano() - startTime > nanoInterval {
+		if time.Now().UnixNano()-startTime > nanoInterval {
 			break
 		}
 
@@ -681,7 +680,7 @@ func stress_cpu(interval time.Duration, cpuPercent float64) {
 			stress_cpu_method(i)
 		}
 		endTime1 := time.Now().UnixNano()
-		delay := ((100 - cpuPercent) * float64(endTime1 - startTime1) / cpuPercent)
+		delay := ((100 - cpuPercent) * float64(endTime1-startTime1) / cpuPercent)
 		delay -= bias
 		if delay <= 0.0 {
 			bias = 0.0
@@ -689,7 +688,7 @@ func stress_cpu(interval time.Duration, cpuPercent float64) {
 			startTime2 := time.Now().UnixNano()
 			time.Sleep(time.Duration(delay) * time.Nanosecond)
 			endTime2 := time.Now().UnixNano()
-			bias = float64(endTime2 - startTime2) - delay
+			bias = float64(endTime2-startTime2) - delay
 		}
 	}
 }

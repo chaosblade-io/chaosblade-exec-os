@@ -19,12 +19,13 @@ package process
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"strconv"
-	"strings"
 )
 
 type ProcessCommandModelSpec struct {
@@ -44,6 +45,7 @@ func NewProcessCommandModelSpec() spec.ExpModelCommandSpec {
 			ExpActions: []spec.ExpActionCommandSpec{
 				NewKillProcessActionCommandSpec(),
 				NewStopProcessActionCommandSpec(),
+				NewProcessLoadActionCommandSpec(),
 			},
 		},
 	}
@@ -61,24 +63,24 @@ func (*ProcessCommandModelSpec) LongDesc() string {
 	return "Process experiment, for example, kill process"
 }
 
-func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid string) (*spec.Response) {
-
+func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid string) *spec.Response {
 	countValue := model.ActionFlags["count"]
 	process := model.ActionFlags["process"]
 	processCmd := model.ActionFlags["process-cmd"]
 	localPorts := model.ActionFlags["local-port"]
+	pid := model.ActionFlags["pid"]
 
 	excludeProcess := model.ActionFlags["exclude-process"]
 	ignoreProcessNotFound := model.ActionFlags["ignore-not-found"] == "true"
-	if process == "" && processCmd == "" && localPorts == "" {
-		log.Errorf(ctx, "less process、process-cmd and local-port, less process matcher")
-		return spec.ResponseFailWithFlags(spec.ParameterLess, "process|process-cmd|local-port")
+	if process == "" && processCmd == "" && localPorts == "" && pid == "" {
+		log.Errorf(ctx, "%s", "pid、less process、process-cmd and local-port, less process matcher")
+		return spec.ResponseFailWithFlags(spec.ParameterLess, "pid|process|process-cmd|local-port")
 	}
 
-	var excludeProcessValue = fmt.Sprintf("blade,%s", excludeProcess)
+	excludeProcessValue := fmt.Sprintf("blade,%s", excludeProcess)
 	ctx = context.WithValue(ctx, channel.ExcludeProcessKey, excludeProcessValue)
 	if !ignoreProcessNotFound {
-		if response := checkProcessInvalid(ctx, process, processCmd, localPorts, cl); response != nil {
+		if response := checkProcessInvalid(ctx, process, processCmd, localPorts, pid, cl); response != nil {
 			return response
 		}
 	}
@@ -86,7 +88,7 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 	if countValue != "" {
 		count, err := strconv.Atoi(countValue)
 		if err != nil {
-			log.Errorf(ctx, spec.ParameterIllegal.Sprintf("count", countValue, err))
+			log.Errorf(ctx, "%s", spec.ParameterIllegal.Sprintf("count", countValue, err))
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", countValue, err)
 		}
 		flags = fmt.Sprintf("%s --count %d", flags, count)
@@ -131,6 +133,9 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 		if err != nil {
 			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("illegal parameter ports, %v", err))
 		}
+	} else if pid != "" {
+		tempPidList := strings.Split(pid, ",")
+		pids = append(pids, tempPidList...)
 	}
 	if pids == nil || len(pids) == 0 {
 		if ignoreProcessNotFound {
@@ -147,7 +152,7 @@ func getPids(ctx context.Context, cl spec.Channel, model *spec.ExpModel, uid str
 	return spec.ReturnSuccess(strings.Join(pids, " "))
 }
 
-func checkProcessInvalid(ctx context.Context, process, processCmd, localPorts string, cl spec.Channel) *spec.Response {
+func checkProcessInvalid(ctx context.Context, process, processCmd, localPorts, pid string, cl spec.Channel) *spec.Response {
 	var pids []string
 	var killProcessName string
 	var err error
@@ -155,7 +160,7 @@ func checkProcessInvalid(ctx context.Context, process, processCmd, localPorts st
 	if process != "" {
 		pids, err = cl.GetPidsByProcessName(process, ctx)
 		if err != nil {
-			log.Errorf(ctx, spec.ProcessIdByNameFailed.Sprintf(process, err))
+			log.Errorf(ctx, "%s", spec.ProcessIdByNameFailed.Sprintf(process, err))
 			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, process, err)
 		}
 		killProcessName = process
@@ -163,7 +168,7 @@ func checkProcessInvalid(ctx context.Context, process, processCmd, localPorts st
 	} else if processCmd != "" {
 		pids, err = cl.GetPidsByProcessCmdName(processCmd, ctx)
 		if err != nil {
-			log.Errorf(ctx, spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
+			log.Errorf(ctx, "%s", spec.ProcessIdByNameFailed.Sprintf(processCmd, err))
 			return spec.ResponseFailWithFlags(spec.ProcessIdByNameFailed, processCmd, err)
 		}
 		killProcessName = processCmd
@@ -176,6 +181,10 @@ func checkProcessInvalid(ctx context.Context, process, processCmd, localPorts st
 		pids, err = cl.GetPidsByLocalPorts(ctx, ports)
 		killProcessName = localPorts
 		processParameter = "local-port"
+	} else if pid != "" {
+		pids = append(pids, pid)
+		killProcessName = pid
+		processParameter = "pid"
 	}
 	if pids == nil || len(pids) == 0 {
 		return spec.ResponseFailWithFlags(spec.ParameterInvalidProName, processParameter, killProcessName)

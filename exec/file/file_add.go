@@ -20,12 +20,13 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"path"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const AddFileBin = "chaos_addfile"
@@ -115,7 +116,7 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 	}
 
 	if exec.CheckFilepathExists(ctx, f.channel, filepath) {
-		log.Errorf(ctx,"`%s`: filepath is exist", filepath)
+		log.Errorf(ctx, "`%s`: filepath is exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the filepath is exist")
 	}
 
@@ -128,9 +129,8 @@ func (f *FileAddActionExecutor) Exec(uid string, ctx context.Context, model *spe
 }
 
 func (f *FileAddActionExecutor) start(cl spec.Channel, filepath, content string, directory, enableBase64, autoCreateDir bool, ctx context.Context) *spec.Response {
-
 	dir := path.Dir(filepath)
-	if autoCreateDir && ! exec.CheckFilepathExists(ctx, cl, filepath) {
+	if autoCreateDir && !exec.CheckFilepathExists(ctx, cl, filepath) {
 		if response := f.channel.Run(ctx, "mkdir", fmt.Sprintf(`-p %s`, dir)); !response.Success {
 			return response
 		}
@@ -143,13 +143,13 @@ func (f *FileAddActionExecutor) start(cl spec.Channel, filepath, content string,
 		} else {
 			if enableBase64 {
 				if decodeBytes, err := base64.StdEncoding.DecodeString(content); err != nil {
-					log.Errorf(ctx, err.Error())
+					log.Errorf(ctx, "%s", err.Error())
 					return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the path is exist")
 				} else {
 					content = string(decodeBytes)
 				}
 			}
-			return f.channel.Run(ctx, "echo", fmt.Sprintf(`"%s" >> "%s"`, content, filepath))
+			return f.channel.Run(ctx, "echo", fmt.Sprintf(`-e "%s" >> "%s"`, content, filepath))
 		}
 	}
 }

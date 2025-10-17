@@ -19,14 +19,14 @@ package kernel
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"path"
 	"strings"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -50,7 +50,7 @@ func NewStraceDelayActionSpec() spec.ExpActionCommandSpec {
 					Desc:     "cgroup root path, default value /sys/fs/cgroup",
 					NoArgs:   false,
 					Required: false,
-					Default: "/sys/fs/cgroup",
+					Default:  "/sys/fs/cgroup",
 				},
 			},
 			ActionFlags: []spec.ExpFlagSpec{
@@ -155,7 +155,7 @@ func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, mode
 
 	delay_loc_flag = model.ActionFlags["delay-loc"]
 	if delay_loc_flag == "" {
-		log.Errorf(ctx,"delay-loc is nil")
+		log.Errorf(ctx, "delay-loc is nil")
 		return spec.ResponseFailWithFlags(spec.ParameterLess, "delay-loc")
 	}
 	first_flag = model.ActionFlags["first"]
@@ -167,12 +167,12 @@ func (dae *StraceDelayActionExecutor) Exec(uid string, ctx context.Context, mode
 	return dae.start(ctx, pidList, time, syscallName, delay_loc_flag, first_flag, end_flag, step)
 }
 
-//start strace delay
+// start strace delay
 func (dae *StraceDelayActionExecutor) start(ctx context.Context, pidList string, time string, syscallName string, delayLoc string, first string, end string, step string) *spec.Response {
 	if pidList != "" {
 		pids := strings.Split(pidList, ",")
 
-		var args = ""
+		args := ""
 		if delayLoc == "enter" {
 			args = fmt.Sprintf("-f -e inject=%s:delay_enter=%s", syscallName, time)
 		} else if delayLoc == "exit" {
@@ -200,6 +200,6 @@ func (dae *StraceDelayActionExecutor) start(ctx context.Context, pidList string,
 }
 
 func (dae *StraceDelayActionExecutor) stop(ctx context.Context, pidList string, syscallName string) *spec.Response {
-	ctx = context.WithValue(ctx,"bin", StraceDelayBin)
+	ctx = context.WithValue(ctx, "bin", StraceDelayBin)
 	return exec.Destroy(ctx, dae.channel, "strace delay")
 }

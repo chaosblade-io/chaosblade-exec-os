@@ -14,41 +14,41 @@
  * limitations under the License.
  */
 
- package systemd
+package systemd
 
- import (
-	 "github.com/chaosblade-io/chaosblade-spec-go/spec"
- )
+import (
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+)
 
- type SystemdCommandModelSpec struct {
-	 spec.BaseExpModelCommandSpec
- }
+type SystemdCommandModelSpec struct {
+	spec.BaseExpModelCommandSpec
+}
 
- func NewSystemdCommandModelSpec() spec.ExpModelCommandSpec {
-	 return &SystemdCommandModelSpec{
-		 spec.BaseExpModelCommandSpec{
-			 ExpFlags: []spec.ExpFlagSpec{
-				 &spec.ExpFlag{
-					 Name:   "ignore-not-found",
-					 Desc:   "Ignore systemd that cannot be found",
-					 NoArgs: true,
-				 },
-			 },
-			 ExpActions: []spec.ExpActionCommandSpec{
-				 NewStopSystemdActionCommandSpec(),
-			 },
-		 },
-	 }
- }
+func NewSystemdCommandModelSpec() spec.ExpModelCommandSpec {
+	return &SystemdCommandModelSpec{
+		spec.BaseExpModelCommandSpec{
+			ExpFlags: []spec.ExpFlagSpec{
+				&spec.ExpFlag{
+					Name:   "ignore-not-found",
+					Desc:   "Ignore systemd that cannot be found",
+					NoArgs: true,
+				},
+			},
+			ExpActions: []spec.ExpActionCommandSpec{
+				NewStopSystemdActionCommandSpec(),
+			},
+		},
+	}
+}
 
- func (*SystemdCommandModelSpec) Name() string {
-	 return "systemd"
- }
+func (*SystemdCommandModelSpec) Name() string {
+	return "systemd"
+}
 
- func (*SystemdCommandModelSpec) ShortDesc() string {
-	 return "Systemd experiment"
- }
+func (*SystemdCommandModelSpec) ShortDesc() string {
+	return "Systemd experiment"
+}
 
- func (*SystemdCommandModelSpec) LongDesc() string {
-	 return "Systemd experiment, for example, stop systemd"
- }
+func (*SystemdCommandModelSpec) LongDesc() string {
+	return "Systemd experiment, for example, stop systemd"
+}

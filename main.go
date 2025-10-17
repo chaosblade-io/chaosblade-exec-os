@@ -4,20 +4,22 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"os"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 )
 
-var executors = model.GetAllOsExecutors()
-var models = model.GetAllExpModels()
-var modelMap = make(map[string]spec.ExpModelCommandSpec)
-var modelActionFlags = make(map[string][]spec.ExpFlag)
+var (
+	executors        = model.GetAllOsExecutors()
+	models           = model.GetAllExpModels()
+	modelMap         = make(map[string]spec.ExpModelCommandSpec)
+	modelActionFlags = make(map[string][]spec.ExpFlag)
+)
 
 func init() {
 	for _, commandSpec := range models {
@@ -106,13 +108,14 @@ func main() {
 		}
 
 		uid := expModel.ActionFlags[model.UidFlag.Name]
-		if uid == "" {
-			uid, _ = util.GenerateUid()
-		}
 
 		ctx = context.WithValue(ctx, spec.Uid, uid)
 		if mode == spec.Destroy {
 			ctx = spec.SetDestroyFlag(ctx, uid)
+		} else {
+			if uid == "" {
+				uid, _ = util.GenerateUid()
+			}
 		}
 
 		if expModel.ActionFlags[model.DebugFlag.Name] == spec.True {

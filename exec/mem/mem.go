@@ -19,18 +19,18 @@ package mem
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
 	"strconv"
 	"time"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -176,9 +176,9 @@ func (ce *memExecutor) SetChannel(channel spec.Channel) {
 }
 
 const (
-	//processOOMScoreAdj = "/proc/%s/oom_score_adj"
-	//oomMinScore        = "-1000"
-	processOOMAdj = "/proc/%s/oom_adj"
+	// processOOMScoreAdj = "/proc/%s/oom_score_adj"
+	// oomMinScore        = "-1000"
+	processOOMAdj = "/proc/%d/oom_adj"
 	oomMinAdj     = "-17"
 )
 
@@ -189,7 +189,7 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 	}
 
 	if ce.channel == nil {
-		log.Errorf(ctx, spec.ChannelNil.Msg)
+		log.Errorf(ctx, "%s", spec.ChannelNil.Msg)
 		return spec.ResponseFailWithFlags(spec.ChannelNil)
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -209,7 +209,7 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		var err error
 		memPercent, err = strconv.Atoi(memPercentStr)
 		if err != nil {
-			log.Errorf(ctx,"`%s`: mem-percent  must be a positive integer", memPercentStr)
+			log.Errorf(ctx, "`%s`: mem-percent  must be a positive integer", memPercentStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "mem-percent", memPercentStr, "it must be a positive integer")
 		}
 		if memPercent > 100 || memPercent < 0 {
@@ -242,7 +242,6 @@ type Block [32 * 1024]int32
 const PageCounterMax uint64 = 9223372036854770000
 
 func calculateMemSize(ctx context.Context, burnMemMode string, percent, reserve int, includeBufferCache bool) (int64, int64, error) {
-
 	total, available, err := getAvailableAndTotal(ctx, burnMemMode, includeBufferCache)
 	if err != nil {
 		return 0, 0, err
@@ -264,12 +263,22 @@ func calculateMemSize(ctx context.Context, burnMemMode string, percent, reserve 
 
 var dirName = "burnmem_tmpfs"
 
+var tmpfsName = "chaos_burn"
+
 var fileName = "file"
 
 var fileCount = 1
 
 func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool, cl spec.Channel) {
-	filePath := path.Join(path.Join(util.GetProgramPath(), dirName), fileName)
+	tmpfsPath := path.Join(util.GetProgramPath(), dirName)
+	filePath := path.Join(tmpfsPath, fileName)
+	// prepare tmpfs
+	cl.Run(ctx, "mkdir", fmt.Sprintf("-p %s", tmpfsPath))
+	cl.Run(ctx, "mount", fmt.Sprintf("-t tmpfs -o size=100%% %s %s", tmpfsName, tmpfsPath))
+
+	if memRate <= 0 {
+		memRate = 100
+	}
 	tick := time.Tick(time.Second)
 	for range tick {
 		_, expectMem, err := calculateMemSize(ctx, burnMemMode, memPercent, memReserve, includeBufferCache)
@@ -281,6 +290,7 @@ func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, 
 			if expectMem > int64(memRate) {
 				fillMem = int64(memRate)
 			}
+			log.Debugf(ctx, "burn mem with cache fill memory: %d", fillMem)
 			nFilePath := fmt.Sprintf("%s%d", filePath, fileCount)
 			response := cl.Run(ctx, "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d", nFilePath, fillMem))
 			if !response.Success {
@@ -295,10 +305,17 @@ func burnMemWithCache(ctx context.Context, memPercent, memReserve, memRate int, 
 func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRate int, burnMemMode string, includeBufferCache bool, avoidBeingKilled bool, cl spec.Channel) {
 	// adjust process oom_score_adj to avoid being killed
 	if avoidBeingKilled {
-		scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
-		if _, err := os.Stat(scoreAdjFile); os.IsExist(err) {
-			if err := ioutil.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0644); err != nil {
-				log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj", burnMemMode)
+		// not works for the channel.NSExecChannel
+		if _, ok := cl.(*channel.NSExecChannel); !ok {
+			scoreAdjFile := fmt.Sprintf(processOOMAdj, os.Getpid())
+			if _, err := os.Stat(scoreAdjFile); err == nil || os.IsExist(err) {
+				if err := os.WriteFile(scoreAdjFile, []byte(oomMinAdj), 0o644); err != nil { //nolint:gosec
+					log.Errorf(ctx, "run burn memory by %s mode failed, cannot edit the process oom_score_adj, %v", burnMemMode, err)
+				} else {
+					log.Infof(ctx, "write oom_adj %s to %s", oomMinAdj, scoreAdjFile)
+				}
+			} else {
+				log.Errorf(ctx, "score adjust file: %s not exists, %v", scoreAdjFile, err)
 			}
 		}
 	}
@@ -308,8 +325,8 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 		return
 	}
 	tick := time.Tick(time.Second)
-	var cache = make(map[int][]Block, 1)
-	var count = 1
+	cache := make(map[int][]Block, 1)
+	count := 1
 	cache[count] = make([]Block, 0)
 	if memRate <= 0 {
 		memRate = 100
@@ -346,6 +363,11 @@ func (ce *memExecutor) start(ctx context.Context, memPercent, memReserve, memRat
 
 // stop burn mem
 func (ce *memExecutor) stop(ctx context.Context, burnMemMode string) *spec.Response {
-	ctx = context.WithValue(ctx,"bin", BurnMemBin)
-	return exec.Destroy(ctx, ce.channel, "mem load")
+	ctx = context.WithValue(ctx, "bin", BurnMemBin)
+	response := exec.Destroy(ctx, ce.channel, "mem load")
+	// umount tmpfs
+	ce.channel.Run(ctx, "umount", tmpfsName)
+	tmpfsPath := path.Join(util.GetProgramPath(), dirName)
+	ce.channel.Run(ctx, "rm", fmt.Sprintf("-rf %s", tmpfsPath))
+	return response
 }

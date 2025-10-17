@@ -20,16 +20,18 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"math/rand"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const AppendFileBin = "chaos_appendfile"
@@ -54,7 +56,7 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 				},
 				&spec.ExpFlag{
 					Name: "interval",
-					Desc: "append interval, must be a positive integer, default 1s",
+					Desc: "append interval, must be a positive integer",
 				},
 				&spec.ExpFlag{
 					Name:   "escape",
@@ -71,19 +73,38 @@ func NewFileAppendActionSpec() spec.ExpActionCommandSpec {
 					Desc:     "cgroup root path, default value /sys/fs/cgroup",
 					NoArgs:   false,
 					Required: false,
-					Default: "/sys/fs/cgroup",
+					Default:  "/sys/fs/cgroup",
+				},
+				&spec.ExpFlag{
+					Name:   "enable-backup",
+					Desc:   "enable backup original file for restore on destroy, default false",
+					NoArgs: true,
+				},
+				&spec.ExpFlag{
+					Name:   "delete-file",
+					Desc:   "delete file on destroy operation, default false. When used with enable-backup, this parameter has higher priority",
+					NoArgs: true,
 				},
 			},
 			ActionExecutor: &FileAppendActionExecutor{},
 			ActionExample: `
-# Appends the content "HELLO WORLD" to the /home/logs/nginx.log file
-blade create file append --filepath=/home/logs/nginx.log --content="HELL WORLD"
+# Appends the content "HELLO WORLD" to the /home/logs/nginx.log file (creates file if not exists)
+blade create file append --filepath=/home/logs/nginx.log --content="HELLO WORLD"
 
 # Appends the content "HELLO WORLD" to the /home/logs/nginx.log file, interval 10 seconds
-blade create file append --filepath=/home/logs/nginx.log --content="HELL WORLD" --interval 10
+blade create file append --filepath=/home/logs/nginx.log --content="HELLO WORLD" --interval 10
 
 # Appends the content "HELLO WORLD" to the /home/logs/nginx.log file, enable base64 encoding
 blade create file append --filepath=/home/logs/nginx.log --content=SEVMTE8gV09STEQ=
+
+# Appends content with backup (destroy will restore original file or delete created file)
+blade create file append --filepath=/home/logs/nginx.log --content="HELLO WORLD" --enable-backup=true
+
+# Appends content and delete file on destroy (delete-file has higher priority than enable-backup)
+blade create file append --filepath=/home/logs/nginx.log --content="HELLO WORLD" --delete-file=true
+
+# Appends content with backup but preserve file on destroy (delete-file=false overrides enable-backup=true)
+blade create file append --filepath=/home/logs/nginx.log --content="HELLO WORLD" --enable-backup=true --delete-file=false
 
 # mock interface timeout exception
 blade create file append --filepath=/home/logs/nginx.log --content="@{DATE:+%Y-%m-%d %H:%M:%S} ERROR invoke getUser timeout [@{RANDOM:100-200}]ms abc  mock exception"
@@ -120,25 +141,30 @@ func (*FileAppendActionExecutor) Name() string {
 }
 
 func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	commands := []string{"echo", "kill"}
+	commands := []string{"echo", "kill", "mkdir"}
 	if response, ok := f.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}
 
 	filepath := model.ActionFlags["filepath"]
 	if _, ok := spec.IsDestroy(ctx); ok {
-		return f.stop(filepath, ctx)
+		enableBackup := model.ActionFlags["enable-backup"] == "true" // default false
+		deleteFile := model.ActionFlags["delete-file"] == "true"     // default false
+		return f.stop(filepath, enableBackup, deleteFile, ctx)
 	}
 
 	if !exec.CheckFilepathExists(ctx, f.channel, filepath) {
-		log.Errorf(ctx,"`%s`: file does not exist", filepath)
+		log.Errorf(ctx, "`%s`: file-append-Exec-file does not exist", filepath)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "filepath", filepath, "the file does not exist")
 	}
 
+	// File append operation supports creating new files if they don't exist
+	// The echo command with >> redirection will automatically create the file
+
 	// default 1
 	count := 1
-	// 1000 ms
-	interval := 1
+	// default 0
+	interval := 0
 
 	content := model.ActionFlags["content"]
 	countStr := model.ActionFlags["count"]
@@ -147,7 +173,7 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 		var err error
 		count, err = strconv.Atoi(countStr)
 		if err != nil || count < 1 {
-			log.Errorf(ctx,"`%s` value must be a positive integer", "count")
+			log.Errorf(ctx, "`%s` value must be a positive integer", "count")
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "count", count, "it must be a positive integer")
 		}
 	}
@@ -162,30 +188,172 @@ func (f *FileAppendActionExecutor) Exec(uid string, ctx context.Context, model *
 
 	escape := model.ActionFlags["escape"] == "true"
 	enableBase64 := model.ActionFlags["enable-base64"] == "true"
+	enableBackup := model.ActionFlags["enable-backup"] == "true" // default false
 
-	return f.start(filepath, content, count, interval, escape, enableBase64, ctx)
+	return f.start(filepath, content, count, interval, escape, enableBase64, enableBackup, ctx)
 }
 
-func (f *FileAppendActionExecutor) start(filepath string, content string, count int, interval int, escape bool, enableBase64 bool, ctx context.Context) *spec.Response {
+func (f *FileAppendActionExecutor) start(filepath string, content string, count int, interval int, escape bool, enableBase64 bool, enableBackup bool, ctx context.Context) *spec.Response {
+	// Create backup of original file before appending content (if enabled and file exists)
+	if enableBackup {
+		uid := ctx.Value(spec.Uid)
+		if uid != nil && uid != spec.UnknownUid && uid != "" {
+			// Only create backup if the original file exists
+			if exec.CheckFilepathExists(ctx, f.channel, filepath) {
+				backupFile := filepath + ".chaos-blade-backup-" + uid.(string)
+				// Only create backup if it doesn't exist (to avoid overwriting existing backup)
+				if !exec.CheckFilepathExists(ctx, f.channel, backupFile) {
+					response := f.channel.Run(ctx, "cp", fmt.Sprintf(`"%s" "%s"`, filepath, backupFile))
+					if !response.Success {
+						log.Errorf(ctx, "Failed to create backup file: %s", response.Err)
+						// Continue with append operation even if backup fails
+					} else {
+						log.Infof(ctx, "Created backup file: %s", backupFile)
+					}
+				}
+			} else {
+				log.Infof(ctx, "File does not exist, skipping backup creation: %s", filepath)
+			}
+		}
+	}
+
 	// first append
 	response := appendFile(f.channel, count, ctx, content, filepath, escape, enableBase64)
 	if !response.Success {
 		return response
 	}
+	// Without interval, it will not be executed regularly.
+	if interval < 1 {
+		return nil
+	}
 
+	// For interval-based operations, we need to run in a loop
+	// This will be managed by the chaos_os process
 	ticker := time.NewTicker(time.Second * time.Duration(interval))
-	for range ticker.C {
-		response := appendFile(f.channel, count, ctx, content, filepath, escape, enableBase64)
-		if !response.Success {
-			return response
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			response := appendFile(f.channel, count, ctx, content, filepath, escape, enableBase64)
+			if !response.Success {
+				log.Errorf(ctx, "Failed to append file content: %s", response.Err)
+				// Continue running even if one append fails
+			}
+		case <-ctx.Done():
+			// Context cancelled, stop the ticker
+			log.Infof(ctx, "File append interval operation stopped")
+			return nil
 		}
 	}
-	return nil
 }
 
-func (f *FileAppendActionExecutor) stop(filepath string, ctx context.Context) *spec.Response {
-	ctx = context.WithValue(ctx,"bin", AppendFileBin)
-	return exec.Destroy(ctx, f.channel, "file append")
+func (f *FileAppendActionExecutor) stop(filepath string, enableBackup bool, deleteFile bool, ctx context.Context) *spec.Response {
+	// For file append operation, we need to handle both one-time and interval-based operations
+	// If it's an interval-based operation, we need to stop the chaos_os process first
+
+	// Check if this is an interval-based operation by looking for the process
+	ctx = context.WithValue(ctx, "bin", AppendFileBin)
+	response := exec.Destroy(ctx, f.channel, "file append")
+
+	// If the destroy operation failed (no process found), it might be a one-time operation
+	// In that case, we handle file restoration/deletion based on backup settings
+	if !response.Success {
+		log.Infof(ctx, "No running process found, treating as one-time operation")
+		return f.handleOneTimeOperation(filepath, enableBackup, deleteFile, ctx)
+	}
+
+	// For interval-based operations, we also need to handle file restoration/deletion
+	return f.handleOneTimeOperation(filepath, enableBackup, deleteFile, ctx)
+}
+
+func (f *FileAppendActionExecutor) handleOneTimeOperation(filepath string, enableBackup bool, deleteFile bool, ctx context.Context) *spec.Response {
+	// Priority logic: delete-file parameter has higher priority than enable-backup
+	if deleteFile {
+		// If delete-file is true, handle based on backup settings
+		if enableBackup {
+			// Get the experiment UID to find the backup file
+			uid := ctx.Value(spec.Uid)
+			if uid == nil || uid == spec.UnknownUid || uid == "" {
+				log.Errorf(ctx, "Cannot get experiment UID for file append destroy")
+				return spec.ReturnFail(spec.ParameterInvalid, "experiment UID is required for destroy operation")
+			}
+
+			// The backup file should be stored as .chaos-blade-backup-{uid}
+			backupFile := filepath + ".chaos-blade-backup-" + uid.(string)
+
+			// Check if backup file exists
+			if !exec.CheckFilepathExists(ctx, f.channel, backupFile) {
+				// If no backup file exists, it means the original file didn't exist
+				// In this case, we should delete the file that was created by the append operation
+				if exec.CheckFilepathExists(ctx, f.channel, filepath) {
+					response := f.channel.Run(ctx, "rm", fmt.Sprintf(`"%s"`, filepath))
+					if !response.Success {
+						log.Errorf(ctx, "Failed to delete created file: %s", response.Err)
+						return response
+					}
+					log.Infof(ctx, "Deleted file that was created by append operation: %s", filepath)
+				}
+				return spec.ReturnSuccess("File append destroy operation completed (deleted created file)")
+			}
+
+			// Restore the original file content and remove the backup file
+			response := f.channel.Run(ctx, "cp", fmt.Sprintf(`"%s" "%s"`, backupFile, filepath))
+			if !response.Success {
+				log.Errorf(ctx, "Failed to restore original file content: %s", response.Err)
+				return response
+			}
+
+			// Remove the backup file
+			_ = f.channel.Run(ctx, "rm", fmt.Sprintf(`"%s"`, backupFile))
+
+			log.Infof(ctx, "File append destroy operation completed for file: %s (original content restored)", filepath)
+			return spec.ReturnSuccess("File append destroy operation completed successfully (original content restored)")
+		} else {
+			// If delete-file is true but enable-backup is false, delete the file
+			if exec.CheckFilepathExists(ctx, f.channel, filepath) {
+				response := f.channel.Run(ctx, "rm", fmt.Sprintf(`"%s"`, filepath))
+				if !response.Success {
+					log.Errorf(ctx, "Failed to delete file: %s, error: %s", filepath, response.Err)
+					return response
+				}
+				log.Infof(ctx, "Deleted file that was created/modified by append operation: %s", filepath)
+			} else {
+				log.Infof(ctx, "File does not exist, nothing to delete: %s", filepath)
+			}
+			return spec.ReturnSuccess("File append destroy operation completed (file deleted)")
+		}
+	}
+
+	// If delete-file is false, handle based on backup settings
+	if !enableBackup {
+		// If backup is disabled and delete-file is false, do nothing (keep the file)
+		log.Infof(ctx, "File append destroy operation completed for file: %s (no action taken, file preserved)", filepath)
+		return spec.ReturnSuccess("File append destroy operation completed (file preserved)")
+	}
+
+	// Get the experiment UID to find the backup file
+	uid := ctx.Value(spec.Uid)
+	if uid == nil || uid == spec.UnknownUid || uid == "" {
+		log.Errorf(ctx, "Cannot get experiment UID for file append destroy")
+		return spec.ReturnFail(spec.ParameterInvalid, "experiment UID is required for destroy operation")
+	}
+
+	// The backup file should be stored as .chaos-blade-backup-{uid}
+	backupFile := filepath + ".chaos-blade-backup-" + uid.(string)
+
+	// Check if backup file exists
+	if !exec.CheckFilepathExists(ctx, f.channel, backupFile) {
+		// If no backup file exists, it means the original file didn't exist
+		// Since delete-file is false, we keep the file that was created by the append operation
+		log.Infof(ctx, "No backup file exists, keeping created file: %s", filepath)
+		return spec.ReturnSuccess("File append destroy operation completed (created file preserved)")
+	}
+
+	// Since delete-file is false, we keep both the appended file and the backup file
+	// No restoration is performed - the file remains in its appended state
+	log.Infof(ctx, "File append destroy operation completed for file: %s (appended file and backup preserved)", filepath)
+	return spec.ReturnSuccess("File append destroy operation completed successfully (appended file and backup preserved)")
 }
 
 func (f *FileAppendActionExecutor) SetChannel(channel spec.Channel) {
@@ -194,6 +362,18 @@ func (f *FileAppendActionExecutor) SetChannel(channel spec.Channel) {
 
 func appendFile(cl spec.Channel, count int, ctx context.Context, content string, filepath string, escape bool, enableBase64 bool) *spec.Response {
 	var response *spec.Response
+
+	// Check if the directory exists, if not create it
+	dir := path.Dir(filepath)
+	if !exec.CheckFilepathExists(ctx, cl, dir) {
+		response = cl.Run(ctx, "mkdir", fmt.Sprintf(`-p "%s"`, dir))
+		if !response.Success {
+			log.Errorf(ctx, "Failed to create directory: %s, error: %s", dir, response.Err)
+			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("failed to create directory %s: %s", dir, response.Err))
+		}
+		log.Infof(ctx, "Created directory: %s", dir)
+	}
+
 	if enableBase64 {
 		decodeBytes, err := base64.StdEncoding.DecodeString(content)
 		if err != nil {
@@ -225,9 +405,48 @@ func parseDate(content string) string {
 			content = strings.Replace(content, text[0], strings.Replace(text[0], "\\", "", 1), 1)
 			continue
 		}
-		content = strings.Replace(content, text[0], "$(date \""+text[1]+"\")", 1)
+		// Parse the time format and generate actual timestamp
+		timeFormat := text[1]
+		currentTime := time.Now()
+		formattedTime := currentTime.Format(convertDateFormat(timeFormat))
+		content = strings.Replace(content, text[0], formattedTime, 1)
 	}
 	return content
+}
+
+// convertDateFormat converts date command format to Go time format
+func convertDateFormat(dateFormat string) string {
+	// Convert common date command format specifiers to Go time format
+	goFormat := dateFormat
+	// Year
+	goFormat = strings.ReplaceAll(goFormat, "%Y", "2006")
+	goFormat = strings.ReplaceAll(goFormat, "%y", "06")
+	// Month
+	goFormat = strings.ReplaceAll(goFormat, "%m", "01")
+	goFormat = strings.ReplaceAll(goFormat, "%B", "January")
+	goFormat = strings.ReplaceAll(goFormat, "%b", "Jan")
+	// Day
+	goFormat = strings.ReplaceAll(goFormat, "%d", "02")
+	goFormat = strings.ReplaceAll(goFormat, "%e", "2")
+	// Hour
+	goFormat = strings.ReplaceAll(goFormat, "%H", "15")
+	goFormat = strings.ReplaceAll(goFormat, "%I", "03")
+	goFormat = strings.ReplaceAll(goFormat, "%k", "15")
+	goFormat = strings.ReplaceAll(goFormat, "%l", "3")
+	// Minute
+	goFormat = strings.ReplaceAll(goFormat, "%M", "04")
+	// Second
+	goFormat = strings.ReplaceAll(goFormat, "%S", "05")
+	// AM/PM
+	goFormat = strings.ReplaceAll(goFormat, "%p", "PM")
+	// Time zone
+	goFormat = strings.ReplaceAll(goFormat, "%Z", "MST")
+	goFormat = strings.ReplaceAll(goFormat, "%z", "-0700")
+	// Weekday
+	goFormat = strings.ReplaceAll(goFormat, "%A", "Monday")
+	goFormat = strings.ReplaceAll(goFormat, "%a", "Mon")
+
+	return goFormat
 }
 
 func parseRandom(content string) *spec.Response {
@@ -241,16 +460,16 @@ func parseRandom(content string) *spec.Response {
 		split := strings.Split(text[1], "-")
 		begin, err := strconv.Atoi(split[0])
 		if err != nil {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%s illegal parameter", begin))
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%d illegal parameter", begin))
 		}
 
 		end, err := strconv.Atoi(split[1])
 		if err != nil {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%s illegal parameter", end))
+			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("%d illegal parameter", end))
 		}
 
 		if end <= begin {
-			return spec.ReturnFail(spec.ParameterIllegal, fmt.Sprintf("run append file %s failed, begin must < end"))
+			return spec.ReturnFail(spec.ParameterIllegal, "run append file failed, begin must < end")
 		}
 		content = strings.Replace(content, text[0], strconv.Itoa(rand.Intn(end-begin)+begin), 1)
 	}

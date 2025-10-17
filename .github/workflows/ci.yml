@@ -1,0 +1,176 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master, dev-* ]
+
+jobs:
+  build-matrix:
+    name: Build on ${{ matrix.os }} (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            platform: linux_amd64
+            runner_arch: x64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            platform: linux_arm64
+            runner_arch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            platform: darwin_amd64
+            runner_arch: x64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            platform: darwin_arm64
+            runner_arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整的 Git 历史用于版本信息
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Get version info
+        id: version
+        run: |
+          # 获取版本信息
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            # 从 Git Tag 获取版本，移除 v 前缀
+            VERSION=${GITHUB_REF#refs/tags/}
+            VERSION=${VERSION#v}  # 移除 v 前缀
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            # 从 Git 描述获取版本，移除 v 前缀和 Git 描述信息（与 Makefile 逻辑一致）
+            VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")
+            VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]*-[a-z0-9]*.*//')
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "=== Version Information ==="
+          echo "Version: ${VERSION}"
+          echo "Is Release: ${{ steps.version.outputs.is_release }}"
+
+      - name: Build for ${{ matrix.platform }}
+        run: |
+          # 使用 Makefile 编译指定平台
+          echo "🔨 Building for ${{ matrix.platform }} using Makefile..."
+          echo "  Target: ${{ matrix.goos }}/${{ matrix.goarch }}"
+          echo "  Runner: ${{ matrix.os }} (${{ matrix.runner_arch }})"
+          echo "  Version: ${{ steps.version.outputs.version }}"
+
+          make ${{ matrix.platform }}
+
+          # 显示版本信息
+          echo "📋 Version information:"
+          make version
+
+      - name: Verify build artifacts
+        run: |
+          # Use version from GitHub context
+          VERSION=${{ steps.version.outputs.version }}
+          PLATFORM_DIR="target/chaosblade-${VERSION}-${{ matrix.platform }}"
+
+          echo "=== Build artifacts for ${{ matrix.platform }} ==="
+          echo "Version: ${VERSION}"
+          echo "Platform directory: ${PLATFORM_DIR}"
+
+          # Check if directory exists
+          if [ ! -d "$PLATFORM_DIR" ]; then
+            echo "❌ Platform directory not found: $PLATFORM_DIR"
+            echo "Available directories in target/:"
+            ls -la target/ || echo "target/ directory does not exist"
+            exit 1
+          fi
+
+          echo "Directory structure:"
+          find "$PLATFORM_DIR" -type f | sort
+          echo ""
+          echo "Binary file size:"
+          ls -lh "$PLATFORM_DIR/bin/chaos_os"
+          echo ""
+          echo "YAML file size:"
+          ls -lh "$PLATFORM_DIR/yaml/chaosblade-os-spec-${VERSION}.yaml"
+
+          # Verify binary file
+          if [ -f "$PLATFORM_DIR/bin/chaos_os" ]; then
+            echo "✅ Binary file exists and is executable"
+            file "$PLATFORM_DIR/bin/chaos_os"
+
+            # Verify version information (if supported)
+            if command -v strings >/dev/null 2>&1; then
+              echo "Version info in binary:"
+              strings "$PLATFORM_DIR/bin/chaos_os" | grep -E "(chaosblade-exec-os|version|git)" | head -5
+            fi
+          else
+            echo "❌ Binary file not found!"
+            exit 1
+          fi
+
+      - name: Upload artifacts
+        if: steps.version.outputs.is_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaosblade-exec-os-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: target/chaosblade-*/${{ matrix.platform }}/
+          retention-days: 30
+
+  test:
+    name: Test on Linux/amd64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Run code style and import order verification
+        run: make verify
+
+      - name: Run tests
+        run: make test
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.txt
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false

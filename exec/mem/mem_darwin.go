@@ -18,11 +18,12 @@ package mem
 
 import (
 	"context"
+
 	"github.com/shirou/gopsutil/mem"
 )
 
 func getAvailableAndTotal(ctx context.Context, burnMemMode string, includeBufferCache bool) (int64, int64, error) {
-	//no limit
+	// no limit
 	virtualMemory, err := mem.VirtualMemory()
 	if err != nil {
 		return 0, 0, err

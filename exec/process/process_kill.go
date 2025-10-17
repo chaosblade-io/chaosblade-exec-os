@@ -19,9 +19,11 @@ package process
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const KillProcessBin = "chaos_killprocess"
@@ -58,6 +60,10 @@ func NewKillProcessActionCommandSpec() spec.ExpActionCommandSpec {
 					Name: "exclude-process",
 					Desc: "Exclude process",
 				},
+				&spec.ExpFlag{
+					Name: "pid",
+					Desc: "pid",
+				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},
 			ActionExecutor: &KillProcessExecutor{},
@@ -69,10 +75,10 @@ blade create process kill --process SimpleHTTPServer
 blade create process kill --process-cmd java
 
 # Specifies the semaphore and local port to kill the process
-blade c process kill --local-port 8080 --signal 15
+blade create process kill --local-port 8080 --signal 15
 
 # Return success even if the process not found
-blade c process kill --process demo --ignore-not-found`,
+blade create process kill --process demo --ignore-not-found`,
 			ActionPrograms:   []string{KillProcessBin},
 			ActionCategories: []string{category.SystemProcess},
 		},

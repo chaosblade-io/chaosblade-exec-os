@@ -19,8 +19,10 @@ package process
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const StopProcessBin = "chaos_stopprocess"
@@ -56,6 +58,10 @@ func NewStopProcessActionCommandSpec() spec.ExpActionCommandSpec {
 				&spec.ExpFlag{
 					Name: "exclude-process",
 					Desc: "Exclude process",
+				},
+				&spec.ExpFlag{
+					Name: "pid",
+					Desc: "pid",
 				},
 			},
 			ActionFlags:    []spec.ExpFlagSpec{},

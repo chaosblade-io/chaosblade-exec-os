@@ -19,8 +19,6 @@ package disk
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"math"
 	"os"
 	"path"
@@ -28,9 +26,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
@@ -74,10 +74,10 @@ func NewFillActionSpec() spec.ExpActionCommandSpec {
 blade create disk fill --path /home --size 40000
 
 # Performs populating the disk by percentage, and retains the file handle that populates the disk
-Command: "blade c disk fill --path /home --percent 80 --retain-handle
+Command: "blade create disk fill --path /home --percent 80 --retain-handle
 
 # Perform a fixed-size experimental scenario
-blade c disk fill --path /home --reserve 1024`,
+blade create disk fill --path /home --reserve 1024`,
 			ActionPrograms:   []string{FillDiskBin},
 			ActionCategories: []string{category.SystemDisk},
 		},
@@ -118,7 +118,7 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 		directory = path
 	}
 	if !util.IsDir(directory) {
-		log.Errorf(ctx,"`%s`: path is illegal, is not a directory", directory)
+		log.Errorf(ctx, "`%s`: path is illegal, is not a directory", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "path", directory, "it must be a directory")
 	}
 	if _, ok := spec.IsDestroy(ctx); ok {
@@ -135,21 +135,21 @@ func (fae *FillActionExecutor) Exec(uid string, ctx context.Context, model *spec
 				}
 				_, err := strconv.Atoi(size)
 				if err != nil {
-					log.Errorf(ctx,"`%s`: size is illegal, it must be positive integer", size)
+					log.Errorf(ctx, "`%s`: size is illegal, it must be positive integer", size)
 					return spec.ResponseFailWithFlags(spec.ParameterIllegal, "size", size, "it must be positive integer")
 				}
 				return fae.start(uid, directory, size, percent, reserve, retainHandle, ctx)
 			}
 			_, err := strconv.Atoi(reserve)
 			if err != nil {
-				log.Errorf(ctx,"`%s`: reserve is illegal, it must be positive integer", reserve)
+				log.Errorf(ctx, "`%s`: reserve is illegal, it must be positive integer", reserve)
 				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "reserve", reserve, "it must be positive integer")
 			}
 			return fae.start(uid, directory, "", percent, reserve, retainHandle, ctx)
 		}
 		_, err := strconv.Atoi(percent)
 		if err != nil {
-			log.Errorf(ctx,"`%s`: percent is illegal, it must be positive integer", percent)
+			log.Errorf(ctx, "`%s`: percent is illegal, it must be positive integer", percent)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "percent", percent, "it must be positive integer")
 		}
 		return fae.start(uid, directory, "", percent, "", retainHandle, ctx)
@@ -185,13 +185,12 @@ func retainFileHandle(ctx context.Context, cl spec.Channel, fillDiskDirectory st
 const diskFillErrorMessage = "No space left on device"
 
 func startFill(ctx context.Context, uid, directory, size, percent, reserve string, retainHandle bool, cl spec.Channel) *spec.Response {
-
 	if directory == "" {
 		log.Errorf(ctx, "`%s`: directory is nil", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "directory is nil")
 	}
 	if size == "" && percent == "" && reserve == "" {
-		log.Errorf(ctx,"`%s`: less --size or --percent or --reserve flag", directory)
+		log.Errorf(ctx, "`%s`: less --size or --percent or --reserve flag", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "less --size or --percent or --reserve flag")
 	}
 	dataFile := path.Join(directory, fillDataFile)
@@ -252,7 +251,14 @@ func calculateFileSize(ctx context.Context, directory, size, percent, reserve st
 		}
 		remainderPercentage := expectedPercentage - usedPercentage
 		log.Debugf(ctx, "remainderPercentage: %f", remainderPercentage)
-		expectSize := math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
+
+		var expectSize float64
+		if remainderPercentage*float64(allBytes) > float64(availableBytes) {
+			expectSize = math.Floor(float64(availableBytes) / (1024.0 * 1024.0))
+		} else {
+			expectSize = math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
+		}
+
 		return fmt.Sprintf("%.f", expectSize), nil
 	} else {
 		r, err := strconv.ParseFloat(reserve, 64)
@@ -297,7 +303,6 @@ func fillDiskByDD(ctx context.Context, dataFile string, directory string, size s
 
 // stopFill contains kill the filldisk process and delete the temp file actions
 func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Response {
-
 	if directory == "" {
 		log.Errorf(ctx, "`%s`: directory is nil", directory)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", directory, "directory is nil")
@@ -309,8 +314,8 @@ func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Resp
 		log.Errorf(ctx, "kill fallocate process err: %s", resp.Err)
 	}
 	// kill daemon process
-	//todo
-	//ctx = context.WithValue(ctx, channel.ProcessKey, fillDiskBin)
+	// todo
+	// ctx = context.WithValue(ctx, channel.ProcessKey, fillDiskBin)
 	pids, _ = cl.GetPidsByProcessName("disk fill", ctx)
 	if pids != nil && len(pids) >= 0 {
 		resp := cl.Run(ctx, "kill", fmt.Sprintf("-9 %s", strings.Join(pids, " ")))

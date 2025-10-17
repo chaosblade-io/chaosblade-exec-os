@@ -35,6 +35,7 @@ func NewKernelInjectCommandSpec() spec.ExpModelCommandSpec {
 		},
 	}
 }
+
 func (*KernelInjectCommandSpec) Name() string {
 	return "strace"
 }

@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 const DropNetworkBin = "chaos_dropnetwork"
@@ -196,7 +197,6 @@ func (ne *NetworkDropExecutor) start(sourceIp, destinationIp, sourcePort, destin
 	}
 	return response
 }
-
 
 func (ne *NetworkDropExecutor) stop(sourceIp, destinationIp, sourcePort, destinationPort, stringPattern, networkTraffic string, ctx context.Context) *spec.Response {
 	var response *spec.Response

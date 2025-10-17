@@ -19,9 +19,11 @@ package tc
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
 type LossActionSpec struct {
@@ -91,10 +93,10 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 		return response
 	}
 
-	var dev = ""
+	dev := ""
 	if netInterface, ok := model.ActionFlags["interface"]; ok {
 		if netInterface == "" {
-			log.Errorf(ctx,"interface is nil")
+			log.Errorf(ctx, "interface is nil")
 			return spec.ResponseFailWithFlags(spec.ParameterLess, "interface")
 		}
 		dev = netInterface
@@ -113,15 +115,16 @@ func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spe
 	destIp := model.ActionFlags["destination-ip"]
 	excludeIp := model.ActionFlags["exclude-ip"]
 	ignorePeerPort := model.ActionFlags["ignore-peer-port"] == "true"
+	protocol := model.ActionFlags["protocol"]
 	force := model.ActionFlags["force"] == "true"
-	return nle.start(dev, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, force, ctx)
+	return nle.start(dev, localPort, remotePort, excludePort, destIp, excludeIp, percent, ignorePeerPort, force, protocol, ctx)
 }
 
 func (nle *NetworkLossExecutor) start(netInterface, localPort, remotePort, excludePort, destIp, excludeIp, percent string,
-	ignorePeerPort, force bool, ctx context.Context) *spec.Response {
+	ignorePeerPort, force bool, protocol string, ctx context.Context,
+) *spec.Response {
 	classRule := fmt.Sprintf("netem loss %s%%", percent)
-	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, nle.channel)
-
+	return startNet(ctx, netInterface, classRule, localPort, remotePort, excludePort, destIp, excludeIp, force, ignorePeerPort, protocol, nle.channel)
 }
 
 func (nle *NetworkLossExecutor) stop(netInterface string, ctx context.Context) *spec.Response {

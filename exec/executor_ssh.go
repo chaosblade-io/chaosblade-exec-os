@@ -19,20 +19,19 @@ package exec
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/version"
-
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+	"github.com/howeyc/gopass"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/howeyc/gopass"
+	"github.com/chaosblade-io/chaosblade-exec-os/version"
 )
 
 const (
@@ -193,8 +192,7 @@ func (e *SSHExecutor) Exec(uid string, ctx context.Context, expModel *spec.ExpMo
 		if bladeReleaseURL == "" {
 			bladeReleaseURL = fmt.Sprintf(BladeReleaseURL, version.BladeVersion, version.BladeVersion)
 		}
-		installCommand :=
-			fmt.Sprintf(`if  [ ! -f "%s" ];then
+		installCommand := fmt.Sprintf(`if  [ ! -f "%s" ];then
 														wget %s;
 														if [ $? -ne 0 ]; then exit 1; fi;
 														tar -zxf $(echo "%s" |awk -F '/' '{print $NF}') -C %s --strip-components 1;
@@ -225,7 +223,7 @@ type SSHClient struct {
 func (c SSHClient) RunCommandWithResponse(ctx context.Context, cmd string) (*spec.Response, bool) {
 	buf, err := c.RunCommand(cmd)
 	if err != nil {
-		log.Errorf(ctx, spec.OsCmdExecFailed.Sprintf(cmd, err))
+		log.Errorf(ctx, "%s", spec.OsCmdExecFailed.Sprintf(cmd, err))
 		if buf != nil {
 			return spec.ResponseFailWithFlags(spec.OsCmdExecFailed, cmd, fmt.Sprintf("buf is %s, %v", string(buf), err)), false
 		}
@@ -256,12 +254,12 @@ func ConvertOutputToResponse(ctx context.Context, output string, err error, defa
 			return response
 		}
 		output = strings.TrimSpace(output)
-		log.Errorf(ctx, spec.SshExecFailed.Sprintf(output, err))
+		log.Errorf(ctx, "%s", spec.SshExecFailed.Sprintf(output, err))
 		return spec.ResponseFailWithFlags(spec.SshExecFailed, output, err)
 	}
 	output = strings.TrimSpace(output)
 	if output == "" {
-		log.Errorf(ctx, spec.SshExecNothing.Msg)
+		log.Errorf(ctx, "%s", spec.SshExecNothing.Msg)
 		return spec.ResponseFailWithFlags(spec.SshExecNothing)
 	}
 	response := spec.Decode(output, defaultResponse)
@@ -284,7 +282,7 @@ func (c *SSHClient) connect() error {
 	if c.Key == "" {
 		auth = append(auth, ssh.Password(c.Password))
 	} else {
-		pemBytes, err := ioutil.ReadFile(c.Key)
+		pemBytes, err := os.ReadFile(c.Key)
 		if err != nil {
 			return err
 		}

@@ -19,15 +19,19 @@ package file
 import (
 	"context"
 	"fmt"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
-	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"path"
 
+	"github.com/chaosblade-io/chaosblade-spec-go/log"
+	"github.com/chaosblade-io/chaosblade-spec-go/spec"
+
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
 
-const MoveFileBin = "chaos_movefile"
+const (
+	MoveFileBin = "chaos_movefile"
+	suffix      = ".chaos-blade-backup"
+)
 
 type FileMoveActionSpec struct {
 	spec.BaseExpActionCommandSpec
@@ -59,11 +63,11 @@ func NewFileMoveActionSpec() spec.ExpActionCommandSpec {
 # Move the file /home/logs/nginx.log to /tmp
 blade create file move --filepath /home/logs/nginx.log --target /tmp
 
-# Force Move the file /home/logs/nginx.log to /temp
+# Force Move the file /home/logs/nginx.log to /tmp
 blade create file move --filepath /home/logs/nginx.log --target /tmp --force
 
-# Move the file /home/logs/nginx.log to /temp/ and automatically create directories that don't exist
-blade create file move --filepath /home/logs/nginx.log --target /temp --auto-create-dir
+# Move the file /home/logs/nginx.log to /tmp and automatically create directories that don't exist
+blade create file move --filepath /home/logs/nginx.log --target /tmp --auto-create-dir
 `,
 			ActionPrograms:   []string{MoveFileBin},
 			ActionCategories: []string{category.SystemFile},
@@ -92,7 +96,7 @@ type FileMoveActionExecutor struct {
 }
 
 func (*FileMoveActionExecutor) Name() string {
-	return "chmod"
+	return "move"
 }
 
 func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
@@ -109,19 +113,14 @@ func (f *FileMoveActionExecutor) Exec(uid string, ctx context.Context, model *sp
 		return f.stop(filepath, target, ctx)
 	}
 
-	if !exec.CheckFilepathExists(ctx, f.channel, target) {
-		log.Errorf(ctx, "`%s`: target dir does not exist", filepath)
-		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", target, "the file does not exist")
-	}
-
 	force := model.ActionFlags["force"] == "true"
 	autoCreateDir := model.ActionFlags["auto-create-dir"] == "true"
 
 	if !force {
 		targetFile := path.Join(target, "/", path.Base(filepath))
 		if exec.CheckFilepathExists(ctx, f.channel, targetFile) {
-			log.Errorf(ctx,"`%s`: target file does not exist", targetFile)
-			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", targetFile, "the target file does not exist")
+			log.Errorf(ctx, "`%s`: target file already exists", targetFile)
+			return spec.ResponseFailWithFlags(spec.ParameterInvalid, "target", targetFile, "the target file already exists")
 		}
 	}
 	return f.start(filepath, target, force, autoCreateDir, ctx)
@@ -138,6 +137,10 @@ func (f *FileMoveActionExecutor) start(filepath, target string, force, autoCreat
 	}
 
 	if force {
+		// backup
+		_ = f.channel.Run(ctx, "cp", fmt.Sprintf(`"%s" "%s"`, path.Join(target, path.Base(filepath)),
+			path.Join(target, path.Base(filepath)+suffix)))
+
 		response = f.channel.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, filepath, target))
 	} else {
 		response = f.channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, filepath, target))
@@ -147,7 +150,13 @@ func (f *FileMoveActionExecutor) start(filepath, target string, force, autoCreat
 
 func (f *FileMoveActionExecutor) stop(filepath, target string, ctx context.Context) *spec.Response {
 	origin := path.Join(target, "/", path.Base(filepath))
-	return f.channel.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, origin, path.Dir(filepath)))
+	response := f.channel.Run(ctx, "mv", fmt.Sprintf(`-f "%s" "%s"`, origin, path.Dir(filepath)))
+	if response.Success {
+		// restore backup
+		_ = f.channel.Run(ctx, "mv", fmt.Sprintf(`"%s" "%s"`, path.Join(target, path.Base(filepath)+suffix),
+			path.Join(target, path.Base(filepath))))
+	}
+	return response
 }
 
 func (f *FileMoveActionExecutor) SetChannel(channel spec.Channel) {

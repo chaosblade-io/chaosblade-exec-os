@@ -19,8 +19,9 @@ package cpu
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
-	os_exec "os/exec"
+	osexec "os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -31,15 +32,19 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
-	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 
-	"github.com/mjibson/go-dsp/fft"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec"
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
+	"github.com/chaosblade-io/chaosblade-exec-os/pkg/automaxprocs"
+  
+  "github.com/mjibson/go-dsp/fft"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/howeyc/crc16"
+
 	_ "go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -185,10 +190,13 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		return ce.stop(ctx)
 	}
 
-	var cpuCount int
-	var cpuList string
-	var cpuPercent int
-	var climbTime int
+	var (
+		cpuCount   int
+		cpuList    string
+		cpuPercent int
+		climbTime  int
+		quotaRatio = 1.0
+	)
 
 	cpuPercentStr := model.ActionFlags["cpu-percent"]
 	if cpuPercentStr != "" {
@@ -199,7 +207,7 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer")
 		}
 		if cpuPercent > 100 || cpuPercent < 0 {
-			log.Errorf(ctx, "`%s`: cpu-list is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr)
+			log.Errorf(ctx, "`%s`: cpu-percent is illegal, it must be a positive integer and not bigger than 100", cpuPercentStr)
 			return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-percent", cpuPercentStr, "it must be a positive integer and not bigger than 100")
 		}
 	} else {
@@ -228,9 +236,25 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 				return spec.ResponseFailWithFlags(spec.ParameterIllegal, "cpu-count", cpuCountStr, "it must be a positive integer")
 			}
 		}
-		if cpuCount <= 0 || cpuCount > runtime.NumCPU() {
-			cpuCount = runtime.NumCPU()
+
+		tmpCpuCnt := runtime.NumCPU()
+		tmpQuotaRatio := 1.0
+		if _, ok := ce.channel.(*channel.NSExecChannel); ok {
+			tmpCpuCnt, tmpQuotaRatio, err = automaxprocs.GetCPUCntByPid(
+				ctx,
+				model.ActionFlags["cgroup-root"],
+				model.ActionFlags[channel.NSTargetFlagName],
+			)
+			if err != nil {
+				log.Errorf(ctx, "get cpu count by pid failed, %v", err)
+			}
 		}
+
+		if cpuCount <= 0 || cpuCount > tmpCpuCnt {
+			cpuCount = tmpCpuCnt
+			quotaRatio = tmpQuotaRatio
+		}
+		log.Infof(ctx, "cpu count: %d, quota ratio: %f", cpuCount, quotaRatio)
 	}
 
 	climbTimeStr := model.ActionFlags["climb-time"]
@@ -249,7 +273,18 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 
 	ctx = context.WithValue(ctx, "cgroup-root", model.ActionFlags["cgroup-root"])
 
-	return ce.start(ctx, cpuList, cpuCount, cpuPercent, climbTime, model.ActionFlags["cpu-index"])
+	// Apply quota ratio to adjust the target percent
+	// Example: quota=0.6 cores, cpuCount=1, ratio=0.6
+	// User wants 80% load, effective target = 80% * 0.6 = 48%
+	// percent should not exceed 100%
+	// percent should not be less than 1%, otherwise the cpu burn program will not work
+	effectivePercent := int(math.Min(math.Max(float64(cpuPercent)*quotaRatio, 1), 100))
+	if effectivePercent != cpuPercent {
+		log.Infof(ctx, "adjusted cpu percent from %d%% to %d%% based on quota ratio %f",
+			cpuPercent, effectivePercent, quotaRatio)
+	}
+
+	return ce.start(ctx, cpuList, cpuCount, effectivePercent, climbTime, model.ActionFlags["cpu-index"])
 }
 
 // start burn cpu.
@@ -268,7 +303,7 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 
 			args = fmt.Sprintf("-c %s %s", core, args)
 			argsArray := strings.Split(args, " ")
-			command := os_exec.CommandContext(ctx, "taskset", argsArray...)
+			command := osexec.CommandContext(ctx, "taskset", argsArray...)
 			command.SysProcAttr = &syscall.SysProcAttr{}
 
 			if err := command.Start(); err != nil {
@@ -282,12 +317,10 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	log.Debugf(ctx, "cpu counts: %d", cpuCount)
 	slopePercent := float64(cpuPercent)
 
-	// The default is zero. Whatever the value of percpu, the 
-	// cpuIndex can be used as a subscript for totalCpuPercent in burn.
-	var cpuIndex int = 0
-	precpu := false
+	var cpuIndex int
+	percpu := false
 	if cpuIndexStr != "" {
-		precpu = true
+		percpu = true
 		var err error
 		cpuIndex, err = strconv.Atoi(cpuIndexStr)
 		if err != nil {
@@ -296,7 +329,9 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 		}
 	}
 
-	slope(ctx, cpuPercent, climbTime, slopePercent, precpu, cpuIndex)
+	// make CPU slowly climb to some level, to simulate slow resource competition
+	// which system faults cannot be quickly noticed by monitoring system.
+	slope(ctx, cpuPercent, climbTime, &slopePercent, percpu, cpuIndex)
 
 	quotas := make([]chan int64, cpuCount)
 	for i := 0; i < cpuCount; i++ {
@@ -308,7 +343,7 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 	// A percpu of false gets the load of the average cpu;
 	// The two cases are combined in a single loop.
 	for {
-		q := getQuota(ctx, slopePercent, precpu, cpuIndex)
+		q := getQuota(ctx, slopePercent, percpu, cpuIndex)
 		for i := 0; i < cpuCount; i++ {
 			quotas[i] <- q
 		}
@@ -317,28 +352,26 @@ func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuP
 
 const period = int64(1000000000)
 
-func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent float64, precpu bool, cpuIndex int) {
+func slope(ctx context.Context, cpuPercent int, climbTime int, slopePercent *float64, percpu bool, cpuIndex int) {
 	if climbTime != 0 {
-		var ticker = time.NewTicker(time.Second)
-		slopePercent = getUsed(ctx, precpu, cpuIndex)
-		var startPercent = float64(cpuPercent) - slopePercent
+		ticker := time.NewTicker(time.Second)
+		*slopePercent = getUsed(ctx, percpu, cpuIndex)
+		startPercent := float64(cpuPercent) - *slopePercent
 		go func() {
 			for range ticker.C {
-				if slopePercent < float64(cpuPercent) {
-					slopePercent += startPercent / float64(climbTime)
-				} else if slopePercent > float64(cpuPercent) {
-					slopePercent -= startPercent / float64(climbTime)
+				if *slopePercent < float64(cpuPercent) {
+					*slopePercent += startPercent / float64(climbTime)
+				} else if *slopePercent > float64(cpuPercent) {
+					*slopePercent -= startPercent / float64(climbTime)
 				}
 			}
 		}()
 	}
 }
 
-// If percpu is true, it returns the ratio of the specified cpu-index;
-// otherwise, it returns the average cpu load ratio.
-func getQuota(ctx context.Context, slopePercent float64, precpu bool, cpuIndex int) int64 {
-	used := getUsed(ctx, precpu, cpuIndex)
-	log.Debugf(ctx, "cpu usage: %f , precpu: %v, cpuIndex %d", used, precpu, cpuIndex)
+func getQuota(ctx context.Context, slopePercent float64, percpu bool, cpuIndex int) int64 {
+	used := getUsed(ctx, percpu, cpuIndex)
+	log.Debugf(ctx, "cpu usage: %f , percpu: %v, cpuIndex %d", used, percpu, cpuIndex)
 	dx := (slopePercent - used) / 100
 	busy := int64(dx * float64(period))
 	return busy

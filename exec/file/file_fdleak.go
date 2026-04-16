@@ -144,32 +144,6 @@ func (e *FileFdleakExecutor) Exec(uid string, ctx context.Context, model *spec.E
 	return e.startByPercent(ctx, percent, dir, prefix)
 }
 
-func (e *FileFdleakExecutor) Check(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	if _, ok := spec.IsDestroy(ctx); ok {
-		return e.stop(ctx)
-	}
-
-	if _, perr := parsePercent(model.ActionFlags["percent"]); perr != nil {
-		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "percent", "", perr.Error())
-	}
-
-	dir := model.ActionFlags["directory"]
-	if dir == "" {
-		dir = os.TempDir()
-	}
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", dir, err.Error())
-	}
-
-	if model.ActionFlags["percent"] != "" {
-		if _, _, err := getDiskSpaceInfo(dir); err != nil {
-			return spec.ResponseFailWithResult(spec.ActionNotSupport, fmt.Sprintf("get disk info: %v", err))
-		}
-	}
-
-	return spec.ReturnSuccess(ctx.Value(spec.Uid))
-}
-
 func (e *FileFdleakExecutor) startByPercent(ctx context.Context, percent int, dir, prefix string) *spec.Response {
 	totalBytes, availableBytes, err := getDiskSpaceInfo(dir)
 	if err != nil {

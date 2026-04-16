@@ -34,6 +34,7 @@ func NewFileCommandSpec() spec.ExpModelCommandSpec {
 				NewFileDeleteActionSpec(),
 				NewFileMoveActionSpec(),
 				NewFileLoadActionSpec(),
+				NewFileFdleakActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},

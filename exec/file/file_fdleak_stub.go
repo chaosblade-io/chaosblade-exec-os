@@ -21,14 +21,10 @@ package file
 import (
 	"context"
 
-	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 
-	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/category"
 )
-
-var fdleakLocalChannelStub = channel.NewLocalChannel()
 
 const FdLeakBin = "chaos_fdleak"
 
@@ -36,11 +32,23 @@ func NewFileFdleakActionSpec() spec.ExpActionCommandSpec {
 	return &FileFdleakActionCommandSpec{
 		spec.BaseExpActionCommandSpec{
 			ActionMatchers: []spec.ExpFlagSpec{
-				&spec.ExpFlag{Name: "percent", Desc: "percentage of disk space to occupy with leaked file data, e.g. 50 or 50%"},
+				&spec.ExpFlag{
+					Name:     "percent",
+					Desc:     "percentage of disk space to occupy with leaked file data, e.g. 50 or 50%",
+					Required: true,
+				},
 			},
 			ActionFlags: []spec.ExpFlagSpec{
-				&spec.ExpFlag{Name: "directory", Desc: "directory for temporary files", Default: ""},
-				&spec.ExpFlag{Name: "prefix", Desc: "filename prefix for temp files", Default: "chaos_fdleak_"},
+				&spec.ExpFlag{
+					Name:    "directory",
+					Desc:    "directory for temporary files; defaults to OS temp directory",
+					Default: "",
+				},
+				&spec.ExpFlag{
+					Name:    "prefix",
+					Desc:    "filename prefix for temp files",
+					Default: "chaos_fdleak_",
+				},
 			},
 			ActionExecutor:   &FileFdleakExecutor{},
 			ActionPrograms:   []string{FdLeakBin},
@@ -82,24 +90,16 @@ func (e *FileFdleakExecutor) SetChannel(channel spec.Channel) { e.channel = chan
 
 func (e *FileFdleakExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if _, ok := spec.IsDestroy(ctx); ok {
-		ch := e.channel
-		if ch == nil {
-			ch = fdleakLocalChannelStub
-		}
-		ctx = context.WithValue(ctx, "bin", FdLeakBin)
-		return exec.Destroy(ctx, ch, "file fdleak")
+		// On non-unix platforms, the action was never started, so destroy is a no-op
+		return spec.ReturnSuccess("file fdleak not supported on this platform, nothing to destroy")
 	}
-	return spec.ResponseFailWithResult(spec.ActionNotSupport, "file fdleak is only supported on linux and darwin")
+	return spec.ResponseFailWithResult(spec.ActionNotSupport, "file fdleak is only supported on unix platforms")
 }
 
 func (e *FileFdleakExecutor) Check(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
 	if _, ok := spec.IsDestroy(ctx); ok {
-		ch := e.channel
-		if ch == nil {
-			ch = fdleakLocalChannelStub
-		}
-		ctx = context.WithValue(ctx, "bin", FdLeakBin)
-		return exec.Destroy(ctx, ch, "file fdleak")
+		// On non-unix platforms, the action was never started, so destroy is a no-op
+		return spec.ReturnSuccess("file fdleak not supported on this platform, nothing to destroy")
 	}
-	return spec.ResponseFailWithResult(spec.ActionNotSupport, "file fdleak is only supported on linux and darwin")
+	return spec.ResponseFailWithResult(spec.ActionNotSupport, "file fdleak is only supported on unix platforms")
 }

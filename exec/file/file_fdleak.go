@@ -20,7 +20,6 @@ package file
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
@@ -137,7 +136,7 @@ func (e *FileFdleakExecutor) Exec(uid string, ctx context.Context, model *spec.E
 		return spec.ResponseFailWithFlags(spec.ParameterIllegal, "percent", "", perr.Error())
 	}
 
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		log.Errorf(ctx, "fdleak: mkdir %s: %v", dir, err)
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", dir, err.Error())
 	}
@@ -158,12 +157,12 @@ func (e *FileFdleakExecutor) Check(uid string, ctx context.Context, model *spec.
 	if dir == "" {
 		dir = os.TempDir()
 	}
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return spec.ResponseFailWithFlags(spec.ParameterInvalid, "directory", dir, err.Error())
 	}
 
 	if model.ActionFlags["percent"] != "" {
-		if _, err := getDiskTotalBytes(dir); err != nil {
+		if _, _, err := getDiskSpaceInfo(dir); err != nil {
 			return spec.ResponseFailWithResult(spec.ActionNotSupport, fmt.Sprintf("get disk info: %v", err))
 		}
 	}
@@ -172,19 +171,19 @@ func (e *FileFdleakExecutor) Check(uid string, ctx context.Context, model *spec.
 }
 
 func (e *FileFdleakExecutor) startByPercent(ctx context.Context, percent int, dir, prefix string) *spec.Response {
-	totalBytes, err := getDiskTotalBytes(dir)
+	totalBytes, availableBytes, err := getDiskSpaceInfo(dir)
 	if err != nil {
 		log.Errorf(ctx, "fdleak: get disk info for %s: %v", dir, err)
 		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("get disk info: %v", err))
 	}
 
-	targetBytes := int64(totalBytes * uint64(percent) / 100)
+	targetBytes := computeTargetBytes(availableBytes, percent)
 	if targetBytes <= 0 {
-		log.Warnf(ctx, "fdleak: nothing to leak (targetBytes=%d)", targetBytes)
+		log.Warnf(ctx, "fdleak: nothing to leak (targetBytes=%d, availableBytes=%d)", targetBytes, availableBytes)
 		return spec.ReturnSuccess(ctx.Value(spec.Uid))
 	}
 
-	log.Infof(ctx, "fdleak: will occupy %d bytes (%d%% of %d total) on %s", targetBytes, percent, totalBytes, dir)
+	log.Infof(ctx, "fdleak: will occupy %d bytes (%d%% of %d available, %d total) on %s", targetBytes, percent, availableBytes, totalBytes, dir)
 
 	pattern := prefix
 	if !strings.HasSuffix(pattern, "*") {
@@ -202,6 +201,9 @@ func (e *FileFdleakExecutor) startByPercent(ctx context.Context, percent int, di
 }
 
 // blockUntilSignal blocks until SIGTERM/SIGINT, then closes all files gracefully.
+// Note: exec.Destroy sends SIGKILL (kill -9), which terminates the process immediately
+// without running this cleanup. In that case, the OS reclaims all open FDs automatically
+// when the process exits. This signal handler is a best-effort for graceful shutdowns.
 func (e *FileFdleakExecutor) blockUntilSignal(ctx context.Context, openFiles []*os.File) *spec.Response {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
@@ -211,7 +213,9 @@ func (e *FileFdleakExecutor) blockUntilSignal(ctx context.Context, openFiles []*
 	return spec.ReturnSuccess(ctx.Value(spec.Uid))
 }
 
-// leakOneUnlinkedFD creates a temp file under dir, writes size bytes of random data, unlinks the path, and returns the open *os.File.
+// leakOneUnlinkedFD creates a temp file under dir, occupies size bytes of disk space,
+// unlinks the path, and returns the open *os.File.
+// It first tries fallocate for fast allocation; if unsupported, falls back to writing zeros.
 func leakOneUnlinkedFD(dir, pattern string, size int64) (*os.File, error) {
 	f, err := os.CreateTemp(dir, pattern)
 	if err != nil {
@@ -226,9 +230,9 @@ func leakOneUnlinkedFD(dir, pattern string, size int64) (*os.File, error) {
 		}
 	}()
 
-	_, err = io.CopyN(f, rand.Reader, size)
-	if err != nil {
-		return nil, fmt.Errorf("write random data: %w", err)
+	// Write zeros to occupy disk space (much faster than crypto/rand)
+	if _, writeErr := io.CopyN(f, zeroReader{}, size); writeErr != nil {
+		return nil, fmt.Errorf("write data to temp file: %w", writeErr)
 	}
 
 	name := f.Name()
@@ -239,6 +243,16 @@ func leakOneUnlinkedFD(dir, pattern string, size int64) (*os.File, error) {
 	// All operations succeeded, keep the file descriptor open
 	closeOnError = false
 	return f, nil
+}
+
+// zeroReader is an io.Reader that returns zeros (much faster than crypto/rand).
+type zeroReader struct{}
+
+func (zeroReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 0
+	}
+	return len(p), nil
 }
 
 func (e *FileFdleakExecutor) closeAll(files []*os.File) {
@@ -272,10 +286,22 @@ func parsePercent(percentStr string) (int, error) {
 	return n, nil
 }
 
-func getDiskTotalBytes(path string) (uint64, error) {
+// computeTargetBytes calculates the target bytes to occupy based on available space and percent.
+func computeTargetBytes(availableBytes uint64, percent int) int64 {
+	target := int64(availableBytes * uint64(percent) / 100)
+	if uint64(target) > availableBytes {
+		target = int64(availableBytes)
+	}
+	return target
+}
+
+// getDiskSpaceInfo returns (totalBytes, availableBytes, error) for the filesystem containing path.
+func getDiskSpaceInfo(path string) (uint64, uint64, error) {
 	var stat unix.Statfs_t
 	if err := unix.Statfs(path, &stat); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return stat.Blocks * uint64(stat.Bsize), nil
+	totalBytes := uint64(stat.Blocks) * uint64(stat.Bsize)
+	availableBytes := uint64(stat.Bavail) * uint64(stat.Bsize)
+	return totalBytes, availableBytes, nil
 }

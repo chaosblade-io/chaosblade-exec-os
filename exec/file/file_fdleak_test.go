@@ -61,21 +61,21 @@ func TestParsePercent(t *testing.T) {
 
 func TestComputeTargetBytes(t *testing.T) {
 	tests := []struct {
-		name        string
-		totalBytes  uint64
-		percent     int
-		expectBytes int64
+		name           string
+		availableBytes uint64
+		percent        int
+		expectBytes    int64
 	}{
 		{"50 percent of 10GB", 10_000_000_000, 50, 5_000_000_000},
 		{"100 percent of 1GB", 1_000_000_000, 100, 1_000_000_000},
 		{"1 percent of 1GB", 1_000_000_000, 1, 10_000_000},
-		{"0 total", 0, 50, 0},
+		{"0 available", 0, 50, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := int64(tt.totalBytes * uint64(tt.percent) / 100)
+			got := computeTargetBytes(tt.availableBytes, tt.percent)
 			if got != tt.expectBytes {
-				t.Fatalf("got %d, want %d", got, tt.expectBytes)
+				t.Fatalf("computeTargetBytes(%d, %d) = %d, want %d", tt.availableBytes, tt.percent, got, tt.expectBytes)
 			}
 		})
 	}
@@ -105,14 +105,21 @@ func TestLeakOneUnlinkedFD(t *testing.T) {
 	}
 }
 
-func TestGetDiskTotalBytes(t *testing.T) {
+func TestGetDiskSpaceInfo(t *testing.T) {
 	dir := t.TempDir()
-	total, err := getDiskTotalBytes(dir)
+	total, available, err := getDiskSpaceInfo(dir)
 	if err != nil {
-		t.Fatalf("getDiskTotalBytes(%s) error: %v", dir, err)
+		t.Fatalf("getDiskSpaceInfo(%s) error: %v", dir, err)
 	}
 	if total == 0 {
-		t.Fatal("getDiskTotalBytes returned 0")
+		t.Fatal("getDiskSpaceInfo returned 0 total")
 	}
-	t.Logf("disk total bytes for %s: %d (%.2f GB)", dir, total, float64(total)/(1<<30))
+	if available == 0 {
+		t.Fatal("getDiskSpaceInfo returned 0 available")
+	}
+	if available > total {
+		t.Fatalf("available (%d) > total (%d)", available, total)
+	}
+	t.Logf("disk info for %s: total=%d (%.2f GB), available=%d (%.2f GB)",
+		dir, total, float64(total)/(1<<30), available, float64(available)/(1<<30))
 }

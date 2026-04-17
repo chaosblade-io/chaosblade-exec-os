@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -295,12 +296,19 @@ func parsePercent(percentStr string) (int, error) {
 }
 
 // computeTargetBytes calculates the target bytes to occupy based on available space and percent.
+// It performs arithmetic in uint64 to avoid overflow on very large filesystems, then clamps
+// the result to math.MaxInt64 before converting to int64.
 func computeTargetBytes(availableBytes uint64, percent int) int64 {
-	target := int64(availableBytes * uint64(percent) / 100)
-	if uint64(target) > availableBytes {
-		target = int64(availableBytes)
+	// Use division-first to avoid uint64 overflow: availableBytes / 100 * percent
+	// loses at most (percent-1) bytes of precision, which is negligible.
+	target := availableBytes / 100 * uint64(percent)
+	if target > availableBytes {
+		target = availableBytes
 	}
-	return target
+	if target > uint64(math.MaxInt64) {
+		target = uint64(math.MaxInt64)
+	}
+	return int64(target)
 }
 
 // getDiskSpaceInfo returns (totalBytes, availableBytes, error) for the filesystem containing path.

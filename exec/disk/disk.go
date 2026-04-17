@@ -30,6 +30,7 @@ func NewDiskCommandSpec() spec.ExpModelCommandSpec {
 			ExpActions: []spec.ExpActionCommandSpec{
 				NewFillActionSpec(),
 				NewBurnActionSpec(),
+				NewUnmountStuckActionSpec(),
 			},
 			ExpFlags: []spec.ExpFlagSpec{},
 		},
@@ -45,5 +46,5 @@ func (*DiskCommandSpec) ShortDesc() string {
 }
 
 func (*DiskCommandSpec) LongDesc() string {
-	return "Disk experiment contains fill disk or burn io"
+	return "Disk experiment contains fill disk, burn io or unmount stuck"
 }

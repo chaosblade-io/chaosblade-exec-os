@@ -22,8 +22,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -117,10 +119,6 @@ func (e *FileFdleakExecutor) SetChannel(channel spec.Channel) {
 }
 
 func (e *FileFdleakExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	if _, ok := spec.IsDestroy(ctx); ok {
-		return e.stop(ctx)
-	}
-
 	dir := model.ActionFlags["directory"]
 	if dir == "" {
 		dir = os.TempDir()
@@ -128,6 +126,10 @@ func (e *FileFdleakExecutor) Exec(uid string, ctx context.Context, model *spec.E
 	prefix := model.ActionFlags["prefix"]
 	if prefix == "" {
 		prefix = defaultFdLeakPrefix
+	}
+
+	if _, ok := spec.IsDestroy(ctx); ok {
+		return e.stop(ctx, dir, prefix)
 	}
 
 	percent, perr := parsePercent(model.ActionFlags["percent"])
@@ -190,6 +192,9 @@ func (e *FileFdleakExecutor) blockUntilSignal(ctx context.Context, openFiles []*
 // leakOneUnlinkedFD creates a temp file under dir, occupies size bytes of disk space,
 // unlinks the path, and returns the open *os.File.
 // It first tries fallocate for fast allocation; if unsupported, falls back to writing zeros.
+// The file path is unlinked immediately after creation (before writing data), so that
+// even if the process is killed (SIGKILL) during the write, the OS will automatically
+// reclaim disk space when the fd is closed — no residual files left on disk.
 func leakOneUnlinkedFD(dir, pattern string, size int64) (*os.File, error) {
 	f, err := os.CreateTemp(dir, pattern)
 	if err != nil {
@@ -204,14 +209,20 @@ func leakOneUnlinkedFD(dir, pattern string, size int64) (*os.File, error) {
 		}
 	}()
 
-	// Write zeros to occupy disk space (much faster than crypto/rand)
-	if _, writeErr := io.CopyN(f, zeroReader{}, size); writeErr != nil {
-		return nil, fmt.Errorf("write data to temp file: %w", writeErr)
-	}
-
+	// Unlink the file path first, before writing any data.
+	// This ensures that if the process is killed during write, the OS reclaims
+	// disk space automatically when the fd is closed — no orphan files remain.
 	name := f.Name()
 	if err := os.Remove(name); err != nil {
 		return nil, fmt.Errorf("unlink %s: %w", name, err)
+	}
+
+	// Try fallocate first (instant disk space allocation without writing data)
+	if fallocErr := tryFallocate(int(f.Fd()), size); fallocErr != nil {
+		// Fallocate not supported (e.g., tmpfs, some filesystems), fall back to writing zeros
+		if _, writeErr := io.CopyN(f, zeroReader{}, size); writeErr != nil {
+			return nil, fmt.Errorf("write data to temp file: %w", writeErr)
+		}
 	}
 
 	// All operations succeeded, keep the file descriptor open
@@ -237,13 +248,37 @@ func (e *FileFdleakExecutor) closeAll(files []*os.File) {
 	}
 }
 
-func (e *FileFdleakExecutor) stop(ctx context.Context) *spec.Response {
+func (e *FileFdleakExecutor) stop(ctx context.Context, dir, prefix string) *spec.Response {
 	ch := e.channel
 	if ch == nil {
 		ch = fdleakLocalChannel
 	}
 	ctx = context.WithValue(ctx, "bin", FdLeakBin)
-	return exec.Destroy(ctx, ch, "file fdleak")
+	resp := exec.Destroy(ctx, ch, "file fdleak")
+
+	// Best-effort cleanup: after killing the process, try to remove any leftover
+	// temp files. On normal filesystems this works reliably. On overlay FS, files
+	// may be hidden by whiteouts and not found by Glob — this is a known limitation.
+	e.cleanupTempFiles(ctx, dir, prefix)
+
+	return resp
+}
+
+// cleanupTempFiles removes temp files matching the prefix pattern in the given directory.
+func (e *FileFdleakExecutor) cleanupTempFiles(ctx context.Context, dir, prefix string) {
+	pattern := filepath.Join(dir, prefix+"*")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		log.Warnf(ctx, "fdleak cleanup: glob %s: %v", pattern, err)
+		return
+	}
+	for _, path := range matches {
+		if err := os.Remove(path); err != nil {
+			log.Warnf(ctx, "fdleak cleanup: remove %s: %v", path, err)
+		} else {
+			log.Infof(ctx, "fdleak cleanup: removed %s", path)
+		}
+	}
 }
 
 func parsePercent(percentStr string) (int, error) {
@@ -261,12 +296,19 @@ func parsePercent(percentStr string) (int, error) {
 }
 
 // computeTargetBytes calculates the target bytes to occupy based on available space and percent.
+// It performs arithmetic in uint64 to avoid overflow on very large filesystems, then clamps
+// the result to math.MaxInt64 before converting to int64.
 func computeTargetBytes(availableBytes uint64, percent int) int64 {
-	target := int64(availableBytes * uint64(percent) / 100)
-	if uint64(target) > availableBytes {
-		target = int64(availableBytes)
+	// Use division-first to avoid uint64 overflow: availableBytes / 100 * percent
+	// loses at most (percent-1) bytes of precision, which is negligible.
+	target := availableBytes / 100 * uint64(percent)
+	if target > availableBytes {
+		target = availableBytes
 	}
-	return target
+	if target > uint64(math.MaxInt64) {
+		target = uint64(math.MaxInt64)
+	}
+	return int64(target)
 }
 
 // getDiskSpaceInfo returns (totalBytes, availableBytes, error) for the filesystem containing path.

@@ -73,7 +73,7 @@ func (f *FileFdleakActionCommandSpec) LongDesc() string {
 	if f.ActionLongDesc != "" {
 		return f.ActionLongDesc
 	}
-	return "Creates temporary files, writes random data, unlinks paths while keeping fds open"
+	return "Creates temporary files, writes data, unlinks paths while keeping fds open"
 }
 
 func (*FileFdleakActionCommandSpec) Categories() []string {

@@ -232,6 +232,13 @@ func (ce *memExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 		}
 	}
 	ctx = context.WithValue(ctx, "cgroup-root", model.ActionFlags["cgroup-root"])
+	// Check container statistics before allocating memory or mounting tmpfs.
+	// This also protects direct nsexec invocations that bypass the CRI executor.
+	if ctx.Value(channel.NSTargetFlagName) != nil {
+		if _, _, err := getAvailableAndTotal(ctx, burnMemModeStr, includeBufferCache); err != nil {
+			return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("memory preflight failed: %v", err))
+		}
+	}
 	ce.start(ctx, memPercent, memReserve, memRate, burnMemModeStr, includeBufferCache, avoidBeingKilled, ce.channel)
 	return spec.Success()
 }

@@ -19,8 +19,10 @@ package exec
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/containerd/cgroups"
+	v1 "github.com/containerd/cgroups/stats/v1"
 	"golang.org/x/sys/unix"
 )
 
@@ -87,6 +89,75 @@ func mountedV1Subsystems(subsystems []cgroups.Subsystem,
 		}
 	}
 	return enabled, nil
+}
+
+// LoadV1ForExperiment permits missing optional controllers but requires the
+// controllers used for resource isolation by this experiment. Callers that
+// start a process must call this before command.Start so that a failed load
+// can never leave a running process outside of the target's resource limit.
+func LoadV1ForExperiment(hierarchy cgroups.Hierarchy, path cgroups.Path, target string) (cgroups.Cgroup, error) {
+	group, err := cgroups.Load(hierarchy, path)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireV1Controllers(group, target); err != nil {
+		return nil, err
+	}
+	return group, nil
+}
+
+func requireV1Controllers(group cgroups.Cgroup, target string) error {
+	var required []cgroups.Name
+	switch target {
+	case "mem":
+		required = []cgroups.Name{cgroups.Memory}
+	case "cpu":
+		required = []cgroups.Name{cgroups.Cpu, cgroups.Cpuacct}
+	default:
+		return nil
+	}
+	active := make(map[cgroups.Name]bool)
+	for _, s := range group.Subsystems() {
+		active[s.Name()] = true
+	}
+	var missing []string
+	for _, name := range required {
+		if !active[name] {
+			missing = append(missing, string(name))
+		}
+	}
+	if len(missing) != 0 {
+		return fmt.Errorf("cgroup v1 %s experiment requires active controller(s): %s", target, strings.Join(missing, ", "))
+	}
+	return nil
+}
+
+// StatV1ForExperiment fails on missing statistics instead of treating them as
+// zero usage or falling back to host memory. IgnoreNotExist must not be used
+// here: CPU metrics are preallocated by containerd even when cpuacct.stat
+// disappears, so container usage would silently be reported as idle.
+func StatV1ForExperiment(group cgroups.Cgroup, target string) (*v1.Metrics, error) {
+	if err := requireV1Controllers(group, target); err != nil {
+		return nil, err
+	}
+	stats, err := group.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("read cgroup v1 %s statistics: %w", target, err)
+	}
+	if stats == nil {
+		return nil, fmt.Errorf("missing cgroup v1 %s statistics", target)
+	}
+	switch target {
+	case "mem":
+		if stats.Memory == nil || stats.Memory.Usage == nil {
+			return nil, fmt.Errorf("missing cgroup v1 memory usage statistics")
+		}
+	case "cpu":
+		if stats.CPU == nil || stats.CPU.Usage == nil {
+			return nil, fmt.Errorf("missing cgroup v1 cpu usage statistics")
+		}
+	}
+	return stats, nil
 }
 
 // defaults returns all known groups

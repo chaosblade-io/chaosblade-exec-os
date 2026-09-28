@@ -88,7 +88,7 @@ func (*NetworkLossExecutor) Name() string {
 }
 
 func (nle *NetworkLossExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	commands := []string{"tc", "head"}
+	commands := tcAvailabilityCommands()
 	if response, ok := nle.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}

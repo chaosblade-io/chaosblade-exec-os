@@ -79,7 +79,7 @@ func (ce *NetworkCorruptExecutor) Name() string {
 }
 
 func (ce *NetworkCorruptExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	commands := []string{"tc", "head"}
+	commands := tcAvailabilityCommands()
 	if response, ok := ce.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}

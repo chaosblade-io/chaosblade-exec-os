@@ -65,16 +65,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          # setup-go already caches ~/go/pkg/mod and ~/.cache/go-build by
+          # default. Do NOT add a separate actions/cache on these same paths:
+          # the double restore makes tar fail on the read-only module files
+          # ("Cannot open: File exists" / "tar ... exit code 2"), flooding the
+          # run with dozens of non-fatal error annotations.
+          cache: true
 
       - name: Get version info
         id: version

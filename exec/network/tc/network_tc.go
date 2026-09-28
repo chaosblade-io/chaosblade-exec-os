@@ -23,6 +23,7 @@ import (
 	"math"
 	"math/bits"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +37,127 @@ import (
 
 // TcNetworkBin for network delay, loss, duplicate, reorder and corrupt experiments
 const TcNetworkBin = "chaos_tcnetwork"
+
+// tcName is the system tc command name, used as the fallback when no bundled
+// tc is shipped alongside chaos_os.
+const tcName = "tc"
+
+// bundledTcPath returns the absolute path of the tc binary shipped together
+// with chaos_os. It lives in the same directory as the chaos_os executable
+// (util.GetProgramPath), e.g. /opt/chaosblade/bin/tc inside the tool image,
+// exactly like the bundled strace.
+//
+// Bundling a pinned, statically linked iproute2 (<=6.8) tc removes the
+// dependency on whatever iproute2 the base image happens to ship. Since
+// iproute2 v6.9.0 the tc netem encoder writes the 64-bit TCA_NETEM_LATENCY64
+// attribute and leaves the 32-bit opt.latency zero; kernels older than 4.15 do
+// not understand LATENCY64, read opt.latency (0) and silently ignore the
+// unknown attribute, so `network delay` is created but has no effect.
+func bundledTcPath() string {
+	return path.Join(util.GetProgramPath(), tcName)
+}
+
+// hasBundledTc reports whether the bundled tc is present.
+func hasBundledTc() bool {
+	return util.IsExist(bundledTcPath())
+}
+
+// tcCommand returns the shell command used to invoke tc. When the bundled tc is
+// present it prepends the bundle directory to PATH so that BOTH the leading tc
+// and every tc embedded in compound args (e.g. `&& tc filter add ...`) resolve
+// to the pinned bundled binary; otherwise it falls back to the plain system tc.
+//
+// This works for every channel: both LocalChannel and NSExecChannel join the
+// script and args into a single `/bin/sh -c "<script> <args>"` string, and the
+// nsexec path does not enter the mount namespace, so the absolute bundle
+// directory is resolved in the tool container filesystem while the netns being
+// configured is still the target's.
+func tcCommand() string {
+	if hasBundledTc() {
+		return fmt.Sprintf("export PATH=%s:$PATH; tc", util.GetProgramPath())
+	}
+	return tcName
+}
+
+// tcAvailabilityCommands returns the command list for the pre-run availability
+// check. When the bundled tc is present the system tc on PATH is irrelevant
+// (execution uses the bundle directory, which is not on the default PATH), so
+// it is not checked; otherwise the fallback still requires the system tc.
+func tcAvailabilityCommands() []string {
+	if hasBundledTc() {
+		return []string{"head"}
+	}
+	return []string{tcName, "head"}
+}
+
+// netemKeywords extracts the netem attribute keywords (delay/loss/duplicate/
+// corrupt/reorder) from a class rule such as "netem delay 3000ms 0ms".
+//
+// Only attributes the user asked to be non-zero are returned. tc omits an
+// attribute from `qdisc show` when its value is zero (the printer guards each
+// one, e.g. `if (qopt.latency)`), so verifying a zero-valued delay/loss would
+// always fail the read-back and wrongly roll back a legitimate injection.
+func netemKeywords(classRule string) []string {
+	supported := []string{"delay", "loss", "duplicate", "corrupt", "reorder"}
+	keywords := make([]string, 0)
+	fields := strings.Fields(classRule)
+	for i, field := range fields {
+		for _, kw := range supported {
+			if field != kw {
+				continue
+			}
+			// The value token follows the keyword, e.g. "3000ms" or "10%".
+			if i+1 < len(fields) && isNonZeroValue(fields[i+1]) {
+				keywords = append(keywords, kw)
+			}
+		}
+	}
+	return keywords
+}
+
+// isNonZeroValue reports whether a netem attribute value token such as "3000ms"
+// or "10%" represents a non-zero amount. An unparseable token is treated as
+// non-zero so the attribute is still verified (fail towards catching the bug).
+func isNonZeroValue(token string) bool {
+	trimmed := strings.TrimRight(token, "ms%")
+	value, err := strconv.ParseFloat(trimmed, 64)
+	if err != nil {
+		return true
+	}
+	return value > 0
+}
+
+// verifyNetemApplied reads the qdisc back to confirm the netem attribute was
+// really accepted by the kernel. tc exits 0 even when the kernel silently
+// ignores an attribute it does not understand (see bundledTcPath), which would
+// otherwise leave `network delay` looking applied while having no effect. When
+// the expected attribute is missing the injection is reported as a failure so
+// the caller can roll back instead of silently succeeding.
+func verifyNetemApplied(ctx context.Context, cl spec.Channel, netInterface, classRule string) *spec.Response {
+	keywords := netemKeywords(classRule)
+	if len(keywords) == 0 {
+		return spec.ReturnSuccess("no netem attribute to verify")
+	}
+	response := cl.Run(ctx, tcCommand(), fmt.Sprintf(`qdisc show dev %s`, netInterface))
+	if !response.Success {
+		// A failed read-back must not mask an otherwise successful injection
+		// (e.g. a restricted environment); warn and let it pass.
+		log.Warnf(ctx, "verify netem: read qdisc for %s failed, %v", netInterface, response.Err)
+		return spec.ReturnSuccess(response.Result)
+	}
+	output := ""
+	if response.Result != nil {
+		output, _ = response.Result.(string)
+	}
+	for _, kw := range keywords {
+		if !strings.Contains(output, kw) {
+			return spec.ReturnFail(spec.UnexpectedStatus, fmt.Sprintf(
+				"netem %s did not take effect on %s: the qdisc was created but the kernel dropped the %q attribute (readback: %s). This happens when the tc/iproute2 version writes an attribute the target kernel does not understand; ship the bundled compatible tc (iproute2<=6.8)",
+				kw, netInterface, kw, strings.TrimSpace(output)))
+		}
+	}
+	return spec.ReturnSuccess(output)
+}
 
 var commFlags = []spec.ExpFlagSpec{
 	&spec.ExpFlag{
@@ -135,7 +257,15 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 	}
 	// Only interface flag
 	if localPort == "" && remotePort == "" && excludePort == "" && destIp == "" && excludeIp == "" && protocol == "" {
-		return cl.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
+		response := cl.Run(ctx, tcCommand(), fmt.Sprintf(`qdisc add dev %s root %s`, netInterface, classRule))
+		if !response.Success {
+			return response
+		}
+		if verifyResp := verifyNetemApplied(ctx, cl, netInterface, classRule); !verifyResp.Success {
+			stopNet(ctx, netInterface, cl)
+			return verifyResp
+		}
+		return response
 	}
 
 	response = addQdiscForDL(cl, ctx, netInterface)
@@ -145,9 +275,14 @@ func startNet(ctx context.Context, netInterface, classRule, localPort, remotePor
 		// Add class rule to 1,2,3 band, exclude port and exclude ip are added to 4 band
 		args := buildNetemToDefaultBandsArgs(netInterface, classRule)
 		excludeFilters := buildExcludeFilterToNewBand(netInterface, excludePortRanges, excludeIp)
-		response := cl.Run(ctx, "tc", args+excludeFilters)
+		response := cl.Run(ctx, tcCommand(), args+excludeFilters)
 		if !response.Success {
 			stopNet(ctx, netInterface, cl)
+			return response
+		}
+		if verifyResp := verifyNetemApplied(ctx, cl, netInterface, classRule); !verifyResp.Success {
+			stopNet(ctx, netInterface, cl)
+			return verifyResp
 		}
 		return response
 	}
@@ -301,10 +436,14 @@ func executeTargetPortAndIpWithExclude(ctx context.Context, channel spec.Channel
 ) *spec.Response {
 	args := fmt.Sprintf(`qdisc add dev %s parent 1:4 handle 40: %s`, netInterface, classRule)
 	args = buildTargetFilterPortAndIp(localPortRanges, remotePortRanges, destIpRules, excludePorts, excludeIpRules, args, netInterface, protocol)
-	response := channel.Run(ctx, "tc", args)
+	response := channel.Run(ctx, tcCommand(), args)
 	if !response.Success {
 		stopNet(ctx, netInterface, channel)
 		return response
+	}
+	if verifyResp := verifyNetemApplied(ctx, channel, netInterface, classRule); !verifyResp.Success {
+		stopNet(ctx, netInterface, channel)
+		return verifyResp
 	}
 	return response
 }
@@ -402,7 +541,7 @@ func buildTargetFilterPortAndIp(localPortRanges, remotePortRanges [][]int, destI
 // addQdiscForDL creates bands for filter
 func addQdiscForDL(channel spec.Channel, ctx context.Context, netInterface string) *spec.Response {
 	// add tc filter for delay specify port
-	return channel.Run(ctx, "tc", fmt.Sprintf(`qdisc add dev %s root handle 1: prio bands 4`, netInterface))
+	return channel.Run(ctx, tcCommand(), fmt.Sprintf(`qdisc add dev %s root handle 1: prio bands 4`, netInterface))
 }
 
 // stopNet
@@ -410,14 +549,14 @@ func stopNet(ctx context.Context, netInterface string, cl spec.Channel) *spec.Re
 	if os.Getuid() != 0 {
 		return spec.ReturnFail(spec.Forbidden, fmt.Sprintf("tc no permission"))
 	}
-	response := cl.Run(ctx, "tc", fmt.Sprintf(`filter show dev %s parent 1: prio 4`, netInterface))
+	response := cl.Run(ctx, tcCommand(), fmt.Sprintf(`filter show dev %s parent 1: prio 4`, netInterface))
 	if response.Success && response.Result != "" {
-		response = cl.Run(ctx, "tc", fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
+		response = cl.Run(ctx, tcCommand(), fmt.Sprintf(`filter del dev %s parent 1: prio 4`, netInterface))
 		if !response.Success {
 			log.Errorf(ctx, "tc del filter err, %s", response.Err)
 		}
 	}
-	return cl.Run(ctx, "tc", fmt.Sprintf(`qdisc del dev %s root`, netInterface))
+	return cl.Run(ctx, tcCommand(), fmt.Sprintf(`qdisc del dev %s root`, netInterface))
 }
 
 // getPeerPorts returns all ports communicating with the port
@@ -532,7 +671,7 @@ func buildMaskForRange(start, end int) [][]uint16 {
 	cur := start
 	masks := make([][]uint16, 0)
 	for cur <= end {
-		x := (1 << (bits.Len(uint(cur)))) - 1
+		x := (1 << bits.Len(uint(cur))) - 1
 		if end < x {
 			x = end
 		}

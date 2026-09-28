@@ -74,7 +74,8 @@ define build_for_platform
 	@mkdir -p $(call get_platform_bin_dir,$(1)) $(call get_platform_yaml_dir,$(1))
 	@GOOS=$(word 1,$(subst _, ,$(1))) GOARCH=$(word 2,$(subst _, ,$(1))) \
 	CGO_ENABLED=0 $(GO) build $(GO_FLAGS) -o $(call get_platform_bin_dir,$(1))/chaos_os main.go
-	@cp extra/strace $(call get_platform_bin_dir,$(1))/ 2>/dev/null || true
+	@cp extra/strace/$(1)/strace $(call get_platform_bin_dir,$(1))/ 2>/dev/null || true
+	@cp extra/tc/$(1)/tc $(call get_platform_bin_dir,$(1))/ 2>/dev/null || true
 	@GOOS=$(CURRENT_OS) GOARCH=$(CURRENT_ARCH) $(GO) run build/spec.go $(call get_platform_yaml_dir,$(1))/$(OS_YAML_FILE_NAME)
 	@echo "✓ Build completed for $(1)"
 	@echo "  Binary: $(call get_platform_bin_dir,$(1))/chaos_os"
@@ -95,7 +96,8 @@ pre_build_current:
 
 build_current_platform:
 	@CGO_ENABLED=0 $(GO) build $(GO_FLAGS) -o $(call get_platform_bin_dir,$(CURRENT_PLATFORM))/chaos_os main.go
-	@cp extra/strace $(call get_platform_bin_dir,$(CURRENT_PLATFORM))/ 2>/dev/null || true
+	@cp extra/strace/$(CURRENT_PLATFORM)/strace $(call get_platform_bin_dir,$(CURRENT_PLATFORM))/ 2>/dev/null || true
+	@cp extra/tc/$(CURRENT_PLATFORM)/tc $(call get_platform_bin_dir,$(CURRENT_PLATFORM))/ 2>/dev/null || true
 	@$(GO) run build/spec.go $(call get_platform_yaml_dir,$(CURRENT_PLATFORM))/$(OS_YAML_FILE_NAME)
 	@echo "✓ Build completed for $(CURRENT_PLATFORM)"
 	@echo "  Binary: $(call get_platform_bin_dir,$(CURRENT_PLATFORM))/chaos_os"

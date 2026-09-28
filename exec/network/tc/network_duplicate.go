@@ -79,7 +79,7 @@ func (de *NetworkDuplicateExecutor) Name() string {
 }
 
 func (de *NetworkDuplicateExecutor) Exec(uid string, ctx context.Context, model *spec.ExpModel) *spec.Response {
-	commands := []string{"tc", "head"}
+	commands := tcAvailabilityCommands()
 	if response, ok := de.channel.IsAllCommandsAvailable(ctx, commands); !ok {
 		return response
 	}

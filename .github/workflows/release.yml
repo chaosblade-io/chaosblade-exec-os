@@ -79,8 +79,19 @@ jobs:
       - name: Get version info
         id: version
         run: |
-          # Get version from Git Tag, remove v prefix and Git description info (same as Makefile logic)
-          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual run: GITHUB_REF is the branch (refs/heads/...), not a tag,
+            # so the version must come from the workflow input instead.
+            VERSION="${{ github.event.inputs.version }}"
+            if [[ -z "${VERSION}" ]]; then
+              echo "::error::workflow_dispatch requires a non-empty 'version' input"
+              exit 1
+            fi
+          else
+            # Tag push: derive the version from the git tag ref.
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          # Remove v prefix and Git description info (same as Makefile logic)
           VERSION=$(echo "$VERSION" | sed 's/^v//' | sed 's/-[0-9]*-[a-z0-9]*.*//')
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
@@ -95,11 +106,14 @@ jobs:
           echo "  Runner: ${{ matrix.os }} (${{ matrix.runner_arch }})"
           echo "  Version: ${{ steps.version.outputs.version }}"
 
-          make ${{ matrix.platform }}
+          # Pass BLADE_VERSION explicitly so the build output directory
+          # (target/chaosblade-<version>-<platform>) always matches the version
+          # the verify/archive steps expect, for BOTH tag-push and manual runs.
+          make ${{ matrix.platform }} BLADE_VERSION=${{ steps.version.outputs.version }}
 
           # Display version information
           echo "📋 Version information:"
-          make version
+          make version BLADE_VERSION=${{ steps.version.outputs.version }}
 
       - name: Verify build artifacts
         run: |

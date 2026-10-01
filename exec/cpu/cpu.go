@@ -276,6 +276,9 @@ func (ce *cpuExecutor) Exec(uid string, ctx context.Context, model *spec.ExpMode
 
 // start burn cpu
 func (ce *cpuExecutor) start(ctx context.Context, cpuList string, cpuCount, cpuPercent, climbTime int, cpuIndexStr string) *spec.Response {
+	if err := validateContainerCPU(ctx); err != nil {
+		return spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("cpu preflight failed: %v", err))
+	}
 	ctx = context.WithValue(ctx, "cpuCount", cpuCount)
 	if cpuList != "" {
 		cores, err := util.ParseIntegerListToStringSlice("cpu-list", cpuList)

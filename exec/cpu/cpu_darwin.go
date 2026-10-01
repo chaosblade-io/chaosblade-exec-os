@@ -24,6 +24,10 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 )
 
+func validateContainerCPU(ctx context.Context) error {
+	return nil
+}
+
 func getUsed(ctx context.Context, percpu bool, cpuIndex int) float64 {
 	totalCpuPercent, err := cpu.Percent(time.Second, percpu)
 	if err != nil {

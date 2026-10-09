@@ -19,7 +19,7 @@ go 1.25.0
 require (
 	github.com/chaosblade-io/chaosblade-spec-go v1.8.0
 	github.com/containerd/cgroups v1.0.2-0.20210605143700-23b51209bf7b
-	github.com/goodhosts/hostsfile v0.1.6
+	github.com/goodhosts/hostsfile v0.1.7
 	github.com/howeyc/gopass v0.0.0-20210920133722-c8aef6fb66ef
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	go.uber.org/automaxprocs v1.6.0

@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 source "$(dirname "$0")/init.sh"
-go install golang.org/x/tools/cmd/goimports@latest
+go install golang.org/x/tools/cmd/goimports@v0.51.0
 
 # Serially process each file to avoid concurrent write issues
 for f in $(git_find); do

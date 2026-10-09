@@ -29,6 +29,10 @@ on:
         type: boolean
         default: false
 
+# Least-privilege default; jobs elevate only what they need.
+permissions:
+  contents: read
+
 jobs:
   build-matrix:
     name: Build on ${{ matrix.os }} (${{ matrix.goos }}/${{ matrix.goarch }})
@@ -57,12 +61,12 @@ jobs:
             platform: darwin_arm64
             runner_arch: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0  # Get full Git history for version information
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.25'
           # setup-go already caches ~/go/pkg/mod and ~/.cache/go-build by
@@ -180,7 +184,7 @@ jobs:
           ls -lh "${ARCHIVE_NAME}.tar.gz"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ steps.version.outputs.version }}-${{ matrix.platform }}
           path: ${{ steps.archive.outputs.archive_name }}
@@ -190,9 +194,12 @@ jobs:
     name: Create Release
     needs: build-matrix
     runs-on: ubuntu-latest
+    permissions:
+      # Create the GitHub Release.
+      contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: ./artifacts
 
@@ -202,7 +209,7 @@ jobs:
           find ./artifacts -type f -name "*.tar.gz" | sort
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}

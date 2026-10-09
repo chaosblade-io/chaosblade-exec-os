@@ -21,6 +21,10 @@ on:
   pull_request:
     branches: [ main, master, dev-* ]
 
+# Least-privilege default token for all CI jobs.
+permissions:
+  contents: read
+
 jobs:
   build-matrix:
     name: Build on ${{ matrix.os }} (${{ matrix.goos }}/${{ matrix.goarch }})
@@ -49,17 +53,17 @@ jobs:
             platform: darwin_arm64
             runner_arch: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0  # 获取完整的 Git 历史用于版本信息
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.25'
 
       - name: Cache Go modules
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cache/go-build
@@ -148,7 +152,7 @@ jobs:
 
       - name: Upload artifacts
         if: steps.version.outputs.is_release == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: chaosblade-exec-os-${{ steps.version.outputs.version }}-${{ matrix.platform }}
           path: target/chaosblade-*/${{ matrix.platform }}/
@@ -158,15 +162,15 @@ jobs:
     name: Test on Linux/amd64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.25'
 
       - name: Cache Go modules
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cache/go-build
@@ -178,14 +182,44 @@ jobs:
       - name: Run code style and import order verification
         run: make verify
       - name: Check License Header
-        uses: korandoru/hawkeye@v6
+        uses: korandoru/hawkeye@7ffde2c5fd29f3c486e4a6510436dca54f386e2a # v6
       - name: Run tests
         run: make test
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
         with:
           file: ./coverage.txt
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
+
+  ci-gate:
+    name: CI Gate
+    needs: [test, build-matrix]
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      TEST_RESULT: ${{ needs.test.result }}
+      BUILD_RESULT: ${{ needs.build-matrix.result }}
+    steps:
+      - name: Require tests and builds to pass
+        run: |
+          echo "test=$TEST_RESULT build-matrix=$BUILD_RESULT"
+          fail=0
+          for entry in "test:$TEST_RESULT" "build-matrix:$BUILD_RESULT"; do
+            job="${entry%%:*}"
+            result="${entry#*:}"
+            if [ "$result" = "success" ]; then
+              continue
+            fi
+            fail=1
+            if [ "$result" = "cancelled" ]; then
+              echo "::error::$job was cancelled"
+            elif [ "$result" = "skipped" ]; then
+              echo "::error::$job was skipped (no path filters exist; expected to always run)"
+            else
+              echo "::error::$job did not succeed (result=$result)"
+            fi
+          done
+          exit $fail

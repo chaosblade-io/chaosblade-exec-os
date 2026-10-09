@@ -14,7 +14,7 @@
 
 module github.com/chaosblade-io/chaosblade-exec-os
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/chaosblade-io/chaosblade-spec-go v1.8.0
@@ -24,7 +24,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/crypto v0.52.0
-	golang.org/x/sys v0.45.0
+	golang.org/x/sys v0.48.0
 )
 
 require (

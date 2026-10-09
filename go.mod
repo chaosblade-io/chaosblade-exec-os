@@ -18,7 +18,7 @@ go 1.25.0
 
 require (
 	github.com/chaosblade-io/chaosblade-spec-go v1.8.0
-	github.com/containerd/cgroups v1.0.2-0.20210605143700-23b51209bf7b
+	github.com/containerd/cgroups v1.1.0
 	github.com/goodhosts/hostsfile v0.1.6
 	github.com/howeyc/gopass v0.0.0-20210920133722-c8aef6fb66ef
 	github.com/shirou/gopsutil v3.21.11+incompatible
@@ -38,7 +38,6 @@ require (
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/magefile/mage v1.15.0 // indirect
 	github.com/opencontainers/runtime-spec v1.2.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect

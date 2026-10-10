@@ -27,12 +27,38 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	containerdCgroups "github.com/containerd/cgroups"
 	"github.com/shirou/gopsutil/cpu"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
 	"github.com/chaosblade-io/chaosblade-exec-os/pkg/automaxprocs/cgroups"
 )
+
+// validateContainerCPU verifies the cgroup v1 cpu/cpuacct controllers and
+// statistics before taskset or the burn goroutines start. This also covers
+// direct nsexec invocations that do not pass through the CRI executor.
+func validateContainerCPU(ctx context.Context) error {
+	pid := ctx.Value(channel.NSTargetFlagName)
+	if pid == nil {
+		return nil
+	}
+	p, err := strconv.Atoi(fmt.Sprint(pid))
+	if err != nil {
+		return fmt.Errorf("invalid target pid: %w", err)
+	}
+	root, _ := ctx.Value("cgroup-root").(string)
+	if root == "" {
+		root = "/sys/fs/cgroup"
+	}
+	if cgroups.DetectCGroupVersion(ctx, root) == cgroups.CGroupV2 {
+		return nil
+	}
+	group, err := exec.LoadV1ForExperiment(exec.Hierarchy(root), exec.PidPath(p), "cpu")
+	if err != nil {
+		return err
+	}
+	_, err = exec.StatV1ForExperiment(group, "cpu")
+	return err
+}
 
 // getCGroupV2CPUUsage 获取 cgroup v2 环境下的 CPU 使用率
 func getCGroupV2CPUUsage(ctx context.Context, cgroupPath string, cpuCount int) (float64, error) {
@@ -172,18 +198,18 @@ func getUsed(ctx context.Context, percpu bool, cpuIndex int) float64 {
 		}
 
 		// 回退到 cgroup v1
-		cgroup, err := containerdCgroups.Load(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p))
+		cgroup, err := exec.LoadV1ForExperiment(exec.Hierarchy(cgroupRoot.(string)), exec.PidPath(p), "cpu")
 		if err != nil {
 			log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 		}
 
-		stats, err := cgroup.Stat(containerdCgroups.IgnoreNotExist)
+		stats, err := exec.StatV1ForExperiment(cgroup, "cpu")
 		if err != nil {
 			log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 		} else {
 			pre := float64(stats.CPU.Usage.Total) / float64(time.Second)
 			time.Sleep(time.Second)
-			nextStats, err := cgroup.Stat(containerdCgroups.IgnoreNotExist)
+			nextStats, err := exec.StatV1ForExperiment(cgroup, "cpu")
 			if err != nil {
 				log.Fatalf(ctx, "get cpu usage fail, %s", err.Error())
 			} else {

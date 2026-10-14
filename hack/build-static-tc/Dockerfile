@@ -27,10 +27,24 @@
 # happens to carry. Static (musl) linking keeps it independent of the base
 # image's libc as well.
 #
+# A fully static musl tc needs one more thing: iproute2 resolves qdisc/filter/
+# action/ematch kinds at runtime via dlopen()/dlsym(), which are link-time
+# stubs in a static musl binary. Without help, EVERY option-bearing qdisc
+# fails with 'Unknown qdisc "netem", hence option "delay" is unparsable'
+# (option-less ones silently "work" through the stub parser, which is why a
+# `tc -V` smoke check never catches it). add-static-register.sh generates a
+# static registration table from the util definitions actually linked into
+# the build and patches the four get_*_kind() lookups to consult it first.
+#
 # Usage: run build.sh in this directory (docker buildx, amd64 + arm64).
 # NOTE: this recipe must be executed once in a docker buildx environment to
 # produce extra/tc/<platform>/tc; iproute2's static dependency set can need
 # minor package-name tweaks per alpine release.
+# NOTE: `file`+`-V` below only prove the binary is static and versioned. The
+# functional check (tc qdisc add ... netem delay ...) needs CAP_NET_ADMIN and
+# therefore lives OUTSIDE the image build — run it on every artifact, e.g.:
+#   docker run --rm --privileged -v $PWD/tc:/tc alpine:3.19 sh -c \
+#     '/tc qdisc add dev eth0 root netem delay 100ms && /tc qdisc show dev eth0'
 ARG ALPINE_VERSION=3.19
 ARG IPROUTE2_VERSION=6.6.0
 FROM alpine:${ALPINE_VERSION} AS builder
@@ -55,6 +69,13 @@ RUN curl -fsSL "https://www.kernel.org/pub/linux/utils/net/iproute2/iproute2-${I
 
 WORKDIR /src/iproute2-${IPROUTE2_VERSION}
 RUN ./configure
+
+# Static util-registration table (see header). Must run after configure:
+# the generator reads the evaluated TCMODULES list from config.mk so that
+# conditionally compiled utils (m_ipt/em_ipt/em_ipset) are only registered
+# when they are actually built.
+COPY add-static-register.sh /add-static-register.sh
+RUN sh /add-static-register.sh
 
 # Build only lib+tc and static-link them. Building the whole tree fails on misc
 # tools (e.g. rtmon) whose Makefiles do not forward the static libs, so SUBDIRS

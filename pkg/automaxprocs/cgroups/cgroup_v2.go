@@ -149,7 +149,18 @@ func FindCGroupV2Path(ctx context.Context, pid string, cgroupRoot string) (strin
 		parts := strings.SplitN(line, ":", 3)
 		if len(parts) == 3 && parts[0] == "0" && parts[1] == "" {
 			cgroupPath := parts[2]
-			fullPath := filepath.Join(cgroupRoot, cgroupPath)
+
+			var fullPath string
+			if strings.HasPrefix(cgroupPath, "/../") {
+				// Inside a container sharing /proc with the host, the cgroup path
+				// contains leading "/../../../" traversal segments. In this case,
+				// strip them and root the path under the host cgroup mount point.
+				stripped := strings.TrimLeft(cgroupPath, "/..")
+				fullPath = filepath.Join("/host-sys/fs/cgroup/kubepods.slice", stripped)
+			} else {
+				fullPath = filepath.Join(cgroupRoot, cgroupPath)
+			}
+
 			log.Infof(ctx, "found cgroup v2 path for PID %s: %s", pid, fullPath)
 			return fullPath, nil
 		}

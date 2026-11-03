@@ -148,3 +148,33 @@ func isMatch(masks [][]uint16, target uint16) bool {
 	}
 	return false
 }
+
+func TestParseIntegerListToPortRanges(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    [][]int
+		wantErr bool
+	}{
+		{name: "single", input: "80", want: [][]int{{80, 80}}},
+		{name: "list and range", input: "80,8000-8080", want: [][]int{{80, 80}, {8000, 8080}}},
+		{name: "max single port", input: "65535", want: [][]int{{65535, 65535}}},
+		{name: "range ending at max port", input: "60000-65535", want: [][]int{{60000, 65535}}},
+		{name: "zero port", input: "0", wantErr: true},
+		{name: "single port too large", input: "70000", wantErr: true},
+		{name: "range end too large", input: "60000-65536", wantErr: true},
+		{name: "range start zero", input: "0-10", wantErr: true},
+		{name: "reversed range", input: "90-80", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseIntegerListToPortRanges("local-port", tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("parseIntegerListToPortRanges(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("parseIntegerListToPortRanges(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}

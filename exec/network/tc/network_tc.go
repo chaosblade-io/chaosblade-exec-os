@@ -621,6 +621,9 @@ func parseIntegerListToPortRanges(flagName string, flagValue string) ([][]int, e
 			if err != nil {
 				return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue, err))
 			}
+			if intValue <= 0 || intValue > math.MaxUint16 {
+				return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue, "Illegal port"))
+			}
 			dedup[intValue] = struct{}{}
 			continue
 		}
@@ -637,7 +640,7 @@ func parseIntegerListToPortRanges(flagName string, flagValue string) ([][]int, e
 		if err != nil {
 			return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue, err))
 		}
-		if startIndex <= 0 || startIndex > math.MaxUint16 || endIndex <= 0 || endIndex >= math.MaxUint16 || endIndex < startIndex {
+		if startIndex <= 0 || startIndex > math.MaxUint16 || endIndex <= 0 || endIndex > math.MaxUint16 || endIndex < startIndex {
 			return nil, errors.New(spec.ParameterIllegal.Sprintf(flagName, flagValue, "Illegal port range"))
 		}
 		for i := startIndex; i <= endIndex; i++ {

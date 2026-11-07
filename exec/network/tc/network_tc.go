@@ -328,7 +328,13 @@ func getExcludePortRanges(ctx context.Context, excludePort string, ignorePeerPor
 }
 
 func buildExcludeFilterToNewBand(netInterface string, excludePortRanges [][]int, excludeIp string) string {
-	var args string
+	// ARP has no ports or IP header to match, so without this filter it lands in a faulty band.
+	// Losing it makes the excluded ports and ips unreachable once the neighbor cache expires.
+	// It needs its own prio because all filters of the same prio must use the same protocol.
+	args := fmt.Sprintf(
+		` && \
+			tc filter add dev %s parent 1: prio 2 protocol arp u32 match u32 0 0 flowid 1:4`,
+		netInterface)
 	excludeIpRules := getExcludeIpRules(excludeIp)
 	for _, rule := range excludeIpRules {
 		args = fmt.Sprintf(

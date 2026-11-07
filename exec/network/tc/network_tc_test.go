@@ -19,6 +19,7 @@ package tc
 import (
 	"math/rand"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -63,6 +64,49 @@ func TestBuildTargetFilterPortAndIp(t *testing.T) {
 		if returnargs != tt.expect {
 			t.Errorf("unexpected result: %s, expected: %s", returnargs, tt.expect)
 		}
+	}
+}
+
+func TestBuildExcludeFilterToNewBand(t *testing.T) {
+	const arpFilter = "tc filter add dev eth0 parent 1: prio 2 protocol arp u32 match u32 0 0 flowid 1:4"
+	tests := []struct {
+		name              string
+		excludePortRanges [][]int
+		excludeIp         string
+		wantFilters       []string
+	}{
+		{
+			name:              "exclude port keeps arp out of the faulty bands",
+			excludePortRanges: [][]int{{22, 22}},
+			wantFilters: []string{
+				arpFilter,
+				"tc filter add dev eth0 parent 1: prio 1 protocol ip u32 match ip dport 22 0xffff flowid 1:4",
+				"tc filter add dev eth0 parent 1: prio 1 protocol ip u32 match ip sport 22 0xffff flowid 1:4",
+			},
+		},
+		{
+			name:      "exclude ip keeps arp out of the faulty bands",
+			excludeIp: "10.0.0.1",
+			wantFilters: []string{
+				arpFilter,
+				"tc filter add dev eth0 parent 1: prio 1 protocol ip u32 match ip src 10.0.0.1 flowid 1:4",
+				"tc filter add dev eth0 parent 1: prio 1 protocol ip u32 match ip dst 10.0.0.1 flowid 1:4",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			for _, command := range strings.Split(buildExcludeFilterToNewBand("eth0", tt.excludePortRanges, tt.excludeIp), "&&") {
+				command = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(command), `\`))
+				if command != "" {
+					got = append(got, command)
+				}
+			}
+			if !reflect.DeepEqual(got, tt.wantFilters) {
+				t.Errorf("filters = %q, want %q", got, tt.wantFilters)
+			}
+		})
 	}
 }
 

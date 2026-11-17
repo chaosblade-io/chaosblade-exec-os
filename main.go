@@ -27,6 +27,7 @@ import (
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
 	"github.com/chaosblade-io/chaosblade-spec-go/util"
 
+	"github.com/chaosblade-io/chaosblade-exec-os/exec/disk"
 	"github.com/chaosblade-io/chaosblade-exec-os/exec/model"
 )
 
@@ -119,7 +120,7 @@ func main() {
 		}
 
 		ctx := context.Background()
-		if mode != spec.Create && mode != spec.Destroy {
+		if mode != spec.Create && mode != spec.Destroy && mode != disk.MaintainMode {
 			exitAndPrint(spec.ReturnFail(spec.OsCmdExecFailed, fmt.Sprintf("invalid parameter, %v", args)), 0)
 		}
 
@@ -139,6 +140,11 @@ func main() {
 		}
 		util.InitLog(util.Bin)
 		log.Infof(ctx, "mode: %s, target: %s, action: %s, flags %v", mode, target, action, expModel.ActionFlags)
+
+		if mode == disk.MaintainMode {
+			disk.MaintainFill(ctx, expModel.ActionFlags["path"], expModel.ActionFlags["percent"])
+			os.Exit(0)
+		}
 
 		key := expModel.Target + expModel.ActionName
 		executor := executors[key]

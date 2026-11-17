@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
 	"github.com/chaosblade-io/chaosblade-spec-go/spec"
@@ -208,6 +209,14 @@ func startFill(ctx context.Context, uid, directory, size, percent, reserve strin
 		response = fillDiskByDD(ctx, dataFile, directory, size, cl)
 	}
 	if response.Success {
+		if percent != "" {
+			// The one-shot fill only enforces the target at create time; space reclaimed
+			// afterwards (e.g. log rotation) would become permanent headroom. Keep a
+			// detached maintainer topping the disk back up until destroy.
+			if err := startFillMaintainer(ctx, directory, percent, cl); err != nil {
+				log.Warnf(ctx, "failed to start fill maintainer, %v", err)
+			}
+		}
 		if retainHandle {
 			// start a process to hold the file handle
 			response := retainFileHandle(ctx, cl, directory)
@@ -235,37 +244,25 @@ func calculateFileSize(ctx context.Context, directory, size, percent, reserve st
 		return size, nil
 	}
 	stat := getSysStatFunc(directory)
-	allBytes := stat.Blocks * uint64(stat.Bsize)
-	availableBytes := stat.Bavail * uint64(stat.Bsize)
-	usedBytes := allBytes - availableBytes
+	freeBytes := stat.Bfree * uint64(stat.Bsize)
 
 	if percent != "" {
 		p, err := strconv.Atoi(percent)
 		if err != nil {
 			return "", err
 		}
-		usedPercentage, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(usedBytes)/float64(allBytes)), 64)
-		expectedPercentage, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", float64(p)/100.0), 64)
-		if usedPercentage >= expectedPercentage {
-			return "", fmt.Errorf("the disk has been used %.2f, large than expected", usedPercentage)
+		deficit, err := fillDeficitBytes(stat, p)
+		if err != nil {
+			return "", err
 		}
-		remainderPercentage := expectedPercentage - usedPercentage
-		log.Debugf(ctx, "remainderPercentage: %f", remainderPercentage)
-
-		var expectSize float64
-		if remainderPercentage*float64(allBytes) > float64(availableBytes) {
-			expectSize = math.Floor(float64(availableBytes) / (1024.0 * 1024.0))
-		} else {
-			expectSize = math.Floor(remainderPercentage * float64(allBytes) / (1024.0 * 1024.0))
-		}
-
-		return fmt.Sprintf("%.f", expectSize), nil
+		log.Debugf(ctx, "fill deficit bytes: %d", deficit)
+		return fmt.Sprintf("%.f", math.Floor(float64(deficit)/(1024.0*1024.0))), nil
 	} else {
 		r, err := strconv.ParseFloat(reserve, 64)
 		if err != nil {
 			return "", err
 		}
-		availableMB := float64(availableBytes) / (1024.0 * 1024.0)
+		availableMB := float64(freeBytes) / (1024.0 * 1024.0)
 		if availableMB <= r {
 			return "", fmt.Errorf("the disk has available size %.2f, less than expected", availableMB)
 		}
@@ -330,4 +327,81 @@ func stopFill(ctx context.Context, directory string, cl spec.Channel) *spec.Resp
 		return cl.Run(ctx, "rm", fmt.Sprintf(`-rf %s`, fileName))
 	}
 	return spec.Success()
+}
+
+// MaintainMode is the hidden bin mode that runs the sustained fill maintainer.
+const MaintainMode = "maintain"
+
+// fillMaintainInterval is how often the maintainer re-checks disk usage.
+const fillMaintainInterval = 2 * time.Second
+
+// fillDeficitBytes returns the bytes needed to bring true disk usage up to percent.
+// It uses Bfree (all free blocks, including root-reserved) so reserved space is not
+// miscounted as used, and works in bytes to avoid percentage-rounding headroom.
+func fillDeficitBytes(stat *syscall.Statfs_t, percent int) (int64, error) {
+	total := int64(stat.Blocks) * int64(stat.Bsize)
+	free := int64(stat.Bfree) * int64(stat.Bsize)
+	used := total - free
+	target := total * int64(percent) / 100
+	deficit := target - used
+	if deficit <= 0 {
+		return 0, fmt.Errorf("the disk has been used >= %d%%, no fill needed", percent)
+	}
+	if deficit > free {
+		deficit = free
+	}
+	return deficit, nil
+}
+
+// startFillMaintainer launches a detached process running this binary in MaintainMode
+// so the target usage is maintained after the create command returns.
+func startFillMaintainer(ctx context.Context, directory, percent string, cl spec.Channel) error {
+	self, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	resp := cl.Run(ctx, "nohup", fmt.Sprintf("%s %s disk fill --path=%s --percent=%s >/dev/null 2>&1 &", self, MaintainMode, directory, percent))
+	if !resp.Success {
+		return fmt.Errorf("%s", resp.Err)
+	}
+	return nil
+}
+
+// MaintainFill blocks, periodically topping the fill file up so disk usage stays at
+// percent until the fill file is removed (destroy) or the process is killed.
+func MaintainFill(ctx context.Context, directory, percent string) {
+	p, err := strconv.Atoi(percent)
+	if err != nil {
+		log.Errorf(ctx, "maintain: invalid percent %s", percent)
+		return
+	}
+	dataFile := path.Join(directory, fillDataFile)
+	for {
+		if !exec.CheckFilepathExists(ctx, localChannel, dataFile) {
+			return
+		}
+		stat := getSysStatFunc(directory)
+		deficit, err := fillDeficitBytes(stat, p)
+		if err == nil && deficit > 0 {
+			topUpFill(ctx, dataFile, deficit)
+		}
+		time.Sleep(fillMaintainInterval)
+	}
+}
+
+// topUpFill grows the fill file by deficit bytes to reclaim freed space.
+func topUpFill(ctx context.Context, dataFile string, deficit int64) {
+	info, err := os.Stat(dataFile)
+	if err != nil {
+		return
+	}
+	newSizeMB := (info.Size() + deficit) / (1024 * 1024)
+	resp := fillDiskByFallocate(ctx, fmt.Sprintf("%d", newSizeMB), dataFile, localChannel)
+	if resp == nil || !resp.Success {
+		// fallocate unavailable/failed: append with dd instead.
+		deficitMB := deficit / (1024 * 1024)
+		if deficitMB > 0 {
+			localChannel.Run(ctx, "dd", fmt.Sprintf("if=/dev/zero of=%s bs=1M count=%d oflag=append conv=notrunc iflag=fullblock", dataFile, deficitMB))
+		}
+	}
 }

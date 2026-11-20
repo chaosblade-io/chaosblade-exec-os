@@ -17,15 +17,18 @@
 package exec
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/containerd/cgroups"
+	"golang.org/x/sys/unix"
 )
 
 func PidPath(pid int) cgroups.Path {
-	p := fmt.Sprintf("/proc/%d/cgroup", pid)
+	return pidPathFromFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+}
+
+func pidPathFromFile(p string) cgroups.Path {
 	paths, err := cgroups.ParseCgroupFile(p)
 	if err != nil {
 		return func(_ cgroups.Name) (string, error) {
@@ -37,7 +40,11 @@ func PidPath(pid int) cgroups.Path {
 		root, ok := paths[string(name)]
 		if !ok {
 			if root, ok = paths["name="+string(name)]; !ok {
-				return "", errors.New("controller is not supported")
+				// Load treats this sentinel as "controller inactive for this
+				// PID" and skips it; an unrelated, unused controller (e.g. an
+				// unmounted hugetlb) must not abort loading the controllers the
+				// experiment actually needs.
+				return "", cgroups.ErrControllerNotActive
 			}
 		}
 		return root, nil
@@ -50,15 +57,36 @@ func Hierarchy(root string) func() ([]cgroups.Subsystem, error) {
 		if err != nil {
 			return nil, err
 		}
-		var enabled []cgroups.Subsystem
-		for _, s := range pathers(subsystems) {
-			// check and remove the default groups that do not exist
-			if _, err := os.Lstat(s.Path("/")); err == nil {
-				enabled = append(enabled, s)
-			}
-		}
-		return enabled, nil
+		return mountedV1Subsystems(subsystems, unix.Statfs)
 	}
+}
+
+// mountedV1Subsystems keeps only the controllers backed by a real cgroup v1
+// mount. A plain Lstat is insufficient: on some cgroup v1 hosts the hugetlb
+// controller directory exists under the cgroup tmpfs but is never mounted, so
+// NewHugetlb succeeds while the controller is unusable. Enumerating it and
+// then failing to resolve it for a PID (which has no hugetlb entry) made
+// cgroups.Load return "controller is not supported", breaking otherwise
+// healthy cpu/memory experiments.
+func mountedV1Subsystems(subsystems []cgroups.Subsystem,
+	statfs func(string, *unix.Statfs_t) error,
+) ([]cgroups.Subsystem, error) {
+	var enabled []cgroups.Subsystem
+	for _, s := range pathers(subsystems) {
+		controllerPath := s.Path("/")
+		var fs unix.Statfs_t
+		if err := statfs(controllerPath, &fs); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("stat cgroup controller %s at %s: %w", s.Name(), controllerPath, err)
+		}
+		// Statfs follows aliases such as cpu -> cpu,cpuacct.
+		if fs.Type == unix.CGROUP_SUPER_MAGIC {
+			enabled = append(enabled, s)
+		}
+	}
+	return enabled, nil
 }
 
 // defaults returns all known groups

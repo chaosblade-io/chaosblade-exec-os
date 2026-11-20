@@ -23,7 +23,6 @@ import (
 
 	"github.com/chaosblade-io/chaosblade-spec-go/channel"
 	"github.com/chaosblade-io/chaosblade-spec-go/log"
-	"github.com/containerd/cgroups"
 	"github.com/shirou/gopsutil/mem"
 
 	"github.com/chaosblade-io/chaosblade-exec-os/exec"
@@ -78,15 +77,15 @@ func getAvailableAndTotal(ctx context.Context, burnMemMode string, includeBuffer
 
 // getAvailableAndTotalV1 获取 cgroup v1 环境下的可用和总内存
 func getAvailableAndTotalV1(ctx context.Context, burnMemMode string, includeBufferCache bool, p int, cgroupRoot string) (int64, int64, error) {
-	cgroup, err := cgroups.Load(exec.Hierarchy(cgroupRoot), exec.PidPath(p))
+	cgroup, err := exec.LoadV1ForExperiment(exec.Hierarchy(cgroupRoot), exec.PidPath(p), "mem")
 	if err != nil {
 		return 0, 0, fmt.Errorf("load cgroup error, %v", err)
 	}
-	stats, err := cgroup.Stat(cgroups.IgnoreNotExist)
+	stats, err := exec.StatV1ForExperiment(cgroup, "mem")
 	if err != nil {
 		return 0, 0, fmt.Errorf("load cgroup stat error, %v", err)
 	}
-	if stats != nil && stats.Memory.Usage.Limit < PageCounterMax {
+	if stats.Memory.Usage.Limit < PageCounterMax {
 		total := int64(stats.Memory.Usage.Limit)
 		available := total - int64(stats.Memory.Usage.Usage)
 		if burnMemMode == "ram" && !includeBufferCache {

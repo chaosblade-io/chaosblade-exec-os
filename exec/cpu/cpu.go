@@ -69,7 +69,13 @@ blade create cpu load --cpu-list 0,3
 blade create cpu load --cpu-list 1-3
 
 # Specified percentage load
-blade create cpu load --cpu-percent 60`,
+blade create cpu load --cpu-percent 60
+
+# Gradually increase CPU load to 60% over 30 seconds
+blade create cpu load --cpu-percent 60 --climb-time 30
+
+# Gradually increase CPU load on 2 cores to 80% over 60 seconds
+blade create cpu load --cpu-percent 80 --cpu-count 2 --climb-time 60`,
 						ActionPrograms:    []string{BurnCpuBin},
 						ActionCategories:  []string{category.SystemCpu},
 						ActionProcessHang: true,
